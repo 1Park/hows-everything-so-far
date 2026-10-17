@@ -54,7 +54,7 @@ class Controller:
         self.tasks = set()
         self.subscribers = set()
         self.events = deque(maxlen=100)
-        self.event_log = EventLog(settings.event_log_path)
+        self.event_log = EventLog(settings.event_log_path, settings.low_fill_threshold)
         self.sequence, self.token = 0, 0
         self.instance_id = uid()
         self.session_id = uid()
