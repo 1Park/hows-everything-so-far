@@ -62,6 +62,8 @@ class Settings(BaseModel):
     audio_channels: int = Field(1, ge=1, le=2)
     audio_seconds: int = Field(6, ge=1, le=15)
     observe_interval_seconds: float = Field(0, ge=0, le=60)  # zero disables automatic observation
+    # JSON Lines history of Controller phase changes (app/events.py). Empty disables.
+    event_log_path: str = ""
 
     @model_validator(mode="after")
     def adapters_required(self):
