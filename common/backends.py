@@ -1,12 +1,15 @@
 import asyncio
 import importlib
 import json
+import os
 import re
+import tempfile
+from pathlib import Path
 from typing import Protocol
 
 import httpx
 
-from common.api import ApiError, request_id
+from common.api import ApiError, log, request_id
 from common.contracts import Generation, uid
 
 
@@ -120,15 +123,146 @@ class FixtureTextBackend:
 
 
 class ExecuTorchBackend:
+    """Board LLM through the Qualcomm qnn_llama_runner CLI, one runner process per request.
+
+    The runner applies the chat template selected by --decoder_model_version and writes the
+    whole transcript to --output_path; only the final model turn is returned. The process is
+    killed when the request times out or is cancelled. Not configured means not ready (503);
+    there is no fixture or remote fallback.
+    """
+
     source = "executorch"
+    TURN_MARKERS = (
+        "<|turn>model",
+        "<start_of_turn>model",
+        "<|im_start|>assistant",
+        "<|start_header_id|>assistant<|end_header_id|>",
+    )
+    END_MARKERS = ("<turn|>", "<end_of_turn>", "<eos>", "<|im_end|>", "<|eot_id|>", "</s>")
+
+    def __init__(self, settings=None):
+        self.settings = settings
+
+    def _paths(self):
+        s = self.settings
+        if s is None or not (s.qwen_runner_bin and s.qwen_model_path and s.qwen_tokenizer_path):
+            return None
+        from common.config import ROOT
+
+        paths = [
+            Path(v) if Path(v).is_absolute() else ROOT / v
+            for v in (s.qwen_runner_bin, s.qwen_model_path, s.qwen_tokenizer_path)
+        ]
+        runner, model, tokenizer = paths
+        if not (runner.is_file() and os.access(runner, os.X_OK)):
+            return None
+        if not (model.is_file() and tokenizer.is_file()):
+            return None
+        return paths
 
     async def ready(self):
-        return False
+        return self._paths() is not None
+
+    @classmethod
+    def final_turn(cls, transcript: str) -> str:
+        cut, marker = max((transcript.rfind(m), m) for m in cls.TURN_MARKERS)
+        text = transcript[cut + len(marker) :] if cut >= 0 else transcript
+        for end in cls.END_MARKERS:
+            text = text.split(end, 1)[0]
+        return text.strip()
+
+    def environment(self) -> dict[str, str]:
+        s, env = self.settings, os.environ.copy()
+        if s.qwen_runner_library_path:
+            current = env.get("LD_LIBRARY_PATH")
+            env["LD_LIBRARY_PATH"] = s.qwen_runner_library_path + (f":{current}" if current else "")
+        if s.qwen_adsp_library_path:
+            env["ADSP_LIBRARY_PATH"] = s.qwen_adsp_library_path
+        return env
+
+    def command(self, paths, body: Generation, output: Path, perf: Path) -> list[str]:
+        s = self.settings
+        system = "\n\n".join(m.content for m in body.messages if m.role == "system")
+        turns = [m for m in body.messages if m.role != "system"]
+        if len(turns) != 1 or turns[0].role != "user":
+            raise ApiError(
+                "unsupported_messages",
+                "The board runner accepts one optional system message and one user message",
+                422,
+            )
+        runner, model, tokenizer = paths
+        cmd = [
+            str(runner),
+            "--model_path", str(model),
+            "--tokenizer_path", str(tokenizer),
+            "--decoder_model_version", s.qwen_decoder_version,
+            "--prompt", turns[0].content,
+            "--seq_len", str(s.qwen_seq_len),
+            "--temperature", str(body.temperature),
+            "--output_path", str(output),
+            "--performance_output_path", str(perf),
+        ]  # fmt: skip
+        if system:
+            cmd += ["--system_prompt", system]
+        if s.qwen_eval_mode:
+            cmd += ["--eval_mode", s.qwen_eval_mode]
+        return cmd
 
     async def generate(self, body: Generation):
-        raise ApiError(
-            "backend_not_configured", "ExecuTorch requires the board runtime adapter", 503
-        )
+        paths = self._paths()
+        if paths is None:
+            raise ApiError(
+                "backend_not_configured",
+                "ExecuTorch needs QWEN_RUNNER_BIN, QWEN_MODEL_PATH and QWEN_TOKENIZER_PATH",
+                503,
+            )
+        with tempfile.TemporaryDirectory(prefix="refill-llm-") as directory:
+            output, perf = Path(directory) / "out.txt", Path(directory) / "perf.txt"
+            cmd = self.command(paths, body, output, perf)
+            try:
+                process = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    cwd=directory,
+                    env=self.environment(),
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+            except OSError:
+                raise ApiError(
+                    "model_unavailable", "The board LLM runner could not start", 502, True
+                ) from None
+            try:
+                _, stderr = await process.communicate()
+            except asyncio.CancelledError:
+                if process.returncode is None:
+                    try:
+                        process.kill()
+                    except ProcessLookupError:
+                        pass
+                await process.wait()
+                raise
+            if process.returncode:
+                log.warning(
+                    {
+                        "event": "llm_runner_failed",
+                        "returncode": process.returncode,
+                        "stderr": stderr.decode(errors="replace")[-2000:],
+                    }
+                )
+                raise ApiError("model_unavailable", "The board LLM runner failed", 502, True)
+            transcript = output.read_text(errors="replace") if output.is_file() else ""
+            speed = perf.read_text(errors="replace").strip() if perf.is_file() else ""
+        content = self.final_turn(transcript)
+        if not content:
+            raise ApiError("model_unavailable", "The board LLM returned no text", 502, True)
+        log.info({"event": "llm_runner_done", "tokens_per_second": speed})
+        return {
+            "model": body.model,
+            "source": "executorch",
+            "choices": [
+                {"message": {"role": "assistant", "content": content}, "finish_reason": "stop"}
+            ],
+        }
 
 
 def external_adapter(path: str):
