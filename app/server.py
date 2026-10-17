@@ -26,7 +26,7 @@ def create_app(settings=None, clients=None, hardware=None):
     settings = settings or load_settings()
     clients = clients or ModelClients(settings)
     controller = Controller(settings, clients, hardware)
-    video = VideoSource(settings.camera_source)
+    video = VideoSource(settings.camera_source, settings.camera_fps, settings.video_stream_fps)
 
     @asynccontextmanager
     async def lifespan(app):

@@ -8,8 +8,10 @@ from common.config import ROOT
 
 
 class VideoSource:
-    def __init__(self, source=""):
+    def __init__(self, source="", capture_fps=20.0, stream_fps=15.0):
         self.source = source
+        self.capture_interval = 1 / capture_fps
+        self.stream_interval = 1 / stream_fps
         self.latest = (ROOT / "docs/assets/cups-example.jpg").read_bytes()
         if source:
             self.latest = None
@@ -47,7 +49,7 @@ class VideoSource:
                     if ok:
                         with self.lock:
                             self.latest, self.content_type = image.tobytes(), "image/jpeg"
-                    self.closed.wait(0.1)
+                    self.closed.wait(self.capture_interval)
             finally:
                 capture.release()
         except Exception as error:
@@ -73,7 +75,7 @@ class VideoSource:
                 + data
                 + b"\r\n"
             )
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(self.stream_interval)
 
     def close(self):
         self.closed.set()

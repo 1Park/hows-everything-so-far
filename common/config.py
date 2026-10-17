@@ -51,6 +51,10 @@ class Settings(BaseModel):
     hardware_backend: Literal["mock", "bridge"] = "mock"
     bridge_timeout: float = Field(3, gt=0, le=30)
     camera_source: str = ""  # empty = explicit static fixture, no implicit /dev/video0
+    # Capture faster than the stream so a streamed frame is never a stale one.
+    # Tune on the board: the encode loop is the cost, not the network.
+    camera_fps: float = Field(20, gt=0, le=60)
+    video_stream_fps: float = Field(15, gt=0, le=60)
     audio_input: Literal["disabled", "fixture", "alsa"] = "disabled"
     audio_device: str = ""  # explicit ALSA capture device, never guessed
     audio_format: Literal["S16_LE", "S32_LE"] = "S16_LE"
