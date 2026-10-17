@@ -1,0 +1,41 @@
+# Personal environment and credentials
+.env
+.env.*
+!.env.board
+!.env.example
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Frontend / generated output
+node_modules/
+dist/
+build/
+coverage/
+
+# Local runtime output and downloaded model assets
+logs/
+*.log
+tmp/
+recordings/
+models/
+*.pte
+*.safetensors
+*.onnx
+*.pt
+*.pth
+
+# OS / personal editor settings
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
