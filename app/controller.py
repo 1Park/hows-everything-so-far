@@ -136,7 +136,7 @@ class Controller:
                 self.target = min(eligible, key=lambda o: (o.fill_ratio, o.object_id))
                 # A proposal is NOT a confirmable card. A customer utterance is required.
                 self.arm_deadline()
-                self.emit("offered", f"Would you like a refill of {self.target.item}?")
+                self.emit("offered", self.offer_message(self.target))
         except TimeoutError:
             await self.fail(
                 token,
@@ -149,6 +149,21 @@ class Controller:
             await self.fail(
                 token, ApiError("vision_error", "Scene analysis failed. Please retry", 502, True)
             )
+
+    def offer_message(self, target):
+        """Name the observed drink, or ask which one when Vision is unsure between look-alikes.
+
+        Coke and coffee look alike in the same glass. The guess still seeds the request card,
+        so the customer sees and can correct the drink before the explicit Confirm.
+        """
+        uncertain = (
+            target.item in ("coke", "coffee")
+            and target.item_confidence is not None
+            and target.item_confidence < self.settings.item_confirm_threshold
+        )
+        if uncertain:
+            return "Would you like a refill? Is that coke or coffee?"
+        return f"Would you like a refill of {target.item}?"
 
     def check_target(self, body):
         if (

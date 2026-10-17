@@ -4,6 +4,9 @@
   item       : drink별 확률을 합한 marginal의 최댓값. empty가 가장 크면 "unknown".
   fill_ratio : level별 대표 비율의 기대값 Σ p(class)·ratio(level). 계약은 0..1 연속값이라 단계 라벨을 비율로 바꾼다.
   confidence : min(item marginal 최댓값, level marginal 최댓값) — 종류·잔량 둘 다 확신할 때만 높다.
+  item_confidence : 음료가 있다고 볼 때 "어느 음료인지"만의 확신도 = 최고 음료 marginal / 음료 marginal 합.
+                    empty/unknown 확률은 빼고 정규화한다. item 이 unknown 이면 None.
+                    coke↔coffee 처럼 음료만 애매한 경우를 Controller가 고객에게 묻는 데 쓴다.
 Controller 정책(confidence ≥ 0.7, fill_ratio ≤ 0.3)은 이 값을 그대로 쓴다.
 """
 
@@ -29,4 +32,9 @@ def to_observation(probs, classes, fill_ratio=None):
         fill += float(p) * ratio.get(level, 0.5)
     item = max(item_p, key=item_p.get)
     conf = min(item_p[item], max(level_p.values()))
-    return dict(item=item, fill_ratio=round(min(max(fill, 0.0), 1.0), 4), confidence=round(min(max(conf, 0.0), 1.0), 4))
+    drink_total = sum(v for k, v in item_p.items() if k in DRINKS)
+    item_conf = None
+    if item != "unknown" and drink_total > 0:
+        item_conf = round(min(max(item_p[item] / drink_total, 0.0), 1.0), 4)
+    return dict(item=item, fill_ratio=round(min(max(fill, 0.0), 1.0), 4),
+                confidence=round(min(max(conf, 0.0), 1.0), 4), item_confidence=item_conf)

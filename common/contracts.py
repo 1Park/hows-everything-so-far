@@ -39,6 +39,10 @@ class ObservedObject(Contract):
     item: Drink | Literal["unknown"]
     fill_ratio: float | None = Field(default=None, ge=0, le=1)
     confidence: float = Field(ge=0, le=1)
+    # Optional: confidence in the drink identity alone (which drink, given there is one).
+    # `confidence` above covers drink and fill together; this lets the Controller ask the
+    # customer when only the drink is uncertain (e.g. coke vs coffee). None = not provided.
+    item_confidence: float | None = Field(default=None, ge=0, le=1)
 
 
 class VisionResult(Contract):

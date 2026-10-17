@@ -10,8 +10,10 @@
 - request_id: 첫 유효 요청 카드에서 발급, 수정 시 유지; revision은 수정마다 증가.
 - bbox: **원본 전체 이미지 기준 normalized xyxy [0,1], 좌상단 원점**, x1<x2, y1<y2. EXIF 자동 회전 없음. 담당자 adapter가 원본 표시 좌표와 일치시킨다.
 - 음료 water/coke/coffee/unknown; fill_ratio 0..1 또는 null; confidence 0..1. 이는 외부 표현이며 모델 내부 라벨 변환은 모델 담당자 책임이다.
+- item_confidence 0..1 또는 null(선택): **음료 종류만**의 확신도. confidence는 음료·잔량을 함께 본 값이다. 제공하지 않으면 null.
 - 요청 음료 water/coke/coffee, 분량 small/regular. ml 용량은 정의하지 않았다.
 - 초기 정책: confidence>=0.7, fill_ratio<=0.3 중 최소 잔량 컵; 동률 object_id 정렬. 환경변수로 변경 가능하며 보드 실측 기준은 아니다.
+- 대상이 coke/coffee이고 item_confidence<0.8(`ITEM_CONFIRM_THRESHOLD`)이면 제안 문구에서 음료를 묻는다("Is that coke or coffee?"). 추정 음료로 카드는 만들되 고객이 수정·Confirm한다. 0.8은 Mac 실사 교차검증(콜라·커피 190장) 기준: 17%를 묻고 혼동의 87%를 잡음 — [vision_evaluation](vision_evaluation/README.md).
 - 한 번에 한 대상/요청. 제안 자체는 Confirm 불가. 고객 입력→카드→명시 Confirm 필요.
 - 관측 음료와 요청 음료는 별개다. 물 컵을 대상으로 coffee 주문 가능; 대상은 유지된다.
 
@@ -32,7 +34,7 @@ HTTP 오류의 request_id/X-Request-ID는 호출 추적 ID이며, 요청 카드 
 Vision `POST /v1/analyze` multipart: file JPEG/PNG 원본 bytes, scene_id, scenario=normal|enough|uncertain (fixture용; external은 무시 가능).
 
 ```json
-{"scene_id":"s","source":"external","objects":[{"object_id":"cup-a","bbox":{"x1":0.1,"y1":0.2,"x2":0.3,"y2":0.7},"item":"water","fill_ratio":0.15,"confidence":0.9}]}
+{"scene_id":"s","source":"external","objects":[{"object_id":"cup-a","bbox":{"x1":0.1,"y1":0.2,"x2":0.3,"y2":0.7},"item":"water","fill_ratio":0.15,"confidence":0.9,"item_confidence":0.97}]}
 ```
 
 STT `POST /v1/transcribe` multipart file. MIME: audio/wav, audio/x-wav, audio/webm, audio/ogg, audio/mp4; codec parameter 허용. 응답 `{"text":"A little water, please","language":"en","source":"external"}`. UI는 결과를 검토한 후 Send하도록 하며 STT만으로 승인하지 않는다.
