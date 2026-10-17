@@ -3,6 +3,7 @@
 import argparse
 import os
 import signal
+import pathlib
 import socket
 import subprocess
 import sys
@@ -14,6 +15,73 @@ from urllib.request import urlopen
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from common.config import load_settings  # noqa: E402
+
+
+def managed_ports(settings, mode):
+    """Ports this supervisor would bind, so a restart can confirm they are free."""
+    ports = [(settings.controller_host, settings.controller_port)]
+    if mode in ("proxy", "integration", "board"):
+        ports.append(("127.0.0.1", settings.qwen_port))
+    if mode in ("integration", "board"):
+        ports.append(("127.0.0.1", settings.vision_port))
+        ports.append(("127.0.0.1", settings.stt_port))
+    return ports
+
+
+def port_free(host, port):
+    with socket.socket() as probe:
+        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            probe.bind((host, port))
+            return True
+        except OSError:
+            return False
+
+
+def wait_for_ports(ports, timeout):
+    """A lock file disappearing does not mean the listeners are gone."""
+    deadline = time.monotonic() + timeout
+    while True:
+        busy = [f"{host}:{port}" for host, port in ports if not port_free(host, port)]
+        if not busy or time.monotonic() >= deadline:
+            return busy
+        time.sleep(0.2)
+
+
+def alive(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def is_our_supervisor(pid):
+    # Only ever signal a process this repo started: the board is shared, and
+    # whisper-server and teammates' processes must survive a restart.
+    try:
+        cmdline = pathlib.Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\0", b" ").decode()
+    except (OSError, ValueError):
+        return False
+    return "scripts/dev.py" in cmdline
+
+
+def escalate(owner):
+    """Graceful shutdown already failed; step up rather than leave the port held."""
+    try:
+        pid = int(owner)
+    except ValueError:
+        return
+    if not alive(pid) or not is_our_supervisor(pid):
+        return
+    for signal_number in (signal.SIGTERM, signal.SIGKILL):
+        os.kill(pid, signal_number)
+        for _ in range(25):
+            if not alive(pid):
+                return
+            time.sleep(0.2)
 
 
 def supervise(args):
@@ -41,8 +109,15 @@ def supervise(args):
                 break
             time.sleep(0.1)
         else:
+            print(f"Supervisor PID {owner} ignored the stop file; signalling it.", flush=True)
+            escalate(owner)
+            lockfile.unlink(missing_ok=True)
+            stopfile.unlink(missing_ok=True)
+            readyfile.unlink(missing_ok=True)
+        busy = wait_for_ports(managed_ports(settings, args.mode), 15)
+        if busy:
             raise RuntimeError(
-                f"Shutdown timed out. Check supervisor PID {owner} and logs before restarting"
+                f"Shutdown left {', '.join(busy)} in use. Inspect the listeners before restarting"
             )
         print("Managed shutdown complete. You can restart now.")
         return
@@ -92,12 +167,11 @@ def supervise(args):
     ports = [service[2] for service in services]
     if len(set(ports)) != len(ports):
         raise RuntimeError("Managed services must use distinct ports")
-    for name, host, port, factory in services:
-        with socket.socket() as probe:
-            try:
-                probe.bind((host, port))
-            except OSError:
-                raise RuntimeError(f"Cannot start {name}: {host}:{port} is in use") from None
+    # A just-stopped listener can linger for a moment; wait briefly before refusing,
+    # so restarting right after a stop does not need a manual retry.
+    busy = wait_for_ports([(host, port) for _, host, port, _ in services], 5)
+    if busy:
+        raise RuntimeError(f"Cannot start: {', '.join(busy)} in use")
     (ROOT / "logs").mkdir(exist_ok=True)
     (ROOT / "tmp").mkdir(exist_ok=True)
     lockfile = (

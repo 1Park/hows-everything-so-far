@@ -9,9 +9,13 @@ if [[ ! -r "/proc/$pid/cmdline" ]] || ! tr '\0' ' ' < "/proc/$pid/cmdline" | gre
   exit 1
 fi
 kill -TERM "$pid"
-for ((attempt=0;attempt<60;attempt++)); do
-  [[ -e tmp/board.lock ]] || { echo 'Managed app processes stopped.'; exit 0; }
-  sleep 0.5
-done
+# dev.py --stop waits for the lock to clear, escalates to the recorded PID if the
+# supervisor ignores it, and only reports success once the ports are free again.
+PYTHON="${REFILL_PYTHON:-.venv/bin/python}"
+[[ -x "$PYTHON" ]] || { echo 'Create the board Python virtualenv first.' >&2; exit 1; }
+if "$PYTHON" scripts/dev.py --stop --mode board --env-file .env.board; then
+  echo 'Managed app processes stopped. arduino-router was not touched.'
+  exit 0
+fi
 echo 'Shutdown still pending. Inspect supervisor and child processes; arduino-router was not touched.' >&2
 exit 1
