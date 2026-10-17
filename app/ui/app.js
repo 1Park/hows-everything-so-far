@@ -8,6 +8,11 @@ let audioVersion = 0;
 let policy = {min_confidence: 0.7, low_fill_threshold: 0.3};  // /ready 값으로 덮어씀
 const audioBuffers = new Map();
 const editablePhases = ['offered','card','clarify','error'];
+// 사진틀 비율을 실제 사진(카메라 4:3, fixture 등) 비율에 맞춘다 → 박스 좌표가 사진과 일치
+function syncFrameRatio() {
+  const img = $('sceneImage');
+  if (img?.naturalWidth && img.naturalHeight) $('scene').style.setProperty('--ar', String(img.naturalWidth / img.naturalHeight));
+}
 function canEdit() { return connected && !!state?.target && editablePhases.includes(state.phase); }
 function stopRecording(discard = false) {
   micVersion++;
@@ -156,6 +161,7 @@ function render(next, authoritative = false) {
     $('videoMode').textContent = 'Live source';
   }
   showBackToLive();
+  syncFrameRatio();
   const boxes = $('boxes'); boxes.replaceChildren(); const objects = $('objects'); objects.replaceChildren();
   for (const obj of state.scene?.objects || []) {
     const selected = obj.object_id === state.target?.object_id;
@@ -197,6 +203,7 @@ function render(next, authoritative = false) {
   }
 }
 $('sceneImage').onload = () => {
+  syncFrameRatio();
   if ($('sceneImage').getAttribute('src') === state?.snapshot_url) $('boxes').hidden = false;
 };
 function sceneImageError() {
