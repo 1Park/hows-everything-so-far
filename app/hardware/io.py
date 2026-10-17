@@ -12,6 +12,7 @@ class HardwareState:
     backend: str = "mock"
     phase: str = "idle"
     led: bool = False
+    color: tuple[int, int, int] = (0, 0, 0)
     button: bool = False
     occupied: bool = False
     command_id: str | None = None
@@ -19,6 +20,7 @@ class HardwareState:
 
 class HardwareIO(Protocol):
     async def set_led(self, on: bool): ...
+    async def set_color(self, red: int, green: int, blue: int): ...
     async def start(self, command_id: str): ...
     async def advance(self) -> str: ...
     async def cancel(self): ...
@@ -32,6 +34,11 @@ class MockHardware:
 
     async def set_led(self, on: bool):
         self.state.led = on
+        self.state.color = (255, 255, 255) if on else (0, 0, 0)
+
+    async def set_color(self, red: int, green: int, blue: int):
+        self.state.color = (red, green, blue)
+        self.state.led = any((red, green, blue))
 
     async def start(self, command_id: str):
         if self.state.phase not in ("idle", "done", "cancelled"):
@@ -91,6 +98,10 @@ class BridgeHardware:
 
     async def set_led(self, on: bool):
         await self.rpc("set_led_state", on)
+
+    async def set_color(self, red: int, green: int, blue: int):
+        if not await self.rpc("set_led_color", red, green, blue):
+            raise ApiError("hardware_rejected", "MCU rejected the colour", 409)
 
     async def advance(self):
         return {0: "idle", 1: "loading", 2: "returning", 3: "done", 4: "cancelled"}.get(
