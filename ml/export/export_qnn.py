@@ -96,7 +96,9 @@ class Dinov2CLS(torch.nn.Module):
     def forward(self, pixel_values):
         h = self.embeddings(pixel_values)
         for layer in self.layers:
-            h = layer(h, None)
+            # transformers 5.15(보드)는 forward(hidden_states)만, 5.20(Mac)은 attention_mask 선택 인자 — 위치 인자 1개로 호출
+            out = layer(h)
+            h = out[0] if isinstance(out, tuple) else out
         return self.layernorm(h)[:, 0]
 
 
