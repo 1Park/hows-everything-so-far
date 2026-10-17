@@ -84,7 +84,7 @@ fixture 모드는 Vision/STT fixture와 Hardware mock을 강제하고 Qwen은 �
 <!-- Native runner implementation status -->
 ### Native ExecuTorch runner status
 
-The board uses resident Gemma4 (`board`, or the legacy `executorch` backend),
+The board uses resident Gemma4 (`executorch` backend),
 preloaded at server startup. The Qwen CLI adapter below is optional (`qwen_cli`)
 and is not the default board path.
 

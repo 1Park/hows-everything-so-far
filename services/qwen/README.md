@@ -8,8 +8,8 @@ queue, queue+실행 timeout20초, 요청 ID/log 제공. 제품 프롬프트와 `
 
 ## 보드: 상주 Gemma4
 
-`QWEN_MODEL_BACKEND=board`, `QWEN_MODEL=gemma4`. 기존 보드 설정의
-`QWEN_MODEL_BACKEND=executorch`도 같은 `BoardLLMBackend`에 연결한다.
+`QWEN_MODEL_BACKEND=executorch`, `QWEN_MODEL=gemma4`로 기존 보드 설정과 같은
+`BoardLLMBackend`에 연결한다. 별도의 `board` 백엔드 설정은 사용하지 않는다.
 주최 측 번들에 Qwen3 `.pte`가 없어 실제 보드 모델은 Gemma이며 서비스 이름·포트와
 `QWEN_*`는 Controller와의 API 경계 이름이다. 설치 기록은
 [BOARD_RUNBOOK](../../docs/BOARD_RUNBOOK.md), 기존 상주 실측은

@@ -219,16 +219,15 @@ def test_api_startup_failure_does_not_accept_requests(worker):
     (worker.parent / "gemma4.pte").unlink()
     backend = BoardLLMBackend(worker)
     with pytest.raises(ApiError):
-        with TestClient(create_app(Settings(qwen_model_backend="board"), backend=backend)):
+        with TestClient(create_app(Settings(qwen_model_backend="executorch"), backend=backend)):
             pytest.fail("Server must not start without the Gemma4 model")
     assert not backend.status["resident"]
 
 
-@pytest.mark.parametrize("mode", ["board", "executorch"])
-def test_board_backend_aliases_preload_gemma4(worker, monkeypatch, mode):
+def test_executorch_backend_preloads_gemma4(worker, monkeypatch):
     backend = BoardLLMBackend(worker)
     monkeypatch.setattr("services.qwen.server.BoardLLMBackend", lambda: backend)
-    with TestClient(create_app(Settings(qwen_model_backend=mode, qwen_model="gemma4"))) as client:
+    with TestClient(create_app(Settings(qwen_model_backend="executorch", qwen_model="gemma4"))) as client:
         ready = client.get("/ready").json()
         assert ready["ready"] and ready["runner"]["llm"] == "gemma4"
         assert not (worker.parent / "requests").exists()

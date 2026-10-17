@@ -1,8 +1,8 @@
 # 보드 수령 후 연결·검증
 
-Gemma 상주 서비스는 `QWEN_MODEL_BACKEND=board`, `QWEN_MODEL=gemma4`로 설정한다. 시작 시 Gemma4 로드 완료를 기다리며 생성 API를 먼저 호출할 필요가 없다. `/ready`의 `runner.resident=true`, `runner.llm=gemma4`를 확인한다. 모델이 없거나 실행기가 실패하면 시작에 실패하고 자식 프로세스를 정리한다. DINOv2의 현재 보드 bundle은 CLI 방식이므로 모델 상주와 별개다.
+Gemma 상주 서비스는 `QWEN_MODEL_BACKEND=executorch`, `QWEN_MODEL=gemma4`로 설정한다. 시작 시 Gemma4 로드 완료를 기다리며 생성 API를 먼저 호출할 필요가 없다. `/ready`의 `runner.resident=true`, `runner.llm=gemma4`를 확인한다. 모델이 없거나 실행기가 실패하면 시작에 실패하고 자식 프로세스를 정리한다. DINOv2의 현재 보드 bundle은 CLI 방식이므로 모델 상주와 별개다.
 
-2026-10-17 실제 보드 검증: LLM 서버 재시작 후 생성 API 호출 없이 GET `/ready`만 확인해 약 5.586초에 ready=true, resident=true, llm=gemma4를 확인했다. 보드 서버의 기존 `executorch` 선택은 `BoardLLMBackend`에 연결돼 있으며, 이 워크스페이스에서는 `board`를 기본으로 사용하며 `executorch`도 동일 상주 Gemma 백엔드에 연결한다. 독립 Qwen CLI 어댑터는 `qwen_cli`로 선택한다. 보드 측 증거는 `logs/gemma-preload-verification.json`에 저장했다. 변경 범위는 상주 백엔드와 서버 시작·종료 처리이며, 제품 프롬프트·요청 계약의 별도 배포와는 구분한다.
+2026-10-17 실제 보드 검증: LLM 서버 재시작 후 생성 API 호출 없이 GET `/ready`만 확인해 약 5.586초에 ready=true, resident=true, llm=gemma4를 확인했다. 보드 서버와 이 워크스페이스 모두 기존 `executorch` 선택을 `BoardLLMBackend`에 연결한다. 독립 Qwen CLI 어댑터는 `qwen_cli`로 선택한다. 보드 측 증거는 `logs/gemma-preload-verification.json`에 저장했다. 변경 범위는 상주 백엔드와 서버 시작·종료 처리이며, 제품 프롬프트·요청 계약의 별도 배포와는 구분한다.
 
 DINOv2 현황: 실제 Vision bundle(`dinov2-qnn-v3`)의 DINO와 detector 모두 runner=cli다. Vision 서버/파이프라인은 유지되지만 추론마다 `qnn_executor_runner`를 실행하므로 모델 상주는 아니다. Gemma4 상주 시 가용 RAM 약 11.1GiB, DINO 파일 44MiB를 확인했으나 이는 DINO 실행 메모리 실측이나 두 QNN/HTP 컨텍스트 동시 상주 성공의 증거는 아니다. 동시 상주를 적용하기 전 두 모델을 로드한 상태에서 순차 추론의 성공·지연·메모리·반복 안정성을 검증한다.
 
