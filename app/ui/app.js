@@ -86,7 +86,7 @@ async function checkConnection() {
     $('imageCredit').textContent = info.video.mode === 'fixture-image' ? 'AI-generated sample · illustrative fixture' : 'Captured by the server · single video owner';
     $('liveStatus').textContent = info.video.error || 'Server capture · camera is opened once · 5 fps preview';
     $('liveRibbon').hidden = info.video.mode === 'fixture-image';
-    if (info.video.mode !== 'fixture-image' && !$('liveFeed').getAttribute('src')) $('liveFeed').src='/api/video';
+    if (info.video.mode !== 'fixture-image') attachStream($('liveFeed'));
   } catch { $('sources').textContent = 'Cannot reach the Controller. Reconnecting…'; }
 }
 function render(next, authoritative = false) {
@@ -238,7 +238,10 @@ $('audioToggle').onclick = () => {
     audioContext.resume().then(()=>state?.phase === 'offered' ? announceOffer() : playPrompt('welcome')).catch(()=>showError('Tap Enable sound to activate audio.'));
   } else {playingSource?.stop(); playingSource=null;}
 };
-$('livePreview').parentElement.addEventListener('toggle', event => {if(event.target.open) $('livePreview').src='/api/video'; else $('livePreview').removeAttribute('src');});
+$('livePreview').parentElement.addEventListener('toggle', event => {
+  if (event.target.open) attachStream($('livePreview'));
+  else {$('livePreview').removeAttribute('src'); delete $('livePreview').dataset.streaming;}
+});
 async function transcribe(blob) {
   if (!canEdit() || pendingAction) return;
   const session = state.session_id, sequence = state.sequence, draft = draftVersion;
@@ -288,6 +291,25 @@ function renderVoiceBanner(state) {
   clearInterval(renderVoiceBanner.timer);
   renderVoiceBanner.timer = setInterval(tick, 200);
   tick();
+}
+
+// An <img> MJPEG stream never retries by itself, so a single dropped connection
+// used to leave a dead feed until the page was reloaded.
+function attachStream(image) {
+  if (image.dataset.streaming) return;
+  image.dataset.streaming = '1';
+  // The query string stops the browser from reusing the dead response.
+  image.src = `/api/video?t=${Date.now()}`;
+  image.onerror = () => {
+    delete image.dataset.streaming;
+    image.removeAttribute('src');
+    setTimeout(() => {
+      // Only reconnect while the element is still meant to be showing a feed.
+      if (!image.isConnected || image.closest('[hidden]')) return;
+      if (image.id === 'livePreview' && !image.parentElement.open) return;
+      attachStream(image);
+    }, 1000);
+  };
 }
 
 $('record').onclick = async () => {
