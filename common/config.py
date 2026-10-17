@@ -21,6 +21,8 @@ class Settings(BaseModel):
     vision_port: int = Field(8001, ge=1, le=65535)
     vision_model_backend: Literal["fixture", "external"] = "fixture"
     vision_adapter: str = ""
+    vision_model_path: str = ""  # services.vision.backend bundle directory (bundle.json)
+    vision_runner_bin: str = ""  # only for bundles using the CLI runner (qnn_executor_runner)
     stt_backend: Literal["fixture", "http"] = "fixture"
     stt_base_url: HttpUrl = "http://127.0.0.1:8002"
     stt_host: str = "127.0.0.1"
@@ -41,6 +43,9 @@ class Settings(BaseModel):
     max_audio_bytes: int = Field(10_000_000, ge=1024, le=25_000_000)
     min_confidence: float = Field(0.7, ge=0, le=1)
     low_fill_threshold: float = Field(0.3, ge=0, le=1)
+    # Ask the customer which drink when Vision reports coke/coffee with item_confidence below this.
+    # 0.8 from real-photo CV (190 coke/coffee): asks 17%, catches 87% of coke<->coffee mix-ups.
+    item_confirm_threshold: float = Field(0.8, ge=0, le=1)
     response_timeout: float = Field(60, gt=0, le=600)
     mock_step_seconds: float = Field(0.8, gt=0, le=20)
     hardware_backend: Literal["mock", "bridge"] = "mock"
