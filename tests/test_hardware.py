@@ -1,6 +1,5 @@
 import asyncio
-import sys
-import types
+
 
 from app.hardware.io import BridgeHardware, MockHardware
 from common.api import ApiError
@@ -15,27 +14,31 @@ async def test_mock_inputs_and_led():
     assert (await hardware.read())["led"] is True
 
 
-async def test_bridge_adapter_contract_only(monkeypatch):
-    calls = []
+class FakeRouter:
+    """Stands in for the Router socket; records calls, no board required."""
 
-    class Bridge:
-        @staticmethod
-        def call(name, *args, timeout):
-            calls.append((name, args, timeout))
-            return 3 if name == "refill_phase" else True
+    def __init__(self):
+        self.calls = []
 
-    module = types.ModuleType("arduino.app_utils")
-    module.Bridge = Bridge
-    monkeypatch.setitem(sys.modules, "arduino", types.ModuleType("arduino"))
-    monkeypatch.setitem(sys.modules, "arduino.app_utils", module)
-    hardware = BridgeHardware(2)
+    def call(self, name, *args):
+        self.calls.append((name, args))
+        return 3 if name == "refill_phase" else True
+
+    def close(self):
+        pass
+
+
+async def test_bridge_adapter_contract_only():
+    router = FakeRouter()
+    calls = router.calls
+    hardware = BridgeHardware(2, client=router)
     await hardware.start("command-id")
     await hardware.set_led(True)
     await hardware.cancel()
     state = await hardware.read()
     assert state["phase"] == "done" and not state["verified_on_board"]
-    assert ("refill_start", ("command-id",), 2) in calls
-    assert ("refill_cancel", ("command-id",), 2) in calls
+    assert ("refill_start", ("command-id",)) in calls
+    assert ("refill_cancel", ("command-id",)) in calls
 
 
 async def test_phase_colour_is_pushed_once_and_never_breaks_the_demo():

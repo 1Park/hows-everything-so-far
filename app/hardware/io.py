@@ -4,6 +4,7 @@ import asyncio
 from dataclasses import asdict, dataclass
 from typing import Protocol
 
+from app.hardware.router import RouterClient, RouterError
 from common.api import ApiError
 
 
@@ -66,23 +67,21 @@ class MockHardware:
 
 
 class BridgeHardware:
-    """Official arduino.app_utils transport; serialized RPC. No invented UART/socket path."""
+    """MessagePack-RPC through arduino-router; serialized. No direct UART access."""
 
-    def __init__(self, timeout: float):
+    def __init__(self, timeout: float, client: RouterClient | None = None):
         self.timeout = timeout
+        self.client = client or RouterClient(timeout)
         self.rpc_lock = asyncio.Lock()
         self.command_id = ""
 
     async def rpc(self, name, *args):
-        def invoke():
-            from arduino.app_utils import Bridge
-
-            return Bridge.call(name, *args, timeout=self.timeout)
-
         try:
             async with self.rpc_lock:
-                return await asyncio.wait_for(asyncio.to_thread(invoke), self.timeout)
-        except Exception:
+                return await asyncio.wait_for(
+                    asyncio.to_thread(self.client.call, name, *args), self.timeout
+                )
+        except (RouterError, OSError, TimeoutError):
             # A timed-out thread cannot be killed. MCU watchdog is authoritative for stopping.
             raise ApiError(
                 "bridge_error",
