@@ -1,7 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import File, Form, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import File, Form, Query, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -163,14 +163,15 @@ def create_app(settings=None, clients=None, hardware=None):
             ) from None
 
     @app.post("/api/stt/check")
-    async def stt_check():
+    async def stt_check(seconds: int = Query(default=0, ge=0, le=15)):
         """Record from the board microphone and transcribe it, outside the demo flow.
 
         The refill path only listens while an offer is on screen and moves the
         controller through phases, which makes it useless for measuring the model.
         This records and transcribes and changes nothing else.
         """
-        audio = await controller.microphone.capture()
+        length = seconds or settings.audio_seconds
+        audio = await controller.microphone.capture(length)
         try:
             async with asyncio.timeout(settings.inference_timeout):
                 result = await clients.stt(audio, "audio/wav")
@@ -181,7 +182,7 @@ def create_app(settings=None, clients=None, hardware=None):
         return {
             "text": result.text,
             "source": result.source,
-            "seconds": settings.audio_seconds,
+            "seconds": length,
             "bytes": len(audio),
         }
 

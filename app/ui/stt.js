@@ -116,9 +116,10 @@ $('sttRecord').onclick = async () => {
   $('sttSkip').disabled = true;
   $('sttDiff').hidden = true;
   $('sttHeard').textContent = '';
-  $('sttStatus').textContent = 'Listening on the board…';
+  $('sttStatus').textContent = `Listening for ${$('sttSeconds').value}s…`;
   try {
-    const response = await fetch('/api/stt/check', {method: 'POST'});
+    const seconds = $('sttSeconds').value;
+    const response = await fetch(`/api/stt/check?seconds=${seconds}`, {method: 'POST'});
     const body = await response.json();
     if (!response.ok) throw new Error(body.error?.message || 'Transcription failed');
     const score = wer(expected, body.text);
@@ -130,8 +131,8 @@ $('sttRecord').onclick = async () => {
     $('sttHeard').append(verdict);
     renderDiff(expected, body.text);
     summarise(body.source);
-    index++;
-    showPhrase();
+    // The sentence stays put: the same wording usually needs several takes before
+    // its accuracy means anything. Use Next suggestion to move on.
   } catch (error) {
     showError(error.message);
   } finally {

@@ -20,8 +20,14 @@ class BoardMicrophone:
             s.audio_input == "alsa" and bool(s.audio_device) and bool(shutil.which("arecord"))
         )
 
-    async def capture(self):
+    async def capture(self, seconds=None):
+        """seconds overrides the configured length; the demo always uses the default.
+
+        Only the accuracy check varies it, so short phrases do not sit through the
+        rest of a fixed take.
+        """
         s = self.settings
+        seconds = s.audio_seconds if seconds is None else seconds
         if not self.ready():
             raise ApiError("microphone_unavailable", "Configure the board microphone first", 503)
         if s.audio_input == "fixture":
@@ -50,7 +56,7 @@ class BoardMicrophone:
                     "-c",
                     str(s.audio_channels),
                     "-d",
-                    str(s.audio_seconds),
+                    str(seconds),
                     str(path),
                     stdout=asyncio.subprocess.DEVNULL,
                     stderr=asyncio.subprocess.DEVNULL,
