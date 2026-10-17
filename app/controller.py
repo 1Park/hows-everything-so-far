@@ -24,6 +24,8 @@ PHASE_COLOURS = {
     "observing": YELLOW,
     "interpreting": YELLOW,
     "offered": BLUE,
+    "listening": AMBER,
+    "transcribing": YELLOW,
     "card": GREEN,
     "done": GREEN,
     "clarify": AMBER,
@@ -83,6 +85,7 @@ class Controller:
             "sequence": self.sequence,
             "deadline": self.deadline,
             "audio_input": self.settings.audio_input,
+            "audio_seconds": self.settings.audio_seconds,
             "transcript": self.transcript,
             "stt_source": self.stt_source,
         }

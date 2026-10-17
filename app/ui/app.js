@@ -113,11 +113,25 @@ function render(next, authoritative = false) {
   if (boardAudio) {
     $('record').textContent = 'Retry board recording';
     $('mediaSupport').textContent = `Microphone: ${state.audio_input === 'fixture' ? 'FIXTURE audio, not a real microphone' : 'board'} · Speaker: this tablet · Recording starts after the offer`;
-    $('recordStatus').textContent = state.phase === 'listening' ? 'Listening on the board…' : state.phase === 'transcribing' ? 'Transcribing…' : '';
+    $('recordStatus').textContent = '';
   }
+  renderVoiceBanner(state);
   if (state.transcript) {
-    $('transcript').textContent = `${state.stt_source.toUpperCase()} STT: “${state.transcript}” — interpreted automatically; review the card before confirming.`;
+    $('transcript').innerHTML = '';
+    const label = document.createElement('span');
+    label.className = 'transcript-label';
+    label.textContent = `HEARD · ${state.stt_source.toUpperCase()} STT`;
+    const text = document.createElement('span');
+    text.className = 'transcript-text';
+    text.textContent = `\u201C${state.transcript}\u201D`;
+    const note = document.createElement('span');
+    note.className = 'transcript-note';
+    note.textContent = 'Interpreted automatically. Review the card before confirming.';
+    $('transcript').append(label, text, note);
     $('transcript').hidden = false;
+  } else {
+    // Without this a previous answer stays on screen through the next recording.
+    $('transcript').hidden = true;
   }
   document.querySelectorAll('[data-say]').forEach(b => b.disabled = !editable);
   $('confirm').disabled = !connected || !!pendingAction || state.phase !== 'card';
@@ -239,6 +253,43 @@ async function transcribe(blob) {
 }
 $('utterance').addEventListener('input', () => {draftVersion++; $('transcript').hidden = true;});
 $('audioFile').onchange = () => {if($('audioFile').files[0]) transcribe($('audioFile').files[0]).catch(()=>{});};
+// The board records for a fixed number of seconds with no browser-side signal,
+// so the page has to show that time passing or the demo looks frozen.
+let listeningSince = null;
+
+function renderVoiceBanner(state) {
+  const banner = $('voiceBanner');
+  if (state.phase !== 'listening' && state.phase !== 'transcribing') {
+    listeningSince = null;
+    clearInterval(renderVoiceBanner.timer);
+    banner.hidden = true;
+    return;
+  }
+  banner.hidden = false;
+  if (state.phase === 'transcribing') {
+    listeningSince = null;
+    clearInterval(renderVoiceBanner.timer);
+    banner.classList.add('working');
+    $('voiceTitle').textContent = 'Transcribing…';
+    $('voiceDetail').textContent = 'The board is turning your words into text.';
+    $('voiceCount').textContent = '';
+    return;
+  }
+  banner.classList.remove('working');
+  $('voiceTitle').textContent = 'Recording — please speak now';
+  $('voiceDetail').textContent = 'The board microphone is open. It stops on its own.';
+  const total = state.audio_seconds || 6;
+  listeningSince ||= Date.now();
+  const tick = () => {
+    const left = Math.max(0, total - Math.floor((Date.now() - listeningSince) / 1000));
+    $('voiceCount').textContent = `${left}s`;
+    if (!left) clearInterval(renderVoiceBanner.timer);
+  };
+  clearInterval(renderVoiceBanner.timer);
+  renderVoiceBanner.timer = setInterval(tick, 200);
+  tick();
+}
+
 $('record').onclick = async () => {
   if (state?.audio_input && state.audio_input !== 'disabled') {
     if (canEdit() && !pendingAction) {

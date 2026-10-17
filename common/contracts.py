@@ -181,6 +181,8 @@ class StateSnapshot(Contract):
     transcript: str | None = None
     stt_source: Literal["fixture", "external"] | None = None
     audio_input: Literal["disabled", "fixture", "alsa"] = "disabled"
+    # How long board capture runs, so the page can show the time passing.
+    audio_seconds: int = 6
 
 
 class StateEvent(Contract):
