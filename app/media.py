@@ -31,16 +31,21 @@ class VideoSource:
         try:
             import cv2
 
-            capture = cv2.VideoCapture(int(self.source) if self.source.isdigit() else self.source)
+            live = self.source.isdigit()
+            capture = cv2.VideoCapture(int(self.source) if live else self.source)
             if not capture.isOpened():
                 raise RuntimeError("Camera or file cannot be opened")
+            if live:
+                # Keep the driver queue at one frame. read() returns the OLDEST queued
+                # frame, so any backlog becomes latency that grows until frames drop.
+                capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
             try:
                 while not self.closed.is_set():
                     ok, frame = capture.read()
                     if not ok:
                         if self.latest is None:
                             raise RuntimeError("Video source returned no frames")
-                        if not self.source.isdigit():
+                        if not live:
                             capture.set(cv2.CAP_PROP_POS_FRAMES, 0)
                             self.closed.wait(0.05)
                             continue
@@ -49,7 +54,9 @@ class VideoSource:
                     if ok:
                         with self.lock:
                             self.latest, self.content_type = image.tobytes(), "image/jpeg"
-                    self.closed.wait(self.capture_interval)
+                    if not live:
+                        # Files have no queue to drain, so pace them to the target rate.
+                        self.closed.wait(self.capture_interval)
             finally:
                 capture.release()
         except Exception as error:
