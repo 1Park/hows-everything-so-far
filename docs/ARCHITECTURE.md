@@ -53,6 +53,12 @@ FastAPI+Uvicorn, 서버별 worker1, ROS/앱 Docker 없음. 학습·export Docker
 - Vision/STT API는 담당자 async factory 또는 HTTP 연결. 신뢰도/bbox/전사 fixture는 항상 fixture로 표시한다. 내부 tensor, preprocessing, label 정의는 추측하지 않는다.
 - ExecuTorch는 HTTP 서버가 아니다. 제공 qnn_llama_runner/qnn_executor_runner CLI의 상주 실행·수명·Python 지원은 실제 보드 확인 후 연결한다. HTTP 상주가 모델 상주를 보장하지 않는다.
 
+## 로컬·보드 모델 연결 가이드
+
+개발자와 코딩 AI는 [models/README.md](../models/README.md)의 배치·설정·담당자 경계를 따른다. 모델 파일은 `models/local/{vision,stt,qwen}/` 또는 `models/board/{vision,stt,qwen}/`에 두고, 실제 runtime에 맞는 backend와 경로를 명시적으로 선택한다. 개인 `.env`와 `.env.board`/process env로 구분하며 Controller에는 API URL만 전달한다.
+
+연결 시 필요한 `VISION_MODEL_PATH`, `STT_MODEL_PATH`, `QWEN_MODEL_PATH`, `QWEN_TOKENIZER_PATH`만 공통 설정과 해당 backend에 추가한다. **현재는 이 경로를 읽는 공통 로더/서비스 연결이 구현되지 않았다.** `mlx` backend도 기존 서버를 호출하는 HTTP client다. 파일 검색·자동 runtime 선택·복잡한 registry를 미리 만들지 않고, 담당자가 구체적인 모델을 연결할 때 최소한으로 구현한다. Vision/STT의 기존 async factory/API 계약과 모델 담당자의 전처리 소유권은 유지한다.
+
 ## 상태·동시성
 
 관찰→정책→offered→고객 입력→interpreting→card→Confirm→loading→returning→done. 충분/불확실 skipped, 거절 declined, 취소 cancelled, 모호 clarify, 대기60초 expired, 오류 error→입력 재시도/새 관찰. 대상은 낮은 fill_ratio의 신뢰할 수 있는 객체, 정책값은 설정 가능하고 보드 실측 기준은 아니다.

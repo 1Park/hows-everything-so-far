@@ -74,6 +74,8 @@ python scripts/evaluate_qwen.py --proxy
 | docs/ | 아키텍처·API 계약·태블릿/보드 안내·검증 기록 |
 | qc-executorch-guide/ | 대회 제공 참조 가이드·artifact inventory |
 
+로컬/보드 모델 파일 배치와 실제 backend 연결 작업은 [모델 연결 가이드](models/README.md)를 따른다. 다른 개발자나 코딩 AI는 구현 전에 이 가이드와 담당 서비스 README를 읽는다. `models/local/`·`models/board/` 및 모델 경로 환경변수는 연결 시 따를 규칙이며, 현재 자동 파일 로더가 구현됐다는 뜻은 아니다.
+
 앱은 **ROS·배포 Docker 없이 Ubuntu + venv + FastAPI/Uvicorn**. 학습/export Docker는 ml/에 분리한다. 모델 bundle/라이브러리는 별도 설치하고 새 표준 버전으로 임의 교체하지 않는다.
 
 ## 문서

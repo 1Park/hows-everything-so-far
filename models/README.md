@@ -1,15 +1,50 @@
-# Local model assets
+# Model assets and integration guidelines
 
-다운로드한 모델·checkpoint·`.pte`·tokenizer·학습 및 export 산출물을 저장한다. 이 README만 Git에 포함하며 나머지 파일·하위 폴더는 제외한다.
+For developers and coding agents connecting real models. Keep integration small: use the existing service backend boundary, a few explicit environment settings, and the public API contracts. Do not introduce a model registry, automatic runtime detection, or another configuration framework.
 
-예시 저장 구조이며 아직 실제 bundle은 없다:
+## Asset layout
 
 ```text
 models/
-  dino/<version>/     모델·labels·전처리/출력 metadata·reference 입력/출력
-  qwen/<version>/     모델·tokenizer·chat template/생성 규격·metadata
-  detector/<version>/ 검출 모델·라벨·입출력 규격
-  experiments/       checkpoint·오프라인 평가 산출물
+  local/                 # Native development runtime assets
+    vision/              # Detector / DINOv2 bundle owned by the Vision developer
+    stt/                 # STT assets owned by the STT developer
+    qwen/                # Only if running Qwen weights on this machine
+  board/                 # VENTUNO Q runtime assets
+    vision/              # Board-compatible Vision bundle
+    stt/                 # Only if STT runs on the board
+    qwen/                # Qwen .pte, tokenizer, and required companion files
+  experiments/           # Local training/export outputs
 ```
 
-모델 출처·버전·checksum·획득 방법·보드 target·ExecuTorch/SDK 버전은 공유 문서 또는 `ml/configs/`에 기록한다. 서버는 설정으로 경로를 받으며 각 개발자의 절대 경로를 코드에 박지 않는다. 실제 보드 bundle 규격은 제공 파일을 확인한 뒤 확정한다.
+This is a placement convention, not an installed bundle. Create directories when adding assets; Git does not preserve empty directories. Keep vendor bundle filenames and companion files together. No particular tensor layout, internal labels, or bundle format is assumed. Existing assets elsewhere may be referenced by an explicit path without copying them.
+
+Only this README is tracked under `models/`. Weights, tokenizers, exports, and other large assets remain ignored. Record acquisition instructions, model version/checksum, and required runtime in the owning service README or `ml/configs/`; do not commit personal absolute paths or credentials.
+
+## Configuration convention
+
+Use personal `.env` for development and `.env.board` plus process-environment overrides for the board. Choose the backend explicitly as well as its path: a local development model and a board `.pte` may require different runtimes. `APP_ENV` alone must not silently select a runtime or scan folders for a model.
+
+When implementing a file-loading backend, use these names as needed:
+
+| Setting | Purpose | Example relative paths: local / board |
+| --- | --- | --- |
+| `VISION_MODEL_PATH` | Vision bundle file or directory | `models/local/vision/...` / `models/board/vision/...` |
+| `STT_MODEL_PATH` | STT bundle file or directory | `models/local/stt/...` / `models/board/stt/...` |
+| `QWEN_MODEL_PATH` | Qwen weights or runtime bundle | `models/local/qwen/...` / `models/board/qwen/...` |
+| `QWEN_TOKENIZER_PATH` | Separate tokenizer, if the runtime needs one | Within the matching Qwen bundle |
+
+Resolve relative paths against the repository root; allow explicit absolute paths through personal configuration. Add only the settings needed by the concrete backend to `common/config.py` when connecting it. A path may identify a file or directory according to the actual runtime; validate the required files in that backend.
+
+**Current implementation:** these model-path settings are not wired into the shared Settings or service factories. The diagnostic script only inspects some process-environment paths; it does not load models. The existing `mlx` Qwen backend is an HTTP client to a running server, not an MLX weights loader. Remote HTTP and fixture backends do not require local model files. These guidelines define the next integration work, not a claim that file loading already works.
+
+## Implementation boundaries
+
+1. Read the owning `services/vision`, `services/stt`, or `services/qwen` README and [public contracts](../docs/CONTRACTS.md) first. Preserve the current HTTP API and Vision/STT no-argument `package:create_backend` factory contract.
+2. Put model loading and runtime-specific work behind that service's backend; connect board Qwen at the existing `ExecuTorchBackend` boundary. The Controller uses API URLs and must not load model files.
+3. Vision developers own detection, crop, DINOv2, preprocessing, and output conversion. STT developers own decoding, audio preprocessing, and recognition. Other agents must not guess or replace those implementations. Keep DINOv2 and Qwen3-0.6B.
+4. Load/reuse the model where the runtime supports it, keep blocking inference off the event loop, and retain the existing timeout/readiness/error contract. Missing files, unsupported runtimes, or failed initialization must produce an explicit error/not-ready state, never an automatic fixture or remote fallback. Fixtures remain explicit; source labels must stay truthful.
+5. Keep camera ownership in Controller VideoSource and microphone/speaker ownership in the tablet browser. Model backends receive the transported image/audio; do not open those devices again.
+6. Document the actual backend setting, asset acquisition, runtime dependencies, and one startup command. Verify readiness, a real input, and missing-file behavior. Report local runtime verification separately from board verification.
+
+Training/export dependencies and any required Docker environment belong in `ml/`. App deployment remains native Ubuntu + venv; do not add training dependencies or guessed board SDK versions to the app just to prepare this structure.
