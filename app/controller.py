@@ -29,7 +29,7 @@ PHASE_COLOURS = {
     "transcribing": YELLOW,
     "card": GREEN,
     "done": GREEN,
-    "clarify": AMBER,
+    "not_understood": AMBER,
     "skipped": RED,
     "declined": RED,
     "cancelled": RED,
@@ -138,7 +138,7 @@ class Controller:
             if (
                 token == self.token
                 and self.deadline == deadline
-                and self.phase in ("offered", "card", "clarify")
+                and self.phase in ("offered", "card", "not_understood")
             ):
                 self.token += 1
                 self.deadline = None
@@ -245,7 +245,7 @@ class Controller:
             raise ApiError("empty_utterance", "Please enter a request", 422)
         async with self.lock:
             self.check_target(body)
-            if self.phase not in ("offered", "card", "clarify", "error"):
+            if self.phase not in ("offered", "card", "not_understood", "error"):
                 raise ApiError(
                     "invalid_state", "A request cannot be edited in the current state", 409
                 )
@@ -256,7 +256,6 @@ class Controller:
         """Caller holds self.lock; shared by typed input and board STT."""
         current = CurrentRequest(
             item=self.card.item if self.card else self.target.item,
-            portion=self.card.portion if self.card else "regular",
         )
         self.token += 1
         self.deadline, self.last_error = None, None
@@ -270,7 +269,7 @@ class Controller:
             if (
                 body.session_id != self.session_id
                 or body.sequence != self.sequence
-                or self.phase not in ("offered", "clarify", "error")
+                or self.phase not in ("offered", "not_understood", "error")
             ):
                 raise ApiError("stale_prompt", "This voice prompt is no longer active", 409)
             if self.deadline is not None and time.time() >= self.deadline:
@@ -331,11 +330,12 @@ class Controller:
                         "cancelled" if result.intent == "cancel" else "declined",
                         "No refill will be started.",
                     )
-                elif result.intent == "clarify":
+                elif result.intent == "not_understood":
                     # Keep previous card as edit context, but phase blocks all confirmation.
                     self.arm_deadline()
                     self.emit(
-                        "clarify", "Please choose water, coke, or coffee, and small or regular."
+                        "not_understood",
+                        "I couldn't understand your request. Please choose water, coke, or coffee.",
                     )
                 else:
                     self.card = RequestCard(
@@ -344,7 +344,6 @@ class Controller:
                         scene_id=self.scene.scene_id,
                         object_id=self.target.object_id,
                         item=result.item,
-                        portion=result.portion,
                     )
                     self.arm_deadline()
                     self.emit(

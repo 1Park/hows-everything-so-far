@@ -1,5 +1,13 @@
 # 보드 수령 후 연결·검증
 
+Gemma 상주 서비스는 `QWEN_MODEL_BACKEND=board`, `QWEN_MODEL=gemma4`로 설정한다. 시작 시 Gemma4 로드 완료를 기다리며 생성 API를 먼저 호출할 필요가 없다. `/ready`의 `runner.resident=true`, `runner.llm=gemma4`를 확인한다. 모델이 없거나 실행기가 실패하면 시작에 실패하고 자식 프로세스를 정리한다. DINOv2의 현재 보드 bundle은 CLI 방식이므로 모델 상주와 별개다.
+
+2026-10-17 실제 보드 검증: LLM 서버 재시작 후 생성 API 호출 없이 GET `/ready`만 확인해 약 5.586초에 ready=true, resident=true, llm=gemma4를 확인했다. 보드 서버의 기존 `executorch` 선택은 `BoardLLMBackend`에 연결돼 있으며, 이 워크스페이스에서는 `board`를 기본으로 사용하며 `executorch`도 동일 상주 Gemma 백엔드에 연결한다. 독립 Qwen CLI 어댑터는 `qwen_cli`로 선택한다. 보드 측 증거는 `logs/gemma-preload-verification.json`에 저장했다. 변경 범위는 상주 백엔드와 서버 시작·종료 처리이며, 제품 프롬프트·요청 계약의 별도 배포와는 구분한다.
+
+DINOv2 현황: 실제 Vision bundle(`dinov2-qnn-v3`)의 DINO와 detector 모두 runner=cli다. Vision 서버/파이프라인은 유지되지만 추론마다 `qnn_executor_runner`를 실행하므로 모델 상주는 아니다. Gemma4 상주 시 가용 RAM 약 11.1GiB, DINO 파일 44MiB를 확인했으나 이는 DINO 실행 메모리 실측이나 두 QNN/HTP 컨텍스트 동시 상주 성공의 증거는 아니다. 동시 상주를 적용하기 전 두 모델을 로드한 상태에서 순차 추론의 성공·지연·메모리·반복 안정성을 검증한다.
+
+실제 Gemma 서비스가 설치된 보드에서는 `bash scripts/board_llm.sh use gemma4`로 모델 선택을 고정한다. `auto`는 메모리 상황에 따라 Gemma3를 고를 수 있으므로 사용하지 않는다. Gemma3 모델 파일·업로드·실행 코드는 보존하며 기본 평가도 Gemma4만 사용한다. 현재 보드는 selection=gemma4와 `/ready`의 `runner.llm=gemma4`를 확인했다. 이 워크스페이스의 요청 계약 변경(`portion` 제거, `not_understood`)은 별도 앱 배포가 필요하다.
+
 현재 앱은 보드 없이 개발/시연 가능하다. 아래 보드 관련 코드는 **준비 단계이며 실기 검증 완료가 아니다**. Ubuntu에 직접 실행, ROS·앱 Docker 없음. 학습·QNN export Docker는 ml/ 관심사.
 
 ## 1. 환경 확인
@@ -37,7 +45,7 @@ Vision/STT 담당자는 [API·async 계약](CONTRACTS.md)을 구현한다. facto
 
 Vision(DINOv2): `VISION_MODEL_BACKEND=external`, `VISION_ADAPTER=services.vision.backend:create_backend`, `VISION_MODEL_PATH=models/board/vision/<bundle>`(bundle 디렉터리, `.pte` 파일 아님). bundle은 `ml/export/make_bundle.py`로 만들고, head는 **보드에서 돌릴 `.pte`의 특징으로** `ml/training/make_head.py`로 학습한다(fp32 head를 양자화 모델에 쓰면 크게 떨어짐). bundle 없음/로드 실패는 ready503. 세부는 [services/vision](../services/vision/README.md)·[ml](../ml/README.md)·[평가 기록](vision_evaluation/README.md).
 
-보드 LLM은 Qwen이 아니라 주최 측 **Gemma**다. `.env.board`의 `QWEN_MODEL_BACKEND=executorch`면 Qwen 서비스(127.0.0.1:8000)가 `services/qwen/board_llm.py`로 상주 `qnn_llm_runner_host`(NPU)를 사용한다. 첫 요청에서 로드한 뒤 같은 모델은 재사용하고 다른 모델 요청일 때만 교체한다. 요청 간 KV는 초기화하고 취소/timeout/오류 때 worker를 회수한다. Mac/fixture로 자동 전환하지 않는다. [상주 실행·전환·실측](RESIDENT_LLM.md), [서비스 안내](../services/qwen/README.md).
+보드 LLM은 Qwen이 아니라 주최 측 **Gemma**다. `.env.board`의 `QWEN_MODEL_BACKEND=executorch`면 Qwen 서비스(127.0.0.1:8000)가 `services/qwen/board_llm.py`로 상주 `qnn_llm_runner_host`(NPU)를 사용한다. 서버 시작 시 생성 호출 없이 Gemma4를 로드하며 같은 모델은 재사용하고 다른 모델을 명시적으로 요청할 때만 교체한다. 요청 간 KV는 초기화하고 취소/timeout/오류 때 worker를 회수한다. Mac/fixture로 자동 전환하지 않는다. [상주 실행·전환·실측](RESIDENT_LLM.md), [서비스 안내](../services/qwen/README.md).
 
 ## 3. 카메라와 태블릿
 
@@ -65,7 +73,7 @@ bash scripts/stop-board.sh
 | 포트 | 서비스 | 실제 backend | 누가 띄우나 | 로그 |
 |---|---|---|---|---|
 | 0.0.0.0:8080 | Controller/UI | Vision·STT·Qwen HTTP 호출, Hardware mock | `scripts/dev.py --mode direct` | `logs/controller.log` |
-| 127.0.0.1:8000 | Qwen 서비스 | **Gemma** (qnn_llm_runner_host, NPU, 첫 요청 load 후 상주) | 단독 uvicorn (아래) | `~/model_output/logs/qwen-8000.log` |
+| 127.0.0.1:8000 | Qwen 서비스 | **Gemma** (qnn_llm_runner_host, NPU, 서버 시작 시 preload 후 상주) | 단독 uvicorn (아래) | `~/model_output/logs/qwen-8000.log` |
 | 127.0.0.1:8001 | Vision 서비스 | DINOv2 fp16 + YOLO11n 16a8w QNN (cli runner, NPU) | 단독 uvicorn (아래) | `~/model_output/logs/vision-8001.log` |
 | 127.0.0.1:8002 | STT 서비스 | whisper.cpp HTTP adapter (`services.stt.whisper_http`) | `dev.py --with-stt` | `logs/stt.log` |
 | 0.0.0.0:8178 | whisper-server | whisper.cpp `ggml-base.en` (레포 밖 `~/whisper.cpp`) | 팀원 수동 실행, 건드리지 않음 | — |

@@ -5,7 +5,7 @@ Only two kinds of line are written:
 - ``detected``: one line per cup each time scene analysis finishes (phase offered or skipped),
   with the drink, its fill level (``low`` / ``high`` against LOW_FILL_THRESHOLD) and the time.
 - ``requested``: one line each time a customer request becomes a refill card,
-  with the requested drink, portion, the customer's words when spoken, and the time.
+  with the requested drink, the customer's words when spoken, and the time.
 
 Recording is best effort: a write failure is logged once and never interrupts the demo.
 EVENT_LOG_PATH empty disables recording.
@@ -61,7 +61,6 @@ class EventLog:
                 "session": session,
                 "object_id": card["object_id"],
                 "item": card["item"],
-                "portion": card["portion"],
                 "revision": card["revision"],
             }
             if state.get("transcript"):

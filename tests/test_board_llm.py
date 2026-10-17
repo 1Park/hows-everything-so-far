@@ -18,7 +18,7 @@ from services.qwen.server import create_app
 
 
 def body(utterance="Just a little coffee please"):
-    return generation("board-gemma", CurrentRequest(item="water", portion="regular"), utterance)
+    return generation("board-gemma", CurrentRequest(item="water"), utterance)
 
 
 @pytest.fixture
@@ -36,7 +36,7 @@ for line in sys.stdin:
     if "CRASH" in req["prompt"]: sys.exit(1)
     if "BAD_PROTOCOL" in req["prompt"]:
         print("not json",flush=True); continue
-    result={"intent":"refill","item":"coffee","portion":"small"}
+    result={"intent":"refill","item":"coffee"}
     print(json.dumps({"token":json.dumps(result)}),flush=True)
     print(json.dumps({"done":True,"finish_reason":"stop","session_reset_reason":"new"}),flush=True)
 ''', encoding="utf-8")
@@ -69,7 +69,7 @@ print(json.dumps(dict(selection=sel,name=name,worker=str(root/"worker.py"),
 async def test_reuse_same_pid_isolated_requests_and_switch(worker):
     backend = BoardLLMBackend(worker)
     try:
-        assert await backend.ready()
+        assert not await backend.ready()
         assert not backend.status["resident"]
         first = await backend.generate(body())
         second = await backend.generate(body("Coffee instead"))
@@ -132,7 +132,10 @@ async def test_timeout_kills_worker_and_restarts(worker):
 async def test_missing_model_not_ready(worker):
     (worker.parent / "gemma4.pte").unlink()
     assert not await BoardLLMBackend(worker).ready()
-    assert await BoardLLMBackend(worker, model="gemma3").ready()
+    backend = BoardLLMBackend(worker)
+    with pytest.raises(ApiError):
+        await backend.startup()
+    assert not backend.status["resident"]
 
 
 async def test_concurrent_calls_serialized(worker):
@@ -155,8 +158,13 @@ def test_api_shutdown_reaps_resident_worker(worker):
     with TestClient(create_app(Settings(qwen_model_backend="executorch", qwen_model="board-gemma"),
                                backend=backend)) as client:
         assert client.get("/ready").json()["ready"]
+        initial = client.get("/ready").json()["runner"]
+        assert initial["resident"] and initial["llm"] == "gemma4"
+        assert not (worker.parent / "requests").exists()
         result = client.post("/v1/chat/completions", json=body().model_dump())
         assert result.status_code == 200 and result.json()["source"] == "executorch"
+        assert not result.json()["runner"]["cold_start"]
+        assert result.json()["runner"]["pid"] == initial["pid"]
         assert client.get("/ready").json()["runner"]["resident"]
         request = body().model_dump()
         request["model"] = "gemma3"
@@ -169,3 +177,59 @@ def test_api_shutdown_reaps_resident_worker(worker):
         assert "gemma4" in [m["id"] for m in client.get("/v1/models").json()["data"]]
         proc = backend.process
     assert proc.returncode is not None
+
+
+async def test_startup_pins_gemma4_and_sends_no_generation(worker):
+    (worker.parent / "selection").write_text("gemma3")
+    backend = BoardLLMBackend(worker)
+    try:
+        await backend.startup()
+        assert await backend.ready()
+        assert backend.status["llm"] == "gemma4"
+        assert not (worker.parent / "requests").exists()
+        pid = backend.status["pid"]
+        await backend.startup()
+        assert backend.status["pid"] == pid
+    finally:
+        await backend.close()
+
+
+async def test_startup_timeout_reaps_child(worker):
+    child = worker.parent / "worker.py"
+    child.write_text(child.read_text().replace(
+        'print(json.dumps({"ready": True}),flush=True)',
+        'time.sleep(30); print(json.dumps({"ready": True}),flush=True)',
+    ))
+    backend = BoardLLMBackend(worker, startup_timeout=1)
+    spawned = []
+    original = backend._event
+
+    async def capture_process():
+        spawned.append(backend.process)
+        return await original()
+
+    backend._event = capture_process
+    with pytest.raises(TimeoutError):
+        await backend.startup()
+    assert spawned and spawned[0].returncode is not None
+    assert not await backend.ready()
+
+
+def test_api_startup_failure_does_not_accept_requests(worker):
+    (worker.parent / "gemma4.pte").unlink()
+    backend = BoardLLMBackend(worker)
+    with pytest.raises(ApiError):
+        with TestClient(create_app(Settings(qwen_model_backend="board"), backend=backend)):
+            pytest.fail("Server must not start without the Gemma4 model")
+    assert not backend.status["resident"]
+
+
+@pytest.mark.parametrize("mode", ["board", "executorch"])
+def test_board_backend_aliases_preload_gemma4(worker, monkeypatch, mode):
+    backend = BoardLLMBackend(worker)
+    monkeypatch.setattr("services.qwen.server.BoardLLMBackend", lambda: backend)
+    with TestClient(create_app(Settings(qwen_model_backend=mode, qwen_model="gemma4"))) as client:
+        ready = client.get("/ready").json()
+        assert ready["ready"] and ready["runner"]["llm"] == "gemma4"
+        assert not (worker.parent / "requests").exists()
+    assert not backend.status["resident"]

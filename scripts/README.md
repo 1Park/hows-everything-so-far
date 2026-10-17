@@ -11,6 +11,7 @@
 | runner_smoke.py -- <실제 runner와 flags> | 단일 입력 실행·시간/출력/오류 logs 기록; CLI를 추측하지 않음 |
 | smoke.py | 실제 Controller HTTP를 통해 리필/수정/stale/duplicate/완료/STT/skip 검증 |
 | evaluate_qwen.py --proxy | 실제 local proxy→Mac 음료 평가, temperature0, timestamp 신규 결과 |
+| evaluate_gemma.py | 보드 HTTP Gemma 평가: 원본20 + 합성 STT 왜곡20, 동일 제품 프롬프트, 케이스별 input/output/시간을 신규 JSON·Markdown에 기록 |
 | browser_check.cjs | 실제 Chromium 녹음/fixtureSTT/고정 오디오/카드/확인/취소/반응형/재연결 |
 | browser_board_voice.cjs | 자동 인식→태블릿 안내 재생 완료→보드 fixture 녹음→STT→카드, 브라우저 마이크 미사용 |
 

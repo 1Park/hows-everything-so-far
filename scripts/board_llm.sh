@@ -24,7 +24,7 @@ gemma4|$HOME/model_output/gemma4_e2b|gemma4_e2b_QCS8275_ctxt_2000.pte|gemma4|200
 
 field() { echo "$MODELS" | awk -F'|' -v n="$1" -v i="$2" '$1==n {print $i}'; }
 avail_mb() { awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo; }
-selected() { [ -f "$STATE" ] && cat "$STATE" || echo auto; }
+selected() { [ -f "$STATE" ] && cat "$STATE" || echo gemma4; }
 
 resolve() {  # auto → 실제 모델 이름
   local sel="$1"

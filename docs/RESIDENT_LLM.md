@@ -1,10 +1,10 @@
 # 보드 LLM 상주 실행
 
-Qwen 서비스의 `executorch` backend는 주최 측 번들의 **`qnn_llm_runner_host`**를 자식 프로세스로 유지한다. FastAPI 프로세스만 살아 있는 것이 아니라 모델 가중치와 QNN context가 실제로 상주한다. 별도 SDK 교체·재빌드는 필요 없다.
+Qwen 서비스의 `board` backend(기존 `executorch`도 호환)는 주최 측 번들의 **`qnn_llm_runner_host`**를 자식 프로세스로 유지한다. FastAPI 프로세스만 살아 있는 것이 아니라 모델 가중치와 QNN context가 실제로 상주한다. 별도 SDK 교체·재빌드는 필요 없다.
 
 ## 동작
 
-- 첫 요청: 선택한 모델을 로드하고 생성한다. 이후 같은 모델은 **동일 worker PID**를 재사용한다.
+- 서버 시작: 생성 요청 없이 Gemma4를 로드하고 worker ready 신호를 기다린다. 로드 실패 또는 120초 timeout이면 서버 시작도 실패하며 child를 정리한다. 첫 요청부터 **동일 worker PID**를 재사용한다. `/ready`는 로드된 worker가 살아 있을 때만 true다.
 - 다른 모델 요청: 현재 worker를 종료·회수한 후 새 모델을 로드한다. 한 번에 LLM 모델 하나만 상주시킨다. Vision 프로세스는 건드리지 않는다.
 - 요청마다 anonymous session으로 KV cache를 초기화한다. 모델 재사용과 대화 기록 재사용은 별개이며 이전 고객 발화가 이어지지 않는다.
 - `temperature`, `max_completion_tokens`를 worker에 전달한다. JSON 파싱·제품 정책은 기존 Controller 담당이다.
@@ -13,7 +13,7 @@ Qwen 서비스의 `executorch` backend는 주최 측 번들의 **`qnn_llm_runner
 
 ## 모델 선택
 
-기존 Controller 설정과 호환되는 `QWEN_MODEL` ID를 보내면 `bash scripts/board_llm.sh use gemma4|gemma3|auto`의 선택을 따른다. 변경 사항은 다음 요청에 적용한다.
+현재 `.env.board`는 `QWEN_MODEL=gemma4`로 고정한다. Gemma3 모델과 명시 실행 코드는 유지하지만 자동 평가에서는 제외하며 `auto`를 사용하지 않는다. 기존 별칭 ID로 요청하는 경우에는 `bash scripts/board_llm.sh use gemma4`의 선택을 따른다. 서버 시작 모델은 항상 Gemma4다.
 
 API의 `model`에 **`gemma4` 또는 `gemma3`**를 보내면 그 요청이 모델을 명시적으로 선택한다. 이어서 같은 ID를 보내면 계속 재사용한다. 이 요청은 `llm_selected` 파일을 변경하지 않는다. 다시 기본 ID로 요청하면 파일의 선택으로 돌아간다. `GET /v1/models`에 지원 ID를 표시한다.
 

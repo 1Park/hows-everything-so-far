@@ -11,7 +11,7 @@
 - bbox: **원본 전체 이미지 기준 normalized xyxy [0,1], 좌상단 원점**, x1<x2, y1<y2. EXIF 자동 회전 없음. 담당자 adapter가 원본 표시 좌표와 일치시킨다.
 - 음료 water/coke/coffee/unknown; fill_ratio 0..1 또는 null; confidence 0..1. 이는 외부 표현이며 모델 내부 라벨 변환은 모델 담당자 책임이다.
 - item_confidence 0..1 또는 null(선택): **음료 종류만**의 확신도. confidence는 음료·잔량을 함께 본 값이다. 제공하지 않으면 null.
-- 요청 음료 water/coke/coffee, 분량 small/regular. ml 용량은 정의하지 않았다.
+- 요청 음료 water/coke/coffee. 분량은 요청·카드·LLM 출력에 포함하지 않는다.
 - 초기 정책: confidence>=0.7, fill_ratio<=0.3 중 최소 잔량 컵; 동률 object_id 정렬. 환경변수로 변경 가능하며 보드 실측 기준은 아니다.
 - 대상이 coke/coffee이고 item_confidence<0.8(`ITEM_CONFIRM_THRESHOLD`)이면 제안 문구에서 음료를 묻는다("Is that coke or coffee?"). 추정 음료로 카드는 만들되 고객이 수정·Confirm한다. 0.8은 Mac 실사 교차검증(콜라·커피 190장) 기준: 17%를 묻고 혼동의 87%를 잡음 — [vision_evaluation](vision_evaluation/README.md).
 - 한 번에 한 대상/요청. 제안 자체는 Confirm 불가. 고객 입력→카드→명시 Confirm 필요.
@@ -60,7 +60,7 @@ async def close(self): ...  # 선택
 
 `POST /v1/chat/completions`: model/messages, temperature0..1(제품·평가0), max_completion_tokens16..512(기본192), stream=false, chat_template_kwargs.enable_thinking=false. 서버는 generic 생성; 프롬프트/strict 파서는 app/language.py.
 
-응답 choices[0].message.content + source mlx/fixture/executorch. 실패 시 fixture 대체 없음. 파서는 intent refill/decline/cancel/clarify, item/portion 필수키, refill만 허용 음료/분량, 나머지는 null. 단일 Markdown JSON fence만 허용; prose에서 JSON 추출/필드 보정 없음.
+응답 choices[0].message.content + source mlx/fixture/executorch. 실패 시 fixture 대체 없음. 파서는 intent refill/decline/cancel/not_understood, item 필수키, refill만 허용 음료, 나머지는 item=null. 이해하지 못한 요청은 not_understood로 반환하고 재입력을 요청한다. 단일 Markdown JSON fence만 허용; prose에서 JSON 추출/필드 보정 없음.
 
 ## Controller
 
@@ -72,7 +72,7 @@ async def close(self): ...  # 선택
 | POST /api/confirm | JSON scene_id, object_id, request_id, revision; 202 |
 | POST /api/cancel | JSON session_id; 현재 작업 무효화/시퀀스 취소 |
 | POST /api/transcribe | multipart audio file; STT 결과만 반환 |
-| POST /api/voice/listen | 안내 재생 후 `{session_id,scene_id,object_id,sequence}`. 현재 offered/clarify/error에서만 녹음 시작; 중복/오래된 ACK409. listening→transcribing→interpreting→card, 승인 없음 |
+| POST /api/voice/listen | 안내 재생 후 `{session_id,scene_id,object_id,sequence}`. 현재 offered/not_understood/error에서만 녹음 시작; 중복/오래된 ACK409. listening→transcribing→interpreting→card, 승인 없음 |
 | GET /api/frame, /api/video | 최신 원본·MJPEG5fps |
 | GET /api/snapshot/{session_id} | 고정 원본 이미지 |
 | GET /api/hardware | simulator/Bridge 입력·상태·명령 ID |
@@ -82,4 +82,4 @@ WS `{type:"state",version:1,sequence:42,state:{...}}`, heartbeat는 type/sequenc
 
 state.instance_id는 서버 실행마다 새 UUID, sequence는 같은 서버에서 단조 증가한다. UI는 늦게 도착한 REST/WS 응답의 작은 sequence를 무시한다. 새 서버 instance는 WS의 초기 전체 상태를 통해 수용해 재시작 후에도 복구한다.
 
-phase: idle/observing/offered/interpreting/clarify/card/loading/returning/done/skipped/declined/cancelled/expired/error. 고객 대기60초. 오류 후 같은 대상 입력 재시도 또는 새 관찰 가능. loading/returning 중 관찰 거부; Cancel 후 다시 시작. generation token+lock으로 오래된 확인·중복 클릭·취소 뒤 늦은 결과·장면 변경 결과를 무효화한다.
+phase: idle/observing/offered/interpreting/not_understood/card/loading/returning/done/skipped/declined/cancelled/expired/error. 고객 대기60초. 오류 후 같은 대상 입력 재시도 또는 새 관찰 가능. loading/returning 중 관찰 거부; Cancel 후 다시 시작. generation token+lock으로 오래된 확인·중복 클릭·취소 뒤 늦은 결과·장면 변경 결과를 무효화한다.

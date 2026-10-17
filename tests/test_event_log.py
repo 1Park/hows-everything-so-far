@@ -44,7 +44,7 @@ async def run_refill(c):
         )
     )
     await settled(c)
-    await c.confirm(ConfirmInput(**c.card.model_dump(exclude={"item", "portion"})))
+    await c.confirm(ConfirmInput(**c.card.model_dump(exclude={"item"})))
     await settled(c)
 
 
@@ -73,7 +73,7 @@ async def test_only_detected_and_requested_are_recorded(tmp_path):
     assert water["item"] == "water" and water["level"] == "low" and water["fill_ratio"] == 0.15
 
     requested = rows[-1]
-    assert requested["item"] == "water" and requested["portion"] == "small"
+    assert requested["item"] == "water" and "portion" not in requested
     assert requested["object_id"] == "cup-water" and requested["revision"] == 1
 
 
@@ -117,7 +117,7 @@ def test_spoken_request_keeps_transcript_and_read_skips_bad_lines(tmp_path):
         "phase": "card",
         "scene": None,
         "transcript": "Just a little coffee, please.",
-        "card": {"object_id": "cup-a", "item": "coffee", "portion": "small", "revision": 2},
+        "card": {"object_id": "cup-a", "item": "coffee", "revision": 2},
     }
     log = EventLog(tmp_path / "e.jsonl")
     log.record(state)

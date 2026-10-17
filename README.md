@@ -34,7 +34,7 @@ python scripts/dev.py
 | 완전 offline | `python scripts/dev.py --mode offline` | Controller/UI만. Qwen 포함 모든 모델 fixture, Hardware mock |
 | 우리 Qwen proxy | `python scripts/dev.py --mode proxy` | Controller + Qwen API; Qwen API→실제 Mac |
 | 서버 간 통합 | `python scripts/dev.py --mode integration` | Controller + Qwen + Vision + STT; Vision/STT 기본 fixture backend |
-| 보드 준비 | `bash scripts/start-board.sh` | .env.board 기반4개 서버. ExecuTorch 미연결이면 /ready 503이 정상 |
+| 보드 준비 | `bash scripts/start-board.sh` | .env.board 기반4개 서버. native runner·모델·길이 미설정이면 /ready 503 |
 
 Mac endpoint `http://won-macmini:8000/v1/chat/completions`, 모델 `mlx-community/Qwen3-0.6B-4bit`. 서버 설정/모델을 변경하지 않는다. proxy와 원격 Mac은 서로 다른 기기의8000포트다. 모델 장애 시 fixture로 자동 대체하지 않는다. 평가는 temperature=0.
 
@@ -85,3 +85,23 @@ python scripts/evaluate_qwen.py --proxy
 - [보드 통합 준비](docs/BOARD_RUNBOOK.md), [검증 결과·남은 작업](docs/VALIDATION.md)
 - [요구사항 체크리스트](docs/IMPLEMENTATION_CHECKLIST.md), [Qwen 평가](docs/qwen_evaluation/README.md)
 - [과거 Design Doc](<docs/Design Doc.md>) (최신 결정은 아키텍처 우선)
+
+
+<!-- Native runner implementation status -->
+### Native ExecuTorch runner status
+
+The board uses resident Gemma4 (`QWEN_MODEL_BACKEND=board`, with the legacy
+`executorch` setting supported). It preloads at server startup. The following
+Qwen CLI adapter is optional and selected only with `QWEN_MODEL_BACKEND=qwen_cli`.
+
+Qwen's former placeholder now invokes the QC native runner via
+`common/backends.py:ExecuTorchBackend`; configure actual runner/model/tokenizer
+paths and `QWEN_SEQ_LEN` per [Qwen setup](services/qwen/README.md).
+DINOv2 prepared-tensor execution is available as `common.executorch.DinoRunner`
+and `scripts/dino_smoke.py`; the Vision owner still supplies all image
+preprocessing/detection and output conversion. See [Vision setup](services/vision/README.md).
+Earlier references to an unconnected adapter describe missing runtime assets or
+remaining board validation, not a missing subprocess implementation.
+This is per-request model loading, not a persistent runtime. Tests use a process
+double; actual board model loading, template compatibility and NPU execution remain
+unverified. Qwen's native limit is total sequence length, not exact completion tokens.

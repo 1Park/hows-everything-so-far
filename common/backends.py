@@ -81,7 +81,7 @@ class FixtureTextBackend:
             raise ApiError(
                 "fixture_input", "Fixture expects a current_request and utterance", 422
             ) from None
-        intent, item, portion = "refill", current["item"], current["portion"]
+        intent, item = "refill", current["item"]
         if re.search(r"\b(cancel|stop|never mind)\b", utterance):
             intent = "cancel"
         elif re.search(r"\b(no|nope|fine|don't need)\b", utterance):
@@ -91,21 +91,16 @@ class FixtureTextBackend:
             if len(drinks) > 1 or re.search(
                 r"\b(juice|tea|time|maybe|whatever|not sure|ignore)\b", utterance
             ):
-                intent = "clarify"
+                intent = "not_understood"
             elif drinks:
                 item = drinks[0]
             elif not re.search(
                 r"yes|please|same|small|little|less|half|regular|normal|full", utterance
             ):
-                intent = "clarify"
-            if re.search(r"small|little|less|half", utterance):
-                portion = "small"
-            elif re.search(r"regular|normal|full", utterance):
-                portion = "regular"
+                intent = "not_understood"
         result = {
             "intent": intent,
             "item": item if intent == "refill" else None,
-            "portion": portion if intent == "refill" else None,
         }
         return {
             "model": body.model,
@@ -113,10 +108,99 @@ class FixtureTextBackend:
             "choices": [
                 {
                     "message": {"role": "assistant", "content": json.dumps(result)},
-                    "finish_reason": "stop",
+                        "finish_reason": "stop",
                 }
             ],
         }
+
+
+class ExecuTorchBackend:
+    source = "executorch"
+
+    def __init__(self, settings=None):
+        from common.config import load_settings
+
+        self.settings = settings or load_settings()
+
+    async def ready(self):
+        from common.executorch import available
+
+        s = self.settings
+        return s.qwen_seq_len is not None and available(
+            s.qnn_llama_runner, s.qwen_model_path, s.qwen_tokenizer_path
+        )
+
+    async def generate(self, body: Generation):
+        import tempfile
+        from pathlib import Path
+        from common.executorch import asset, execute
+
+        if not await self.ready():
+            raise ApiError(
+                "not_ready", "Configure Qwen runner, model, tokenizer and sequence limit", 503
+            )
+        if body.chat_template_kwargs.enable_thinking:
+            raise ApiError(
+                "unsupported_option", "Board runner supports non-thinking requests only", 422
+            )
+        # The track qwen3 runner must accept preformatted ChatML, as documented
+        # in services/qwen/README.md. Do not ask the runner to wrap it a second time.
+        prompt = (
+            "".join(f"<|im_start|>{m.role}\n{m.content}<|im_end|>\n" for m in body.messages)
+            + "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+        )
+        s = self.settings
+        with tempfile.TemporaryDirectory(prefix="refill-qwen-") as directory:
+            work = Path(directory)
+            await execute(
+                [
+                    str(asset(s.qnn_llama_runner)),
+                    "--model_path",
+                    str(asset(s.qwen_model_path)),
+                    "--tokenizer_path",
+                    str(asset(s.qwen_tokenizer_path)),
+                    "--decoder_model_version",
+                    "qwen3",
+                    "--prompt",
+                    prompt,
+                    "--temperature",
+                    str(body.temperature),
+                    "--seq_len",
+                    str(s.qwen_seq_len),
+                    "--output_path",
+                    str(work / "answer.txt"),
+                ],
+                work,
+                s.inference_timeout,
+            )
+            path = work / "answer.txt"
+            if not path.is_file() or path.stat().st_size > 1_000_000:
+                raise ApiError(
+                    "invalid_backend_output", "Qwen output file is missing or oversized", 502
+                )
+            try:
+                content = path.read_text(encoding="utf-8").strip()
+            except UnicodeError:
+                raise ApiError(
+                    "invalid_backend_output", "Qwen output is not UTF-8 text", 502
+                ) from None
+            if content.startswith(prompt):
+                content = content[len(prompt) :].strip()
+            for suffix in ("<|im_end|>", "<|endoftext|>"):
+                content = content.removesuffix(suffix).strip()
+            if not content:
+                raise ApiError("invalid_backend_output", "Qwen produced empty output", 502)
+            return {
+                "model": body.model,
+                "source": self.source,
+                "choices": [
+                    {"message": {"role": "assistant", "content": content}, "finish_reason": None}
+                ],
+                "runner_limits": {
+                    "total_sequence_tokens": s.qwen_seq_len,
+                    "completion_token_limit_enforced": False,
+                },
+            }
 
 
 def external_adapter(path: str):

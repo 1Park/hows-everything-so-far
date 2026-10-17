@@ -7,7 +7,7 @@ let micPending = false, transcribing = false, pendingAction = null;
 let audioVersion = 0;
 let policy = {min_confidence: 0.7, low_fill_threshold: 0.3};  // /ready 값으로 덮어씀
 const audioBuffers = new Map();
-const editablePhases = ['offered','card','clarify','error'];
+const editablePhases = ['offered','card','not_understood','error'];
 // 사진틀 비율을 실제 사진(카메라 4:3, fixture 등) 비율에 맞춘다 → 박스 좌표가 사진과 일치
 function syncFrameRatio() {
   const img = $('sceneImage');
@@ -115,7 +115,7 @@ function render(next, authoritative = false) {
   $('phase').textContent = state.phase.toUpperCase(); $('message').textContent = state.message;
   const editable = canEdit() && !pendingAction;
   $('utterance').disabled = !editable; $('send').disabled = !editable;
-  $('record').disabled = !editable || micPending || transcribing || (boardAudio && !['offered','clarify','error'].includes(state.phase));
+  $('record').disabled = !editable || micPending || transcribing || (boardAudio && !['offered','not_understood','error'].includes(state.phase));
   $('audioFile').disabled = !editable || micPending || transcribing || recorder?.state === 'recording';
   if (!canEdit() || pendingAction) stopRecording(true);
   $('audioFile').parentElement.hidden = boardAudio;
@@ -180,9 +180,9 @@ function render(next, authoritative = false) {
   }
   $('sceneTitle').textContent = state.scene ? `${state.scene.objects.length} cups observed` : 'Ready when you are';
   $('sceneSubtitle').textContent = state.scene ? `${state.scene.source === 'fixture' ? 'FIXTURE · Predetermined labels and scores' : 'EXTERNAL · Model team observations'}` : 'Inspect a scene to see the cups and their fill levels.';
-  $('requestCard').hidden = !state.card || !['card','interpreting','clarify','error','loading','returning','done'].includes(state.phase);
+  $('requestCard').hidden = !state.card || !['card','interpreting','not_understood','error','loading','returning','done'].includes(state.phase);
   if (state.card) {
-    $('cardDrink').textContent = state.card.item; $('cardPortion').textContent = `${state.card.portion} refill`;
+    $('cardDrink').textContent = state.card.item;
     $('revision').textContent = `v${state.card.revision}`;
     $('targetId').textContent = `Target ${state.card.object_id} · Frozen at proposal · ${state.qwen_source || 'pending'} Qwen`;
     // CSS presentation of the frozen target. Never supplied as model crop/preprocessing.
@@ -191,7 +191,7 @@ function render(next, authoritative = false) {
     $('targetImage').style.backgroundSize = `${100/width}% ${100/height}%`;
     $('targetImage').style.backgroundPosition = `${width === 1 ? 0 : b.x1/(1-width)*100}% ${height === 1 ? 0 : b.y1/(1-height)*100}%`;
   }
-  const step = ['observing','skipped'].includes(state.phase) ? 0 : ['offered','listening','transcribing','interpreting','clarify','error'].includes(state.phase) ? 1 : state.phase === 'card' ? 2 : ['loading','returning','done'].includes(state.phase) ? 3 : -1;
+  const step = ['observing','skipped'].includes(state.phase) ? 0 : ['offered','listening','transcribing','interpreting','not_understood','error'].includes(state.phase) ? 1 : state.phase === 'card' ? 2 : ['loading','returning','done'].includes(state.phase) ? 3 : -1;
   document.querySelectorAll('[data-step]').forEach(e => e.classList.toggle('active', Number(e.dataset.step) <= step));
   if (lastPhase !== state.phase) {
     if (lastPhase === 'offered') {audioVersion++; playingSource?.stop();}

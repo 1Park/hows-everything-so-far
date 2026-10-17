@@ -3,10 +3,10 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from app.language import parse_interpretation
+from app.language import generation, parse_interpretation
 from common.api import ApiError
 from common.config import load_settings
-from common.contracts import BBox, Interpretation, VisionResult
+from common.contracts import BBox, CurrentRequest, Interpretation, VisionResult
 
 
 def test_env_priority_and_validation(tmp_path, monkeypatch):
@@ -35,12 +35,17 @@ def test_bbox_and_duplicate_ids():
 @pytest.mark.parametrize(
     "raw",
     [
-        'Here is your request: {"intent":"cancel","item":null,"portion":null}',
-        '{"intent":"refill","item":"tea","portion":"small"}',
+        'Here is your request: {"intent":"cancel","item":null}',
+        '{"intent":"refill","item":"tea"}',
         '{"intent":"refill","item":"water","portion":"huge"}',
-        '{"intent":"cancel","item":"water","portion":null}',
-        '{"intent":"cancel","intent":"refill","item":"water","portion":"small"}',
-        '{"intent":"refill","item":"water","portion":"small","confirm":true}',
+        '{"intent":"refill","item":"water","portion":"small"}',
+        '{"intent":"refill","item":null}',
+        '{"intent":"refill"}',
+        '{"intent":"cancel","item":"water"}',
+        '{"intent":"not_understood","item":"water"}',
+        '{"intent":"clarify","item":null}',
+        '{"intent":"cancel","intent":"refill","item":"water"}',
+        '{"intent":"refill","item":"water","confirm":true}',
     ],
 )
 def test_model_output_is_strict(raw):
@@ -50,9 +55,22 @@ def test_model_output_is_strict(raw):
 
 def test_single_fence_allowed():
     result = parse_interpretation(
-        '```json\n{"intent":"refill","item":"water","portion":"small"}\n```'
+        '```json\n{"intent":"refill","item":"water"}\n```'
     )
-    assert result == Interpretation(intent="refill", item="water", portion="small")
+    assert result == Interpretation(intent="refill", item="water")
+
+
+def test_not_understood_output():
+    assert parse_interpretation('{"intent":"not_understood","item":null}') == Interpretation(
+        intent="not_understood", item=None
+    )
+
+
+def test_generation_uses_item_only_context():
+    body = generation("test", CurrentRequest(item="coffee"), "Same again please")
+    assert json.loads(body.messages[1].content) == {
+        "current_request": {"item": "coffee"}, "utterance": "Same again please"
+    }
 
 
 def test_item_confidence_is_optional_and_bounded():

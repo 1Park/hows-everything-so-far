@@ -37,8 +37,9 @@ class BoardLLMBackend:
     source = "executorch"
     model_ids = ("gemma3", "gemma4")
 
-    def __init__(self, script=SCRIPT, model=None):
+    def __init__(self, script=SCRIPT, model=None, startup_timeout=120):
         self.script, self.model = Path(script), model
+        self.startup_timeout = startup_timeout
         self.process = None
         self.config = None
         self.stderr_task = None
@@ -81,12 +82,19 @@ class BoardLLMBackend:
                 "pid": self.process.pid if alive else None}
 
     async def ready(self):
-        # Config readiness only. Never switch/unload the worker on a health poll.
-        try:
-            await self._config()
-            return True
-        except (ApiError, OSError, ValueError, TimeoutError):
-            return False
+        # Health polls never load or switch models. Require a live, loaded worker.
+        return self.status["resident"]
+
+    async def startup(self):
+        """Load Gemma4 before accepting HTTP requests; do not run generation."""
+        async with self.lock:
+            try:
+                async with asyncio.timeout(self.startup_timeout):
+                    config = await self._config(pinned=False, requested="gemma4")
+                    await self._ensure(config)
+            except BaseException:
+                await self._stop()
+                raise
 
     async def _drain_stderr(self, proc):
         while chunk := await proc.stderr.read(8192):

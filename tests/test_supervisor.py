@@ -66,7 +66,7 @@ def test_start_demo_stop_restart_and_duplicate():
                     time.sleep(0.02)
                 c.post(
                     "/api/confirm",
-                    json={k: v for k, v in s["card"].items() if k not in ("item", "portion")},
+                    json={k: v for k, v in s["card"].items() if k not in ("item",)},
                 ).raise_for_status()
                 while time.monotonic() < end:
                     s = c.get("/api/state").json()

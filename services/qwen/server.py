@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi.responses import JSONResponse
 
 from common.api import ApiError, InferenceGate, create_api
-from common.backends import FixtureTextBackend, MLXBackend
+from common.backends import ExecuTorchBackend, FixtureTextBackend, MLXBackend
 from common.config import load_settings
 from common.contracts import Generation
 from services.qwen.board_llm import BoardLLMBackend
@@ -16,6 +16,8 @@ def create_app(settings=None, backend=None):
         or {
             "fixture": lambda: FixtureTextBackend(),
             "executorch": lambda: BoardLLMBackend(),
+            "qwen_cli": lambda: ExecuTorchBackend(settings),
+            "board": lambda: BoardLLMBackend(),
             "mlx": lambda: MLXBackend(
                 str(settings.qwen_upstream_url), settings.qwen_model, settings.inference_timeout
             ),
@@ -25,9 +27,13 @@ def create_app(settings=None, backend=None):
 
     @asynccontextmanager
     async def lifespan(app):
-        yield
-        if hasattr(backend, "close"):
-            await backend.close()
+        try:
+            if hasattr(backend, "startup"):
+                await backend.startup()
+            yield
+        finally:
+            if hasattr(backend, "close"):
+                await backend.close()
 
     app = create_api("Qwen", lifespan)
 
