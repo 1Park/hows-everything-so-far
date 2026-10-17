@@ -12,7 +12,7 @@
 
 - Controller 상태/리필 정책/영어 제품 프롬프트/엄격 파서/수정/취소/무응답/재시도/명시 확인, 상태 mock HardwareIO 구현.
 - Qwen 독립 FastAPI: MLX HTTP·명시 fixture·미연결 ExecuTorch 경계, 생성 옵션/입력 검증·bounded queue·timeout·health/readiness.
-- Vision/STT: API·schema·입력 제한·fixture·external async factory/HTTP·오류/readiness. 검출/crop/DINO/STT 모델·전후처리는 구현하지 않았음.
+- Vision/STT: API·schema·입력 제한·fixture·external async factory/HTTP·오류/readiness. 검출/crop/DINO/STT 모델·전후처리는 구현하지 않았음(이후 Vision은 PR #2에서 추가, 아래 표 참고).
 - 실제 앱 UI: 태블릿 브라우저 녹음·원본 전달·전사 검토·고정 WAV 재생, frozen frame/bbox/대상 카드·Confirm/Cancel·연결 복구·반응형. live camera/video source는 별도 live ribbon으로 계속 표시.
 - direct/fixture/proxy/integration 모드, 프로세스별 logs·포트/lock·시작 실패 rollback·graceful stop/재시작. board shell·진단·runner smoke 준비.
 
@@ -52,7 +52,7 @@ CAMERA_SOURCE에 샘플 AVI 파일을 지정한 실제 서버에서도 전체 fi
 
 | 항목 | 현재 상태 / 실제 필요한 것 |
 | --- | --- |
-| Vision 모델 | 팀원 소유. API·fixture/external 연결은 완성. 실제 detector/crop/DINO·라벨/bbox를 팀원이 연결하고 정확도 확인 |
+| Vision 모델 | DINOv2 external backend 병합(PR #2, `services.vision.backend:create_backend`): YOLO11n/고정 ROI → crop → DINOv2 → head. Mac XNNPACK bundle로 실제 HTTP 검증. 보드 QNN bundle·실사 데이터(coffee·잔량 단계)·정확도/지연은 현장 확인 — [vision_evaluation](vision_evaluation/README.md) |
 | STT 모델 | 팀원 소유. 원본 오디오 전달은 확인. WebM/Opus·Safari MP4/AAC 지원/실제 영어 인식 확인 필요 |
 | ExecuTorch/QNN | 보드/runner/bundle/SDK 경로 미제공. ExecuTorchBackend는 명시 not-ready503. 경로·상주 실행·토크나이저·취소/성능/NPU delegation은 현장 검증 |
 | Bridge/MCU | 공식 RPC API 기반 adapter·nonblocking/cancel/watchdog 초안. 실제 board core compile, LED polarity·package 버전·router·timeout/단절/센서 연결 미검증 |

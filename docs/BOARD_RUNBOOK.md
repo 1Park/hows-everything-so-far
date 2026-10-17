@@ -18,7 +18,8 @@ python scripts/diagnose.py
 ```sh
 export QNN_EXECUTOR_RUNNER='<actual executable path>'
 export QNN_LLAMA_RUNNER='<actual executable path>'
-export VISION_MODEL_PATH='<actual DINO bundle .pte>'
+export VISION_MODEL_PATH='<Vision bundle directory containing bundle.json>'
+export VISION_RUNNER_BIN='<qnn_executor_runner path, only for cli-runner bundles>'
 export QWEN_MODEL_PATH='<actual Qwen .pte>'
 export QWEN_TOKENIZER_PATH='<actual tokenizer path>'
 export LD_LIBRARY_PATH='<actual host library paths>'
@@ -34,11 +35,13 @@ smoke는 한 입력·출력/exit code/시간만 logs에 저장한다. 모델 로
 
 Vision/STT 담당자는 [API·async 계약](CONTRACTS.md)을 구현한다. factory/HTTP를 연결하고 실제 source=external/readiness를 확인한다. DINO output이 embedding인지 classification logits인지 bundle을 보고 결정하며 담당자 전처리를 서비스가 대체하지 않는다.
 
+Vision(DINOv2): `VISION_MODEL_BACKEND=external`, `VISION_ADAPTER=services.vision.backend:create_backend`, `VISION_MODEL_PATH=models/board/vision/<bundle>`(bundle 디렉터리, `.pte` 파일 아님). bundle은 `ml/export/make_bundle.py`로 만들고, head는 **보드에서 돌릴 `.pte`의 특징으로** `ml/training/make_head.py`로 학습한다(fp32 head를 양자화 모델에 쓰면 크게 떨어짐). bundle 없음/로드 실패는 ready503. 세부는 [services/vision](../services/vision/README.md)·[ml](../ml/README.md)·[평가 기록](vision_evaluation/README.md).
+
 Qwen ExecuTorch는 common/backends.py의 ExecuTorchBackend 경계에 실제 runtime을 연결한다. 토크나이저·chat template·생성 옵션·취소/timeout·상주 실행·원본 output을 확인한다. 일회성 CLI를 감싼 HTTP 상주만으로 모델 상주를 주장하지 않는다. .env.board는 QWEN_MODEL_BACKEND=executorch라서 연결 전 ready503을 반환하며 Mac/fixture로 자동 전환하지 않는다. 실제 보드 bundle의 공개 model ID는 확인 후 설정한다.
 
 ## 3. 카메라와 태블릿
 
-선택 `python -m pip install -e '.[camera]'`, CAMERA_SOURCE에 확인한 USB index/파일 경로. Controller만 장치를 열고 stream과 분석으로 분기한다. 다른 camera process는 종료한다. 태블릿 브라우저의 마이크/스피커는 [HTTPS runbook](TABLET_DEMO.md)을 따른다. 서버 오디오 장치 접근은 필요 없다.
+선택 `python -m pip install -e '.[camera]'`, CAMERA_SOURCE에 확인한 USB index/파일 경로. Controller만 장치를 열고 stream과 분석으로 분기한다. 다른 camera process는 종료한다. 보드 마이크·태블릿 UI/스피커는 [음성 runbook](TABLET_DEMO.md)을 따른다. 태블릿 안내 재생 완료→보드 녹음→STT→Qwen→카드 순서이며, 이 경로는 태블릿 마이크 권한/HTTPS가 필요 없다.
 
 ## 4. MCU·Bridge
 
@@ -59,4 +62,4 @@ bash scripts/stop-board.sh
 
 ## 현장 승인 전 확인
 
-실제 DINO/STT 입력·출력·bbox 좌표계, 영어 음료 요청 결과, CPU/QNN 별도 export 및 delegation/profile, 메모리/지연/두 모델 동시 자원, USB disconnect, Bridge/watchdog/cancel, 태블릿 HTTPS·마이크 권한·출력 청취. 모두 **현장 미검증**이며 로컬 fixture/UI 테스트와 구분해 기록한다.
+실제 DINO/STT 입력·출력·bbox 좌표계, 영어 음료 요청 결과, CPU/QNN 별도 export 및 delegation/profile, 메모리/지연/두 모델 동시 자원, USB disconnect, Bridge/watchdog/cancel, 태블릿 출력 청취·안내 완료 신호·보드 마이크 녹음. 모두 **현장 미검증**이며 로컬 fixture/UI 테스트와 구분해 기록한다.

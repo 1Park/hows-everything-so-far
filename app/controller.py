@@ -7,6 +7,33 @@ from app.audio import BoardMicrophone
 from common.api import ApiError, log
 from common.contracts import CurrentRequest, RequestCard, StateEvent, uid
 
+# What the board shows for each controller phase. Linux owns this mapping so a new
+# state needs no firmware change; the MCU only applies the colour it is given.
+# Few meanings only: waiting, thinking, asking, confirmed, amber while a reply is
+# still being sought, and red for every way the request ends without a card.
+WHITE, YELLOW, BLUE, GREEN, AMBER, RED = (
+    (255, 255, 255),
+    (255, 200, 0),
+    (0, 80, 255),
+    (0, 255, 0),
+    (255, 110, 0),
+    (255, 0, 0),
+)
+PHASE_COLOURS = {
+    "idle": WHITE,
+    "observing": YELLOW,
+    "interpreting": YELLOW,
+    "offered": BLUE,
+    "card": GREEN,
+    "done": GREEN,
+    "clarify": AMBER,
+    "skipped": RED,
+    "declined": RED,
+    "cancelled": RED,
+    "expired": RED,
+    "error": RED,
+}
+
 TERMINAL = {"idle", "done", "cancelled", "declined", "skipped", "expired", "error"}
 
 
@@ -28,6 +55,7 @@ class Controller:
         self.instance_id = uid()
         self.session_id = uid()
         self.phase, self.message = "idle", "Start a demo to inspect the scene."
+        self.led_colour = None
         self.scene = None
         self.target = None
         self.card = None
@@ -59,9 +87,29 @@ class Controller:
             "stt_source": self.stt_source,
         }
 
+    def show_phase_led(self, phase):
+        # Best effort only: the LED is an indicator, so a Bridge failure must never
+        # interrupt the demo. The mock sequence drives its own colour on the MCU.
+        colour = PHASE_COLOURS.get(phase)
+        if colour is None or colour == self.led_colour:
+            return
+        self.led_colour = colour
+
+        async def push():
+            try:
+                await self.hardware.set_color(*colour)
+            except ApiError:
+                pass
+
+        try:
+            self.launch(push())
+        except RuntimeError:
+            pass  # no running loop; nothing is watching the LED either
+
     def emit(self, phase, message):
         self.phase, self.message = phase, message
         self.sequence += 1
+        self.show_phase_led(phase)
         event = StateEvent(sequence=self.sequence, state=self.state()).model_dump()
         self.events.append(event)
         for queue in self.subscribers:
@@ -148,7 +196,7 @@ class Controller:
                 self.target = min(eligible, key=lambda o: (o.fill_ratio, o.object_id))
                 # A proposal is NOT a confirmable card. A customer utterance is required.
                 self.arm_deadline()
-                self.emit("offered", f"Would you like a refill of {self.target.item}?")
+                self.emit("offered", self.offer_message(self.target))
         except TimeoutError:
             await self.fail(
                 token,
@@ -161,6 +209,21 @@ class Controller:
             await self.fail(
                 token, ApiError("vision_error", "Scene analysis failed. Please retry", 502, True)
             )
+
+    def offer_message(self, target):
+        """Name the observed drink, or ask which one when Vision is unsure between look-alikes.
+
+        Coke and coffee look alike in the same glass. The guess still seeds the request card,
+        so the customer sees and can correct the drink before the explicit Confirm.
+        """
+        uncertain = (
+            target.item in ("coke", "coffee")
+            and target.item_confidence is not None
+            and target.item_confidence < self.settings.item_confirm_threshold
+        )
+        if uncertain:
+            return "Would you like a refill? Is that coke or coffee?"
+        return f"Would you like a refill of {target.item}?"
 
     def check_target(self, body):
         if (

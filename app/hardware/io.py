@@ -4,6 +4,7 @@ import asyncio
 from dataclasses import asdict, dataclass
 from typing import Protocol
 
+from app.hardware.router import RouterClient, RouterError
 from common.api import ApiError
 
 
@@ -12,6 +13,7 @@ class HardwareState:
     backend: str = "mock"
     phase: str = "idle"
     led: bool = False
+    color: tuple[int, int, int] = (0, 0, 0)
     button: bool = False
     occupied: bool = False
     command_id: str | None = None
@@ -19,6 +21,7 @@ class HardwareState:
 
 class HardwareIO(Protocol):
     async def set_led(self, on: bool): ...
+    async def set_color(self, red: int, green: int, blue: int): ...
     async def start(self, command_id: str): ...
     async def advance(self) -> str: ...
     async def cancel(self): ...
@@ -32,6 +35,11 @@ class MockHardware:
 
     async def set_led(self, on: bool):
         self.state.led = on
+        self.state.color = (255, 255, 255) if on else (0, 0, 0)
+
+    async def set_color(self, red: int, green: int, blue: int):
+        self.state.color = (red, green, blue)
+        self.state.led = any((red, green, blue))
 
     async def start(self, command_id: str):
         if self.state.phase not in ("idle", "done", "cancelled"):
@@ -59,23 +67,21 @@ class MockHardware:
 
 
 class BridgeHardware:
-    """Official arduino.app_utils transport; serialized RPC. No invented UART/socket path."""
+    """MessagePack-RPC through arduino-router; serialized. No direct UART access."""
 
-    def __init__(self, timeout: float):
+    def __init__(self, timeout: float, client: RouterClient | None = None):
         self.timeout = timeout
+        self.client = client or RouterClient(timeout)
         self.rpc_lock = asyncio.Lock()
         self.command_id = ""
 
     async def rpc(self, name, *args):
-        def invoke():
-            from arduino.app_utils import Bridge
-
-            return Bridge.call(name, *args, timeout=self.timeout)
-
         try:
             async with self.rpc_lock:
-                return await asyncio.wait_for(asyncio.to_thread(invoke), self.timeout)
-        except Exception:
+                return await asyncio.wait_for(
+                    asyncio.to_thread(self.client.call, name, *args), self.timeout
+                )
+        except (RouterError, OSError, TimeoutError):
             # A timed-out thread cannot be killed. MCU watchdog is authoritative for stopping.
             raise ApiError(
                 "bridge_error",
@@ -91,6 +97,10 @@ class BridgeHardware:
 
     async def set_led(self, on: bool):
         await self.rpc("set_led_state", on)
+
+    async def set_color(self, red: int, green: int, blue: int):
+        if not await self.rpc("set_led_color", red, green, blue):
+            raise ApiError("hardware_rejected", "MCU rejected the colour", 409)
 
     async def advance(self):
         return {0: "idle", 1: "loading", 2: "returning", 3: "done", 4: "cancelled"}.get(
