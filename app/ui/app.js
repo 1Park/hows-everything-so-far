@@ -318,6 +318,35 @@ function renderVoiceBanner(state) {
   tick();
 }
 
+let liveSource = false;
+
+function detachStream(image) {
+  delete image.dataset.streaming;
+  // Hand the element back to its own error handling; while streaming, attachStream
+  // owns onerror so a dropped feed reconnects instead of raising a scene error.
+  image.onerror = image.id === 'sceneImage' ? sceneImageError : null;
+  if (image.getAttribute('src')?.startsWith('/api/video')) image.removeAttribute('src');
+}
+
+// An <img> MJPEG stream never retries by itself, so a single dropped connection
+// used to leave a dead feed until the page was reloaded.
+function attachStream(image) {
+  if (image.dataset.streaming) return;
+  image.dataset.streaming = '1';
+  // The query string stops the browser from reusing the dead response.
+  image.src = `/api/video?t=${Date.now()}`;
+  image.onerror = () => {
+    delete image.dataset.streaming;
+    image.removeAttribute('src');
+    setTimeout(() => {
+      // Only reconnect while the element is still meant to be showing a feed.
+      if (!image.isConnected || image.closest('[hidden]')) return;
+      if (image.id === 'livePreview' && !image.parentElement.open) return;
+      attachStream(image);
+    }, 1000);
+  };
+}
+
 // Recomputed on every render: readiness and state arrive in either order, and the
 // freeze branch only runs once, so deciding there left the button stuck hidden.
 function showBackToLive() {
