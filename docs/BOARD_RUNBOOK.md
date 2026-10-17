@@ -60,6 +60,52 @@ bash scripts/stop-board.sh
 
 프로세스별 logs, tmp/board.lock. startup 실패 시 시작한 자식들만 정리한다. stale lock이면 PID/cmdline와 열린 포트를 확인한 후 수동 제거한다. 종료는 matching supervisor만 대상으로 하고 router/firmware/Tailscale은 건드리지 않는다. 다시 시작해 동일 demo를 재현한다.
 
+## 6. 현재 보드 포트 배치 (2026-10-17, QCVENTUNO002)
+
+| 포트 | 서비스 | 실제 backend | 누가 띄우나 | 로그 |
+|---|---|---|---|---|
+| 0.0.0.0:8080 | Controller/UI | Vision·STT·Qwen HTTP 호출, Hardware mock | `scripts/dev.py --mode direct` | `logs/controller.log` |
+| 127.0.0.1:8000 | Qwen 서비스 | **Gemma** (`board_llm.sh` → qnn_llama_runner, NPU, 요청마다 load) | 단독 uvicorn (아래) | `~/model_output/logs/qwen-8000.log` |
+| 127.0.0.1:8001 | Vision 서비스 | DINOv2 fp16 + YOLO11n 16a8w QNN (cli runner, NPU) | 단독 uvicorn (아래) | `~/model_output/logs/vision-8001.log` |
+| 127.0.0.1:8002 | STT 서비스 | whisper.cpp HTTP adapter (`services.stt.whisper_http`) | `dev.py --with-stt` | `logs/stt.log` |
+| 0.0.0.0:8178 | whisper-server | whisper.cpp `ggml-base.en` (레포 밖 `~/whisper.cpp`) | 팀원 수동 실행, 건드리지 않음 | — |
+
+보드 시스템 포트(22 ssh, 53 DNS, 631 cups, 5683 arduino-cloud-connector, 8800 arduino-app-cli, Tailscale)는 앱과 무관하다.
+
+- 연결 순서: Controller → Vision 8001 / Qwen 8000 / STT 8002 → whisper-server 8178. 주소는 `.env.board` 기본값(`*_BASE_URL`)과 같다
+- **Vision과 Gemma는 `dev.py`가 관리하지 않는다.** `dev.py --stop`이나 Controller 재시작으로는 꺼지지 않고, 보드를 재부팅하면 아래 명령으로 다시 띄운다
+- Controller는 `--mode direct`로 띄운다. `--mode fixture`는 Vision·STT를 강제로 fixture로 바꾸고, `--mode integration`/`board`는 8000·8001을 직접 띄우려다 포트 충돌로 시작하지 않는다
+- 모델이 둘 다 NPU를 쓰지만 동시 실행 확인함(Gemma4 + DINOv2 + YOLO, 오류 없음). 데모 전 `bash scripts/board_llm.sh use gemma4`로 Gemma4 고정 권장
+
+```sh
+cd ~/project/hows-everything-so-far
+ET=$HOME/git/executorch
+
+# Vision 8001 (bundle: models/board/vision/dinov2-qnn-v1)
+LD_LIBRARY_PATH=$ET/build-x86/backends/qualcomm:/usr/lib ADSP_LIBRARY_PATH=/usr/lib \
+VISION_MODEL_BACKEND=external VISION_ADAPTER=services.vision.backend:create_backend \
+VISION_MODEL_PATH=models/board/vision/dinov2-qnn-v1 \
+VISION_RUNNER_BIN=$ET/build-x86/examples/qualcomm/executor_runner/qnn_executor_runner \
+setsid nohup .venv/bin/python -m uvicorn services.vision.server:create_app --factory \
+  --host 127.0.0.1 --port 8001 > ~/model_output/logs/vision-8001.log 2>&1 < /dev/null &
+
+# Gemma 8000 (.env.board가 QWEN_MODEL_BACKEND=executorch)
+setsid nohup .venv/bin/python -m uvicorn services.qwen.server:create_app --factory \
+  --host 127.0.0.1 --port 8000 > ~/model_output/logs/qwen-8000.log 2>&1 < /dev/null &
+
+# Controller 8080 + STT 8002 (whisper-server 8178이 떠 있어야 함)
+STT_MODEL_BACKEND=external STT_ADAPTER=services.stt.whisper_http:create_backend \
+setsid nohup .venv/bin/python scripts/dev.py --mode direct --with-stt --env-file .env.board \
+  > logs/dev-8080.out 2>&1 < /dev/null &
+
+# 확인: 전체 ready=true, vision/stt source=external
+curl -s http://127.0.0.1:8001/ready; curl -s http://127.0.0.1:8000/ready; curl -s http://127.0.0.1:8080/ready
+
+# Vision·Gemma 끄기 (Controller는 .venv/bin/python scripts/dev.py --stop --env-file .env.board)
+pkill -f 'services.vision.server:create_app --factory --host 127.0.0.1 --port 8001'
+pkill -f 'services.qwen.server:create_app --factory --host 127.0.0.1 --port 8000'
+```
+
 ## 현장 승인 전 확인
 
 실제 DINO/STT 입력·출력·bbox 좌표계, 영어 음료 요청 결과, CPU/QNN 별도 export 및 delegation/profile, 메모리/지연/두 모델 동시 자원, USB disconnect, Bridge/watchdog/cancel, 태블릿 출력 청취·안내 완료 신호·보드 마이크 녹음. 모두 **현장 미검증**이며 로컬 fixture/UI 테스트와 구분해 기록한다.
