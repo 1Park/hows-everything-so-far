@@ -41,7 +41,7 @@ Qwen ExecuTorch는 common/backends.py의 ExecuTorchBackend 경계에 실제 runt
 
 ## 3. 카메라와 태블릿
 
-선택 `python -m pip install -e '.[camera]'`, CAMERA_SOURCE에 확인한 USB index/파일 경로. Controller만 장치를 열고 stream과 분석으로 분기한다. 다른 camera process는 종료한다. 태블릿 브라우저의 마이크/스피커는 [HTTPS runbook](TABLET_DEMO.md)을 따른다. 서버 오디오 장치 접근은 필요 없다.
+선택 `python -m pip install -e '.[camera]'`, CAMERA_SOURCE에 확인한 USB index/파일 경로. Controller만 장치를 열고 stream과 분석으로 분기한다. 다른 camera process는 종료한다. 보드 마이크·태블릿 UI/스피커는 [음성 runbook](TABLET_DEMO.md)을 따른다. 태블릿 안내 재생 완료→보드 녹음→STT→Qwen→카드 순서이며, 이 경로는 태블릿 마이크 권한/HTTPS가 필요 없다.
 
 ## 4. MCU·Bridge
 
@@ -62,4 +62,4 @@ bash scripts/stop-board.sh
 
 ## 현장 승인 전 확인
 
-실제 DINO/STT 입력·출력·bbox 좌표계, 영어 음료 요청 결과, CPU/QNN 별도 export 및 delegation/profile, 메모리/지연/두 모델 동시 자원, USB disconnect, Bridge/watchdog/cancel, 태블릿 HTTPS·마이크 권한·출력 청취. 모두 **현장 미검증**이며 로컬 fixture/UI 테스트와 구분해 기록한다.
+실제 DINO/STT 입력·출력·bbox 좌표계, 영어 음료 요청 결과, CPU/QNN 별도 export 및 delegation/profile, 메모리/지연/두 모델 동시 자원, USB disconnect, Bridge/watchdog/cancel, 태블릿 출력 청취·안내 완료 신호·보드 마이크 녹음. 모두 **현장 미검증**이며 로컬 fixture/UI 테스트와 구분해 기록한다.
