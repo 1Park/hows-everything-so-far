@@ -73,6 +73,11 @@ def create_app(settings=None, clients=None, hardware=None):
             response.headers.update(no_store)
             return response
 
+        def is_not_modified(self, *args, **kwargs):
+            # no-store alone was not enough: a copy cached before the header existed
+            # still revalidated into a 304, so the tablet kept running old code.
+            return False
+
     app.mount("/ui", FreshStaticFiles(directory=ROOT / "app/ui"), name="ui")
 
     @app.get("/ready")

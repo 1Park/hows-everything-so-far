@@ -16,7 +16,7 @@ const DEFAULT_PHRASES = [
 
 let phrases = load();
 let index = 0;
-const results = [];
+let results = [];
 
 function load() {
   try {
@@ -99,6 +99,16 @@ function summarise(source) {
       cell.textContent = value;
       row.append(cell);
     }
+    // A fumbled take says nothing about the model, so single rows can go.
+    const cell = document.createElement('td');
+    const drop = document.createElement('button');
+    drop.type = 'button';
+    drop.className = 'secondary';
+    drop.textContent = '✕';
+    drop.title = 'Discard this take';
+    drop.onclick = () => { results.splice(i, 1); summarise(); };
+    cell.append(drop);
+    row.append(cell);
     rows.prepend(row);
   });
 }
@@ -168,6 +178,12 @@ $('sttReset').onclick = () => {
   showPhrase();
 };
 
+$('sttClear').onclick = () => {
+  if (results.length && !confirm(`Discard all ${results.length} takes?`)) return;
+  results = [];
+  summarise();
+};
+
 $('sttCopy').onclick = async () => {
   const csv = ['expected,heard,wer']
     .concat(results.map(r => `"${r.expected}","${r.heard.replace(/"/g, '""')}",${r.wer.toFixed(3)}`))
@@ -180,6 +196,8 @@ $('sttCopy').onclick = async () => {
     showError('Clipboard unavailable. Select the table instead.');
   }
 };
+
+$('sttCopyTop').onclick = () => $('sttCopy').click();
 
 $('sttPhrases').value = phrases.join('\n');
 renderSuggestions();
