@@ -55,11 +55,13 @@ docker build --platform linux/amd64 -t refill-ml-export ml                      
 | NPU 검증 | `ml/docker-run.sh python -m ml.evaluation.qnn_sim_check {yolo,dinov2} <pte>` | HTP 시뮬레이터 출력 vs fp32 |
 | 보드 export·NPU | 보드 ExecuTorch venv에서 `python -m ml.export.export_qnn ... --soc_model QCS8275`, `python -m ml.evaluation.board_npu_check {dinov2,yolo} --pte <pte> --images <dir>` | 보드 실측 (설치·환경변수는 [BOARD_RUNBOOK](../docs/BOARD_RUNBOOK.md#보드-executorch-설치-기록-2026-10-17-qcventuno002)) |
 | 보드 LLM | `scripts/board_llm.sh status / use gemma3\|gemma4\|auto / ask "..."` | 주최 측 Gemma `.pte` 전환 실행 |
-| head 학습 | `python -m ml.training.make_head --dino-pte <pte> --runner {py,cli}` (**배포할 .pte로**) | head JSON |
+| 학습 crop | `python -m ml.training.make_crops --data data/real --bundle <bundle> --runner-bin <runner> --out data/crops` | YOLO 모드: 학습 사진 → 추론과 같은 pad crop (`data/crops/`, 옆 물체는 `data/crops_extra/`) |
+| head 학습 | `python -m ml.training.make_head --data data/crops --dino-pte <pte> --runner {py,cli} --class-weight balanced` (**배포할 .pte로**) | head JSON |
 | bundle | `python -m ml.export.make_bundle --out models/{local,board}/vision/<name> ...` | `bundle.json` + .pte + head |
 
 ### 꼭 지킬 것
 
+- **YOLO 모드면 head도 YOLO crop으로 학습한다** (`make_crops`). 사진 전체로 학습하면 배경 물체를 같이 배운다: coke__full 사진 절반에 콜라캔이 옆에 있어 캔 crop이 coke로 나왔다. 가장자리에서 잘린 옆 물체 crop을 other로 넣으면 화면 끝에 걸린 진짜 잔까지 버린다 → 넣지 않는다
 - **head는 보드에서 실제로 돌릴 .pte가 낸 특징으로 학습한다.** fp32 head를 양자화 모델에 쓰면 크게 떨어진다 (int8 근사 88.8%→68.2%, QNN 16a8w 24%).
 - DINOv2 QNN은 **fp16 우선** (fp32 대비 cosine 0.9992). 16a8w는 0.58, 16a16w는 망가짐.
 - 일반 ExecuTorch 1.5.1엔 QCS8275 타깃이 없다. 주최 측 checkout/SDK로 export하고, SM8650(같은 HTP v75) 산출물은 리허설용으로만 쓴다.

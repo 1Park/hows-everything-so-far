@@ -34,8 +34,11 @@ class Head:
         return softmax(((X - self.mean) / self.scale) @ self.W.T + self.b)
 
 
-def fit_head(X, y, classes, C=0.1, iters=3000, lr=0.5):
-    """StandardScaler + 다항 로지스틱 회귀. sklearn 있으면 그것(Mac과 동일), 없으면 numpy 경사하강."""
+def fit_head(X, y, classes, C=0.1, iters=3000, lr=0.5, class_weight=None):
+    """StandardScaler + 다항 로지스틱 회귀. sklearn 있으면 그것(Mac과 동일), 없으면 numpy 경사하강.
+
+    class_weight="balanced": 클래스별 장수 차이를 가중치로 보정 (예: other에 캔 crop을 많이 넣었을 때).
+    """
     X = np.asarray(X, np.float64).reshape(len(X), -1)
     y = np.asarray(y)
     mean, scale = X.mean(0), X.std(0)
@@ -45,7 +48,7 @@ def fit_head(X, y, classes, C=0.1, iters=3000, lr=0.5):
     try:
         from sklearn.linear_model import LogisticRegression
 
-        lr_ = LogisticRegression(max_iter=3000, C=C).fit(Z, y)
+        lr_ = LogisticRegression(max_iter=3000, C=C, class_weight=class_weight).fit(Z, y)
         W, b = lr_.coef_, lr_.intercept_
         if k == 2:  # sklearn 2클래스는 W 1행 → softmax 형태로 펼침
             W, b = np.vstack([-W[0] / 2, W[0] / 2]), np.array([-b[0] / 2, b[0] / 2])
@@ -54,9 +57,12 @@ def fit_head(X, y, classes, C=0.1, iters=3000, lr=0.5):
         n, d = Z.shape
         W, b = np.zeros((k, d)), np.zeros(k)
         Y = np.eye(k)[y]
+        sw = np.ones(n)
+        if class_weight == "balanced":  # sklearn과 같은 정의: n / (k * 클래스 장수)
+            sw = n / (k * np.bincount(y, minlength=k)[y])
         lam = 1.0 / (C * n)  # sklearn 목적함수(합 CE + ||W||²/2C)를 n으로 나눈 것
         for _ in range(iters):
-            G = softmax(Z @ W.T + b) - Y
+            G = (softmax(Z @ W.T + b) - Y) * sw[:, None]
             W -= lr * (G.T @ Z / n + lam * W)
             b -= lr * G.mean(0)
         how = "numpy-gd"

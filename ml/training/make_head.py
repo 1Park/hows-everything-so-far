@@ -6,6 +6,10 @@ sklearn 이 없으면 numpy 경사하강으로 학습.
   python -m ml.training.make_head --data data/real --dino-pte dino.pte --runner py --out models/experiments/vision/heads/head_board.json
   python -m ml.training.make_head --data data/real --dino-pte dino.pte --runner cli \
       --runner-bin $QNN_RUNNER --dino-out-shape 1 384 --out models/experiments/vision/heads/head_board.json
+
+YOLO 모드 bundle이면 학습 사진을 먼저 추론과 같은 crop으로 바꾼다 (ml/training/make_crops.py):
+  python -m ml.training.make_crops --data data/real --bundle <bundle> --runner-bin $QNN_RUNNER --out data/crops
+  python -m ml.training.make_head --data data/crops --class-weight balanced ...
 """
 
 import argparse
@@ -32,6 +36,7 @@ def main():
     ap.add_argument("--dino-out-shape", type=int, nargs="+", default=[1, 384])
     ap.add_argument("--batch", type=int, default=16, help="cli runner 한 번에 넣을 장 수")
     ap.add_argument("--C", type=float, default=0.1)
+    ap.add_argument("--class-weight", choices=["balanced"], help="클래스별 장수 차이 보정")
     ap.add_argument("--out", default="models/experiments/vision/heads/head_board.json")
     args = ap.parse_args()
 
@@ -55,8 +60,8 @@ def main():
     if hasattr(runner, "close"):
         runner.close()
 
-    head = fit_head(X, y, classes, C=args.C)
-    head["source"] = dict(pte=str(args.dino_pte), runner=args.runner, data=str(root))
+    head = fit_head(X, y, classes, C=args.C, class_weight=args.class_weight)
+    head["source"] = dict(pte=str(args.dino_pte), runner=args.runner, data=str(root), class_weight=args.class_weight)
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text(json.dumps(head))
     np.savez(Path(args.out).with_suffix(".npz"), X=X, y=np.array(y), classes=np.array(classes))
