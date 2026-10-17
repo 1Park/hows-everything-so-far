@@ -53,6 +53,8 @@ docker build --platform linux/amd64 -t refill-ml-export ml                      
 | CPU .pte | `python -m ml.export.export_xnnpack`, YOLO는 ultralytics `format="executorch"` | `models/local/vision/` |
 | NPU .pte | `ml/docker-run.sh python -m ml.export.export_qnn --model {yolo,dinov2} [--quant fp16] --soc_model QCS8275 --build_folder /tmp --compile_only` | `models/experiments/vision/qnn/<soc>_<quant>/` |
 | NPU 검증 | `ml/docker-run.sh python -m ml.evaluation.qnn_sim_check {yolo,dinov2} <pte>` | HTP 시뮬레이터 출력 vs fp32 |
+| 보드 export·NPU | 보드 ExecuTorch venv에서 `python -m ml.export.export_qnn ... --soc_model QCS8275`, `python -m ml.evaluation.board_npu_check {dinov2,yolo} --pte <pte> --images <dir>` | 보드 실측 (설치·환경변수는 [BOARD_RUNBOOK](../docs/BOARD_RUNBOOK.md#보드-executorch-설치-기록-2026-10-17-qcventuno002)) |
+| 보드 LLM | `scripts/board_llm.sh status / use gemma3\|gemma4\|auto / ask "..."` | 주최 측 Gemma `.pte` 전환 실행 |
 | head 학습 | `python -m ml.training.make_head --dino-pte <pte> --runner {py,cli}` (**배포할 .pte로**) | head JSON |
 | bundle | `python -m ml.export.make_bundle --out models/{local,board}/vision/<name> ...` | `bundle.json` + .pte + head |
 

@@ -102,3 +102,12 @@ COCO YOLO11n은 캔·병도 `cup`으로 잡는다(실측: 노란 탄산수 캔 0
 | **회색 패딩 ×1.15 (현재 기본)** | **other** | **coffee** | **empty** | **other** | **9/9** |
 
 `pad_crop`: 박스를 1.15배만 넓혀 자르고 정사각형의 남는 부분은 회색(114)으로 채운다. 박스 중심을 고정해 가장자리에서도 밀리지 않는다.
+
+## 보드 NPU 실측 (2026-10-17, VENTUNO Q / QCS8275, 주최 측 ExecuTorch + QNN 2.49)
+
+| 모델 | 형식 | 지연 | 정확도 |
+|---|---|---:|---|
+| DINOv2-small CLS | fp16, 46 MB | **5.8~6.0 ms/장** | fp32 대비 cosine 0.9995 (min 0.9991) → Mac head 그대로 사용 가능 |
+| YOLO11n | 16a8w, 3.3 MB | **16 ms/장** | fp32 박스 19/21 일치(IoU>0.8), 놓친 2개는 배경 저신뢰 잔 |
+
+SM8650 x86 시뮬레이터 리허설과 같은 경향(DINOv2 fp16 0.9992 / YOLO 25/27). 측정: `ml/evaluation/board_npu_check.py`. 설치 절차·경로는 [BOARD_RUNBOOK](../BOARD_RUNBOOK.md#보드-executorch-설치-기록-2026-10-17-qcventuno002).
