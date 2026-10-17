@@ -5,6 +5,7 @@ let audioContext = null, playingSource = null;
 let draftVersion = 0, transcriptionVersion = 0, micVersion = 0;
 let micPending = false, transcribing = false, pendingAction = null;
 let audioVersion = 0;
+let policy = {min_confidence: 0.7, low_fill_threshold: 0.3};  // /ready 값으로 덮어씀
 const audioBuffers = new Map();
 const editablePhases = ['offered','card','clarify','error'];
 function canEdit() { return connected && !!state?.target && editablePhases.includes(state.phase); }
@@ -78,7 +79,7 @@ function modePill(label, source, ready = true) {
 }
 async function checkConnection() {
   try {
-    const response = await fetch('/ready'); const info = await response.json();
+    const response = await fetch('/ready'); const info = await response.json(); if (info.policy) policy = info.policy;
     const sources = $('sources'); sources.replaceChildren();
     for (const [name, data] of Object.entries(info.dependencies)) sources.append(modePill(name.toUpperCase(), data.source, data.ready));
     sources.append(modePill('Hardware', info.hardware, info.hardware_ready)); sources.append(modePill('Location', info.location));
@@ -158,11 +159,15 @@ function render(next, authoritative = false) {
   const boxes = $('boxes'); boxes.replaceChildren(); const objects = $('objects'); objects.replaceChildren();
   for (const obj of state.scene?.objects || []) {
     const selected = obj.object_id === state.target?.object_id;
-    const box = document.createElement('div'); box.className = 'bbox' + (selected ? ' selected' : '');
+    // 리필 필요 = Controller 정책과 같은 잔량·confidence 기준 (빈 잔 unknown도 눈으로는 리필 대상이라 표시)
+    // Vision은 빈 잔을 item unknown으로 보낸다 (계약에 empty 없음) → 화면에서만 empty로 표시
+    const item = obj.item === 'unknown' && obj.fill_ratio !== null && obj.fill_ratio <= 0.1 ? 'empty' : obj.item;
+    const refill = obj.fill_ratio !== null && obj.fill_ratio <= policy.low_fill_threshold && obj.confidence >= policy.min_confidence;
+    const box = document.createElement('div'); box.className = 'bbox' + (selected ? ' selected' : '') + (refill ? ' refill' : '');
     const b = obj.bbox; Object.assign(box.style, {left:`${b.x1*100}%`, top:`${b.y1*100}%`, width:`${(b.x2-b.x1)*100}%`, height:`${(b.y2-b.y1)*100}%`});
-    const label = document.createElement('span'); label.className = 'box-label'; label.textContent = `${obj.object_id} · ${obj.item}`; box.append(label); boxes.append(box);
+    const label = document.createElement('span'); label.className = 'box-label'; label.textContent = `${obj.object_id} · ${item}${refill ? ' · REFILL' : ''}\n${obj.fill_ratio === null ? 'fill ?' : Math.round(obj.fill_ratio*100)+'% left'} · conf ${Math.round(obj.confidence*100)}%`; box.append(label); boxes.append(box);
     const card = document.createElement('div'); card.className = 'object' + (selected ? ' target' : '');
-    const title = document.createElement('strong'); title.textContent = obj.item; card.append(title);
+    const title = document.createElement('strong'); title.textContent = item; card.append(title);
     const small = document.createElement('small'); small.textContent = obj.object_id; card.append(small);
     const bar = document.createElement('div'); bar.className='fill'; const fill = document.createElement('span'); fill.style.width=`${(obj.fill_ratio || 0)*100}%`; bar.append(fill); card.append(bar);
     const details = document.createElement('span'); details.textContent = `${obj.fill_ratio === null ? 'Unknown fill' : Math.round(obj.fill_ratio*100)+'% left'} · ${Math.round(obj.confidence*100)}% confidence`; card.append(details); objects.append(card);
