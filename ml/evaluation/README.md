@@ -10,3 +10,11 @@
 대량 출력은 `models/` 하위 실험 폴더 등에 저장한다. 공유할 설정·요약 보고서는 `docs/`에 두고 모델·데이터 버전과 실행 위치를 명시한다. 생성된 설명용 사진과 fixture는 실측 정확도 자료로 취급하지 않는다.
 
 과거 Qwen 텍스트·유사 STT 치환 평가 아카이브는 `docs/qwen_evaluation/`에 그대로 둔다. 앱의 unit/integration 테스트와 모델 정확도 평가는 구분한다.
+
+## 파일
+
+- `eval_fewshot.py` — DINOv2 임베딩 + prototype/logreg few-shot, CONF_MIN coverage
+- `bench_latency.py` — Mac CPU/MPS 지연시간
+- `detect_test.py` — COCO YOLO11n 컵 검출 (파인튜닝 없이)
+- `yolo_et.py` — YOLO `.pte` + numpy 후처리 vs ultralytics 비교
+- `qnn_sim_check.py` — QNN `.pte`를 x86 HTP 시뮬레이터로 실행해 fp32와 비교 (Docker)

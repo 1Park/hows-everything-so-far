@@ -9,6 +9,9 @@ unsigned long lastPoll = 0;
 // No sensor pins are guessed. Wire real inputs only after the team chooses hardware.
 bool mockButton = false;
 bool mockOccupied = false;
+// Linux owns the LED except while a sequence runs; see loop().
+bool manualLED = false;
+int ledOutput = -1;  // -1 = never written, so the first apply always writes.
 
 bool startMock(String command) {
   if (command.length() == 0 || command == lastCommand || phase == LOADING || phase == RETURNING) return false;
@@ -25,11 +28,19 @@ bool cancelMock(String command) {
 int readPhase() { lastPoll = millis(); return (int)phase; }
 bool readButton() { return mockButton; }
 bool readOccupied() { return mockOccupied; }
-void setLED(bool on) { digitalWrite(LED_BUILTIN, on ? LOW : HIGH); }
+// RPC handler: record the request only. loop() decides what actually reaches the pin.
+void setLED(bool on) { manualLED = on; }
+
+// Active-low builtin LED; writes only on change.
+void applyLED(bool on) {
+  if (ledOutput == (int)on) return;
+  ledOutput = (int)on;
+  digitalWrite(LED_BUILTIN, on ? LOW : HIGH);
+}
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
-  setLED(false);
+  applyLED(false);
   if (!Bridge.begin()) { while (true) { delay(10); } }
   Bridge.provide_safe("refill_start", startMock);
   Bridge.provide_safe("refill_cancel", cancelMock);
@@ -46,6 +57,9 @@ void loop() {
     else if (now - startedAt >= 3000) phase = DONE;
     else if (now - startedAt >= 1500) phase = RETURNING;
   }
-  setLED(phase == LOADING || phase == RETURNING);
+  // A running sequence owns the LED so it stays correct if the host goes away.
+  // Otherwise the last set_led_state value persists, which is also the Bridge smoke test.
+  bool running = (phase == LOADING || phase == RETURNING);
+  applyLED(running ? true : manualLED);
   // No blocking sequence, nested Bridge.call(), or RPC logging in handlers.
 }
