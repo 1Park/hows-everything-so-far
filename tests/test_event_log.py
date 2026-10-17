@@ -29,9 +29,13 @@ def make(path):
     return Controller(settings, ModelClients(settings))
 
 
-async def run_refill(c):
-    await c.start((ROOT / "docs/assets/cups-example.jpg").read_bytes(), "image/jpeg", "normal")
+async def observe(c, scenario="normal"):
+    await c.start((ROOT / "docs/assets/cups-example.jpg").read_bytes(), "image/jpeg", scenario)
     await settled(c)
+
+
+async def run_refill(c):
+    await observe(c)
     await c.utterance(
         UtteranceInput(
             scene_id=c.scene.scene_id,
@@ -48,29 +52,41 @@ def lines(path):
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
 
 
-async def test_refill_session_is_recorded(tmp_path):
+async def test_only_detected_and_requested_are_recorded(tmp_path):
     path = tmp_path / "events.jsonl"
     c = make(path)
     try:
         await run_refill(c)
+        cups = len(c.scene.objects)
     finally:
         await c.close()
     rows = lines(path)
-    phases = [r["phase"] for r in rows]
-    for phase in ("observing", "offered", "interpreting", "card", "loading", "done"):
-        assert phase in phases
-    assert phases.index("offered") < phases.index("card") < phases.index("done")
-    assert len({r["session"] for r in rows if r["phase"] != "idle"}) == 1
-    assert [r["sequence"] for r in rows] == sorted(r["sequence"] for r in rows)
+    assert [r["event"] for r in rows] == ["detected"] * cups + ["requested"]
     for r in rows:
         datetime.fromisoformat(r["ts"])
+    assert len({r["session"] for r in rows}) == 1
 
-    offered = next(r for r in rows if r["phase"] == "offered")
-    assert offered["item"] in ("water", "coke", "coffee", "unknown")
-    assert 0 <= offered["fill_ratio"] <= 1 and "confidence" in offered
-    card = next(r for r in rows if r["phase"] == "card")
-    assert card["req_item"] == "water" and card["portion"] == "small"
-    assert card["request_id"] and card["revision"] == 1
+    detected = rows[:cups]
+    assert all(r["level"] in ("low", "high", "unknown") for r in detected)
+    assert any(r["level"] == "low" for r in detected)
+    water = next(r for r in detected if r["object_id"] == "cup-water")
+    assert water["item"] == "water" and water["level"] == "low" and water["fill_ratio"] == 0.15
+
+    requested = rows[-1]
+    assert requested["item"] == "water" and requested["portion"] == "small"
+    assert requested["object_id"] == "cup-water" and requested["revision"] == 1
+
+
+async def test_full_cups_are_recorded_as_high(tmp_path):
+    path = tmp_path / "events.jsonl"
+    c = make(path)
+    try:
+        await observe(c, "enough")
+        assert c.phase == "skipped"
+    finally:
+        await c.close()
+    rows = lines(path)
+    assert rows and all(r["event"] == "detected" and r["level"] == "high" for r in rows)
 
 
 async def test_disabled_writes_nothing(tmp_path, monkeypatch):
@@ -95,29 +111,31 @@ async def test_unwritable_path_never_breaks_the_demo(tmp_path):
         await c.close()
 
 
-def test_row_and_read_round_trip(tmp_path):
+def test_spoken_request_keeps_transcript_and_read_skips_bad_lines(tmp_path):
     state = {
-        "instance_id": "i",
         "session_id": "s",
-        "sequence": 7,
-        "phase": "error",
+        "phase": "card",
         "scene": None,
-        "target": None,
-        "card": None,
-        "transcript": "No thanks",
-        "stt_source": "external",
-        "qwen_source": "executorch",
-        "last_error": {"code": "model_unavailable", "message": "x", "retryable": True},
+        "transcript": "Just a little coffee, please.",
+        "card": {"object_id": "cup-a", "item": "coffee", "portion": "small", "revision": 2},
     }
     log = EventLog(tmp_path / "e.jsonl")
     log.record(state)
-    (tmp_path / "e.jsonl").open("a").write("not json\n")
-    log.record({**state, "sequence": 8, "phase": "idle"})
+    with (tmp_path / "e.jsonl").open("a") as file:
+        file.write("not json\n")
+    log.record({**state, "phase": "loading"})  # other phases add nothing
     rows = log.read()
-    assert [r["sequence"] for r in rows] == [7, 8]
-    assert rows[0]["error_code"] == "model_unavailable" and "error_code" not in rows[1]
-    assert rows[0]["transcript"] == "No thanks" and rows[0]["qwen_source"] == "executorch"
-    assert log.read(limit=1)[0]["sequence"] == 8
+    assert len(rows) == 1
+    assert rows[0]["transcript"] == "Just a little coffee, please."
+    assert rows[0]["item"] == "coffee" and rows[0]["revision"] == 2
+
+
+@pytest.mark.parametrize(
+    ("fill", "level"),
+    [(0.0, "low"), (0.3, "low"), (0.31, "high"), (1.0, "high"), (None, "unknown")],
+)
+def test_level_uses_threshold(fill, level):
+    assert EventLog(None, low_fill_threshold=0.3).level(fill) == level
 
 
 def test_relative_path_resolves_against_repo_root():

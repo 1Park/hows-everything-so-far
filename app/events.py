@@ -1,9 +1,14 @@
-"""Append-only JSON Lines record of Controller phase changes, for the history dashboard.
+"""Append-only JSON Lines history for the dashboard: what was detected and what was requested.
 
-One line per emitted state: when it happened, which session, the phase, and the facts known at
-that moment (target cup and fill level, transcript, request card, error). A session's lines
-together describe one customer interaction. Recording is best effort: a write failure is logged
-once and never interrupts the demo. EVENT_LOG_PATH empty disables recording.
+Only two kinds of line are written:
+
+- ``detected``: one line per cup each time scene analysis finishes (phase offered or skipped),
+  with the drink, its fill level (``low`` / ``high`` against LOW_FILL_THRESHOLD) and the time.
+- ``requested``: one line each time a customer request becomes a refill card,
+  with the requested drink, portion, the customer's words when spoken, and the time.
+
+Recording is best effort: a write failure is logged once and never interrupts the demo.
+EVENT_LOG_PATH empty disables recording.
 """
 
 import json
@@ -14,7 +19,7 @@ from common.api import log
 
 
 class EventLog:
-    def __init__(self, path: str | Path | None):
+    def __init__(self, path: str | Path | None, low_fill_threshold: float = 0.3):
         from common.config import ROOT
 
         if not path:
@@ -22,53 +27,59 @@ class EventLog:
         else:
             path = Path(path)
             self.path = path if path.is_absolute() else ROOT / path
+        self.low_fill_threshold = low_fill_threshold
         self.failed = False
 
-    @staticmethod
-    def row(state: dict, now: datetime | None = None) -> dict:
-        now = now or datetime.now(timezone.utc)
-        row = {
-            "ts": now.isoformat(timespec="milliseconds"),
-            "instance": state["instance_id"],
-            "session": state["session_id"],
-            "sequence": state["sequence"],
-            "phase": state["phase"],
-        }
-        scene = state.get("scene")
-        if scene:
-            row["scene_id"] = scene["scene_id"]
-            row["vision_source"] = scene["source"]
-            row["objects"] = len(scene["objects"])
-        target = state.get("target")
-        if target:
-            row["object_id"] = target["object_id"]
-            row["item"] = target["item"]
-            row["fill_ratio"] = target["fill_ratio"]
-            row["confidence"] = target["confidence"]
-        if state.get("transcript"):
-            row["transcript"] = state["transcript"]
-            row["stt_source"] = state.get("stt_source")
-        card = state.get("card")
-        if card:
-            row["request_id"] = card["request_id"]
-            row["req_item"] = card["item"]
-            row["portion"] = card["portion"]
-            row["revision"] = card["revision"]
-        if state.get("qwen_source"):
-            row["qwen_source"] = state["qwen_source"]
-        error = state.get("last_error")
-        if error and state["phase"] == "error":
-            row["error_code"] = error["code"]
-        return row
+    def level(self, fill_ratio: float | None) -> str:
+        if fill_ratio is None:
+            return "unknown"
+        return "low" if fill_ratio <= self.low_fill_threshold else "high"
+
+    def rows(self, state: dict, now: datetime | None = None) -> list[dict]:
+        """History lines for one emitted state; most phases produce none."""
+        ts = (now or datetime.now(timezone.utc)).isoformat(timespec="milliseconds")
+        phase, session = state["phase"], state["session_id"]
+        if phase in ("offered", "skipped") and state.get("scene"):
+            return [
+                {
+                    "ts": ts,
+                    "event": "detected",
+                    "session": session,
+                    "object_id": o["object_id"],
+                    "item": o["item"],
+                    "level": self.level(o["fill_ratio"]),
+                    "fill_ratio": o["fill_ratio"],
+                    "confidence": o["confidence"],
+                }
+                for o in state["scene"]["objects"]
+            ]
+        if phase == "card" and state.get("card"):
+            card = state["card"]
+            row = {
+                "ts": ts,
+                "event": "requested",
+                "session": session,
+                "object_id": card["object_id"],
+                "item": card["item"],
+                "portion": card["portion"],
+                "revision": card["revision"],
+            }
+            if state.get("transcript"):
+                row["transcript"] = state["transcript"]
+            return [row]
+        return []
 
     def record(self, state: dict) -> None:
         if self.path is None:
             return
         try:
-            line = json.dumps(self.row(state), ensure_ascii=False)
+            rows = self.rows(state)
+            if not rows:
+                return
+            text = "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows)
             self.path.parent.mkdir(parents=True, exist_ok=True)
             with self.path.open("a", encoding="utf-8") as file:
-                file.write(line + "\n")
+                file.write(text)
         except (OSError, TypeError, ValueError, KeyError) as error:
             if not self.failed:
                 self.failed = True
