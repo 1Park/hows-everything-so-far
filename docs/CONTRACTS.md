@@ -35,7 +35,7 @@ Vision `POST /v1/analyze` multipart: file JPEG/PNG 원본 bytes, scene_id, scena
 {"scene_id":"s","source":"external","objects":[{"object_id":"cup-a","bbox":{"x1":0.1,"y1":0.2,"x2":0.3,"y2":0.7},"item":"water","fill_ratio":0.15,"confidence":0.9}]}
 ```
 
-STT `POST /v1/transcribe` multipart file. MIME: audio/wav, audio/x-wav, audio/webm, audio/ogg, audio/mp4; codec parameter 허용. 응답 `{"text":"A little water, please","language":"en","source":"external"}`. UI는 결과를 검토한 후 Send하도록 하며 STT만으로 승인하지 않는다.
+STT `POST /v1/transcribe` multipart file. MIME: audio/wav, audio/x-wav, audio/webm, audio/ogg, audio/mp4; codec parameter 허용. 응답 `{"text":"A little water, please","language":"en","source":"external"}`. 보드 마이크 흐름은 STT→Qwen→카드를 자동 생성하고 전사를 UI에 표시한다. STT만으로 동작을 승인하지 않으며 Confirm이 필요하다. 개발용 브라우저 업로드는 전사 검토 후 Send를 유지한다.
 
 Plugin: `VISION_MODEL_BACKEND=external`, `VISION_ADAPTER=your_package:create_backend` (STT도 동일). factory는 인자 없이 한 번 실행된다. backend:
 
@@ -52,7 +52,7 @@ async def close(self): ...  # 선택
 
 별도 팀 서버가 HTTP 계약을 제공하면 Controller `VISION_BACKEND=http`, VISION_BASE_URL 지정(STT 동일). 내부 출력 변환은 담당자 adapter 책임. **검출/crop/DINO 전후처리·오디오 전처리/STT 모델은 이번 구현 범위 밖**이다.
 
-카메라는 **Controller VideoSource 하나**가 소유한다. 원본 capture bytes를 Vision에 전달하고 모델 서버는 같은 카메라를 열지 않는다. 파일 루프/USB는 선택 OpenCV, 모델 resize/정규화 없음. 마이크/스피커는 **태블릿 브라우저 소유**; 서버는 오디오 장치를 열지 않는다. 분석 bbox는 고정 snapshot에 겹치고 live preview에는 과거 bbox를 겹치지 않는다.
+카메라는 **Controller VideoSource 하나**가 소유한다. 원본 capture bytes를 Vision에 전달하고 모델 서버는 같은 카메라를 열지 않는다. 파일 루프/USB는 선택 OpenCV, 모델 resize/정규화 없음. **보드 Controller만 마이크를 열고 태블릿은 스피커를 소유**한다. STT 모델 서버는 마이크를 다시 열지 않는다. 분석 bbox는 고정 snapshot에 겹치고 live preview에는 과거 bbox를 겹치지 않는다.
 
 ## Qwen
 
@@ -70,6 +70,7 @@ async def close(self): ...  # 선택
 | POST /api/confirm | JSON scene_id, object_id, request_id, revision; 202 |
 | POST /api/cancel | JSON session_id; 현재 작업 무효화/시퀀스 취소 |
 | POST /api/transcribe | multipart audio file; STT 결과만 반환 |
+| POST /api/voice/listen | 안내 재생 후 `{session_id,scene_id,object_id,sequence}`. 현재 offered/clarify/error에서만 녹음 시작; 중복/오래된 ACK409. listening→transcribing→interpreting→card, 승인 없음 |
 | GET /api/frame, /api/video | 최신 원본·MJPEG5fps |
 | GET /api/snapshot/{session_id} | 고정 원본 이미지 |
 | GET /api/hardware | simulator/Bridge 입력·상태·명령 ID |

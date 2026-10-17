@@ -1,6 +1,6 @@
 # How’s Everything So Far — Refill Assist
 
-여러 컵·접시의 종류/잔량을 관찰하고, 고객 요청을 해석한 뒤 **명시적 확인을 받아 mock 적재·주방 복귀**를 시연하는 4인 해커톤 프로젝트다. 목표 보드는 Arduino VENTUNO Q 한 대, 비전 DINOv2, 요청 해석 Qwen3-0.6B, 주요 음료 water/coke/coffee다. UI·마이크·스피커는 태블릿 브라우저가 담당한다.
+여러 컵·접시의 종류/잔량을 관찰하고, 고객 요청을 해석한 뒤 **명시적 확인을 받아 mock 적재·주방 복귀**를 시연하는 4인 해커톤 프로젝트다. 목표 보드는 Arduino VENTUNO Q 한 대, 비전 DINOv2, 요청 해석 Qwen3-0.6B, 주요 음료 water/coke/coffee다. UI·스피커는 태블릿 브라우저, 마이크 녹음은 보드가 담당한다.
 
 현재 보드 없이 실행 가능하다. 기본은 **Vision/STT fixture + 실제 Mac Qwen HTTP + mock HardwareIO**. Vision/STT 모델 자체는 다른 팀원 소유이며 이 레포 구현은 서비스 계층이다. 보드 ExecuTorch/카메라/Bridge 실기 검증은 별도다. fixture 결과를 실제 인식으로 표시하지 않는다.
 
@@ -38,7 +38,7 @@ python scripts/dev.py
 
 Mac endpoint `http://won-macmini:8000/v1/chat/completions`, 모델 `mlx-community/Qwen3-0.6B-4bit`. 서버 설정/모델을 변경하지 않는다. proxy와 원격 Mac은 서로 다른 기기의8000포트다. 모델 장애 시 fixture로 자동 대체하지 않는다. 평가는 temperature=0.
 
-태블릿에서는 HTTPS가 필요하다. [태블릿 접속·마이크·스피커 안내](docs/TABLET_DEMO.md)에 따라 Tailscale Serve로 연결한다. **음성 입출력 장치는 태블릿 브라우저 소유**이고 서버는 마이크/스피커를 열지 않는다. 고정 안내 WAV를 재생하며 live TTS는 없다.
+태블릿은 HTTP로 접속 가능하다. **태블릿 안내 재생 완료 → 보드 마이크 녹음 → STT → Qwen → 확인 카드**가 자동으로 이어진다. 고정 안내 WAV를 재생하며 live TTS는 없다. 초기 Enable sound 동작은 브라우저 스피커 활성화에만 필요하다. [보드 마이크·태블릿 연결 및 실행](docs/TABLET_DEMO.md). 개발용 브라우저 녹음을 선택하는 경우에만 HTTPS가 필요하다.
 
 ## 실행·검증
 

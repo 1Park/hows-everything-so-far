@@ -64,6 +64,14 @@ def supervise(args):
             env[f"{name.upper()}_BASE_URL"] = (
                 f"http://127.0.0.1:{getattr(settings, f'{name}_port')}"
             )
+    if args.with_stt and args.mode not in ("integration", "board"):
+        if args.mode in ("fixture", "offline"):
+            raise RuntimeError("Use --mode direct --with-stt for an actual STT backend")
+        services.append(
+            ("stt", settings.stt_host, settings.stt_port, "services.stt.server:create_app")
+        )
+        env["STT_BACKEND"] = "http"
+        env["STT_BASE_URL"] = f"http://127.0.0.1:{settings.stt_port}"
     services.append(
         ("controller", settings.controller_host, settings.controller_port, "app.server:create_app")
     )
@@ -176,6 +184,11 @@ if __name__ == "__main__":
         help="fixture mocks Vision/STT/hardware and uses real Qwen HTTP; offline mocks everything",
     )
     parser.add_argument("--env-file")
+    parser.add_argument(
+        "--with-stt",
+        action="store_true",
+        help="Also manage our STT API; keep Qwen remote in direct mode",
+    )
     parser.add_argument(
         "--stop", action="store_true", help="Ask the matching managed supervisor to stop"
     )

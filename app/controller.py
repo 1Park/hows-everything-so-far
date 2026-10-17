@@ -3,6 +3,7 @@ import time
 from collections import deque
 
 from app.hardware.io import BridgeHardware, MockHardware
+from app.audio import BoardMicrophone
 from common.api import ApiError, log
 from common.contracts import CurrentRequest, RequestCard, StateEvent, uid
 
@@ -34,6 +35,9 @@ class Controller:
         self.qwen_source = None
         self.deadline = None
         self.last_error = None
+        self.microphone = BoardMicrophone(settings)
+        self.voice_task = None
+        self.transcript = self.stt_source = None
 
     def state(self):
         return {
@@ -50,6 +54,9 @@ class Controller:
             "last_error": self.last_error,
             "sequence": self.sequence,
             "deadline": self.deadline,
+            "audio_input": self.settings.audio_input,
+            "transcript": self.transcript,
+            "stt_source": self.stt_source,
         }
 
     def emit(self, phase, message):
@@ -83,17 +90,22 @@ class Controller:
                 self.deadline = None
                 self.emit("expired", "The request expired. Inspect the scene again to retry.")
 
-    async def start(self, data: bytes, content_type: str, scenario: str):
+    async def start(self, data: bytes, content_type: str, scenario: str, automatic=False):
         async with self.lock:
+            if automatic and self.phase not in ("idle", "skipped"):
+                return self.state()
             if self.phase in ("loading", "returning"):
                 raise ApiError(
                     "sequence_running", "Cancel the sequence before observing another scene", 409
                 )
             self.token += 1
+            if self.voice_task:
+                self.voice_task.cancel()
             token = self.token
             self.session_id, self.scene, self.target, self.card = uid(), None, None, None
             self.snapshot = (data, content_type)
             self.deadline, self.last_error, self.qwen_source = None, None, None
+            self.transcript = self.stt_source = None
             scene_id = uid()
             self.emit("observing", "Inspecting the scene…")
             self.launch(self.observe(token, data, content_type, scene_id, scenario))
@@ -168,16 +180,73 @@ class Controller:
                 raise ApiError(
                     "invalid_state", "A request cannot be edited in the current state", 409
                 )
-            current = CurrentRequest(
-                item=self.card.item if self.card else self.target.item,
-                portion=self.card.portion if self.card else "regular",
-            )
+            self.begin_interpret(body.utterance)
+            return self.state()
+
+    def begin_interpret(self, utterance):
+        """Caller holds self.lock; shared by typed input and board STT."""
+        current = CurrentRequest(
+            item=self.card.item if self.card else self.target.item,
+            portion=self.card.portion if self.card else "regular",
+        )
+        self.token += 1
+        self.deadline, self.last_error = None, None
+        self.emit("interpreting", "Understanding your request… You can cancel at any time.")
+        self.launch(self.interpret(self.token, current, utterance))
+
+    async def listen(self, body):
+        """Tablet acknowledges finished playback; only the first current ack records."""
+        async with self.lock:
+            self.check_target(body)
+            if (
+                body.session_id != self.session_id
+                or body.sequence != self.sequence
+                or self.phase not in ("offered", "clarify", "error")
+            ):
+                raise ApiError("stale_prompt", "This voice prompt is no longer active", 409)
+            if self.deadline is not None and time.time() >= self.deadline:
+                raise ApiError("expired", "This request has expired", 409)
+            if not self.microphone.ready():
+                raise ApiError(
+                    "microphone_unavailable", "Configure the board microphone first", 503
+                )
             self.token += 1
             token = self.token
             self.deadline, self.last_error = None, None
-            self.emit("interpreting", "Understanding your request… You can cancel at any time.")
-            self.launch(self.interpret(token, current, body.utterance))
+            self.transcript = self.stt_source = None
+            self.emit("listening", "Listening on the board microphone. Please speak now.")
+            task = asyncio.create_task(self.hear(token))
+            self.voice_task = task
+            self.tasks.add(task)
+            task.add_done_callback(self.tasks.discard)
             return self.state()
+
+    async def hear(self, token):
+        try:
+            audio = await self.microphone.capture()
+            async with self.lock:
+                if token != self.token:
+                    return
+                self.emit("transcribing", "Transcribing your request… You can cancel at any time.")
+            async with asyncio.timeout(self.settings.inference_timeout):
+                result = await self.clients.stt(audio, "audio/wav")
+            async with self.lock:
+                if token != self.token:
+                    return
+                self.transcript, self.stt_source = result.text, result.source
+                self.begin_interpret(result.text)
+        except TimeoutError:
+            await self.fail(
+                token,
+                ApiError("stt_timeout", "Speech recognition timed out. Please retry", 504, True),
+            )
+        except ApiError as error:
+            await self.fail(token, error)
+        except Exception:
+            log.exception("Board voice input failed")
+            await self.fail(
+                token, ApiError("voice_error", "Voice input failed. Please retry", 502, True)
+            )
 
     async def interpret(self, token, current, utterance):
         try:
@@ -299,6 +368,8 @@ class Controller:
                 raise ApiError("stale_session", "This demo session is no longer active", 409)
             running = self.phase in ("loading", "returning")
             self.token += 1
+            if self.voice_task:
+                self.voice_task.cancel()
             self.deadline = None
             self.emit("cancelled", "Cancelled. No new action will be started.")
             if running:

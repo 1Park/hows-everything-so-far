@@ -20,7 +20,7 @@
       <div id="requestCard" class="request-card" hidden><div class="card-top"><div class="target-image" id="targetImage"></div><div><span class="eyebrow">YOUR REQUEST</span><h3 id="cardDrink"></h3><p id="cardPortion"></p></div><span class="card-revision" id="revision"></span></div><p class="target-id" id="targetId"></p></div>
       <div class="audio-controls"><button id="record" disabled>◉ Record request</button><label class="upload-audio">Upload audio<input id="audioFile" type="file" accept="audio/wav,audio/webm,audio/ogg,audio/mp4"></label><span id="recordStatus"></span></div>
       <p id="mediaSupport" class="confirmation-note">Microphone & speaker: this browser</p>
-      <form id="requestForm"><label for="utterance">Review the transcript, or type your request</label><div class="text-entry"><textarea id="utterance" rows="2" maxlength="1000" placeholder="A little water, please" disabled></textarea><button id="send" type="submit" aria-label="Send request" disabled>↑</button></div></form>
+      <form id="requestForm"><label for="utterance">Speak after the offer, or type a request</label><div class="text-entry"><textarea id="utterance" rows="2" maxlength="1000" placeholder="A little water, please" disabled></textarea><button id="send" type="submit" aria-label="Send request" disabled>↑</button></div></form>
       <div class="suggestions"><button data-say="A little water, please">A little water</button><button data-say="Coffee instead, please">Coffee instead</button><button data-say="No thanks">No thanks</button></div>
       <div id="transcript" class="transcript" hidden></div>
       <div class="actions"><button id="cancel" class="secondary" disabled>Cancel</button><button id="confirm" class="primary" disabled>Confirm refill <span>✓</span></button></div>
@@ -29,7 +29,7 @@
     </aside>
   </div>
   <section class="runtime panel"><div><span class="eyebrow">RUNNING THIS DEMO</span><h2>Know what’s connected.</h2></div><div id="sources" class="sources">Checking services…</div><button id="refresh" class="secondary">Check connection</button></section>
-  <div class="footer"><span>REFILL ASSIST / VENTUNO Q</span><span>Browser microphone & speaker · Fixed prompts · No live TTS</span><button id="audioToggle" aria-pressed="false">Enable sound</button></div>
+  <div class="footer"><span>REFILL ASSIST / VENTUNO Q</span><span>Board microphone when configured · Tablet speaker · Fixed prompts · No live TTS</span><button id="audioToggle" aria-pressed="false">Enable sound</button></div>
   <div id="error" role="alert" class="error" hidden></div>
 </main><script src="/ui/app.js" defer></script>
 </body></html>

@@ -16,8 +16,9 @@ flowchart TD
   Media -->|original image bytes| Vision[Vision API: teammate model or explicit fixture]
   Media -->|MJPEG| UI[Tablet browser UI]
   Vision --> Controller[Controller policy / state / validation]
-  UI -->|browser microphone recording| STT[STT API: teammate model or explicit fixture]
-  STT -->|transcript review then Send| UI
+  UI -->|offer playback ended| Controller
+  Controller -->|board microphone WAV| STT[STT API: teammate model or explicit fixture]
+  STT -->|English transcript| Controller
   UI -->|English request| Controller
   Controller --> Qwen[Optional local Qwen API]
   Qwen --> MLX[Actual Mac MLX or board ExecuTorch adapter]
@@ -31,19 +32,19 @@ flowchart TD
 
 **변경된 카메라 소유 책임:** 이전 문서의 Vision 서버 camera owner를 Controller VideoSource로 이동했다. 서비스 레이어가 원본 bytes를 전달하고 모델 담당자가 카메라까지 중복 구현하지 않도록 한 선택이다. detector/crop 구현 변경이 아니다. bbox는 분석 시 snapshot 위에만 표시하고 live preview에는 오래된 box를 겹치지 않는다. 요청 카드는 같은 frozen frame의 대상 부분을 CSS로 표시하며 모델 crop 코드가 아니다.
 
-태블릿 브라우저가 마이크·스피커를 모두 소유한다. MediaRecorder→Controller→STT, 전사 검토→Send. 서버 장치 오디오 없음. Start demo에서 AudioContext를 활성화하고 고정 WAV 안내를 재생한다. 실제 TTS 없음. [HTTPS/권한/현장 점검](TABLET_DEMO.md).
+태블릿 브라우저는 UI·스피커를 소유하고 보드 Controller는 연결된 마이크를 소유한다. 인식 결과의 offered 이벤트를 WS로 받은 태블릿이 고정 WAV 안내를 재생하고, 재생 완료 후 session/target/sequence를 포함한 ACK를 보낸다. Controller가 보드에서 녹음→STT→Qwen을 진행하며 UI는 listening/transcribing/card 이벤트로 바뀐다. Cancel/장면 변경은 녹음과 늦은 결과를 폐기한다. 음성 요청은 확인 카드까지만 자동 처리하며 물리 동작은 Confirm이 필요하다. Enable sound 최초 동작만 필요하고 실제 TTS는 없다. [실행/연결/현장 점검](TABLET_DEMO.md).
 
 ## 실행 위치
 
 | 구성 | 개인 개발 | 보드 |
 | --- | --- | --- |
-| Controller/UI | 개발자 노트북, UI는 태블릿 또는 로컬 브라우저 | Ubuntu, 태블릿 HTTPS 접속 |
+| Controller/UI | 개발자 노트북, UI는 태블릿 또는 로컬 브라우저 | Ubuntu, 태블릿 HTTP 또는 HTTPS 접속 |
 | Qwen | 실제 Mac mini HTTP; 선택 우리 proxy 또는 명시 fixture | localhost API + 미연결 ExecuTorch adapter |
 | Vision/STT | fixture 또는 담당자 async backend/HTTP 서버 | localhost API + 담당자 실제 모델 |
 | HardwareIO | 상태 mock | 명시 Bridge 선택 후 MCU mock sequence |
-| Mic/speaker | 브라우저 | 태블릿 브라우저 |
+| Mic/speaker | fixture 또는 선택 브라우저 녹음 / 브라우저 재생 | 보드 마이크 / 태블릿 스피커 |
 
-FastAPI+Uvicorn, 서버별 worker1, ROS/앱 Docker 없음. 학습·export Docker는 ml/ 별도. 기본 포트 Controller8080, Qwen8000, Vision8001, STT8002; 모두 localhost. 태블릿은 Tailscale Serve HTTPS→Controller. raw IP 화면만 필요할 때 CONTROLLER_HOST를 설정할 수 있지만 마이크에는 HTTPS 필요.
+FastAPI+Uvicorn, 서버별 worker1, ROS/앱 Docker 없음. 학습·export Docker는 ml/ 별도. 기본 포트 Controller8080, Qwen8000, Vision8001, STT8002; 모델 API는 localhost. 태블릿은 보드 이더넷 HTTP 또는 선택 HTTPS→Controller. CONTROLLER_HOST=0.0.0.0으로 외부 접속을 연다. 보드 마이크 사용 시 브라우저 마이크 권한/HTTPS는 필요 없다.
 
 ## 제품 로직과 모델 서버
 

@@ -17,6 +17,7 @@ from common.contracts import (
     StateSnapshot,
     StateEvent,
     Heartbeat,
+    ListenInput,
 )
 from common.media import read_upload, validate_audio, validate_image
 
@@ -30,9 +31,29 @@ def create_app(settings=None, clients=None, hardware=None):
     @asynccontextmanager
     async def lifespan(app):
         video.start()
-        yield
-        video.close()
-        await controller.close()
+
+        async def watch_scene():
+            while True:
+                await asyncio.sleep(max(0.2, settings.observe_interval_seconds))
+                # Pause for the whole customer interaction. Never interrupt a card/sequence.
+                if controller.phase in ("idle", "skipped"):
+                    try:
+                        data, mime = video.frame()
+                        validate_image(data, mime)
+                        if len(data) <= settings.max_image_bytes:
+                            await controller.start(data, mime, "normal", automatic=True)
+                    except ApiError:
+                        pass
+
+        watcher = asyncio.create_task(watch_scene()) if settings.observe_interval_seconds else None
+        try:
+            yield
+        finally:
+            if watcher:
+                watcher.cancel()
+                await asyncio.gather(watcher, return_exceptions=True)
+            video.close()
+            await controller.close()
 
     app = create_api("Controller", lifespan)
     app.state.controller, app.state.video = controller, video
@@ -58,6 +79,7 @@ def create_app(settings=None, clients=None, hardware=None):
             and not video.error
             and video.latest is not None
             and hardware_ready
+            and (settings.audio_input == "disabled" or controller.microphone.ready())
         )
         return JSONResponse(
             status_code=200 if ok else 503,
@@ -68,6 +90,10 @@ def create_app(settings=None, clients=None, hardware=None):
                 "hardware": settings.hardware_backend,
                 "hardware_ready": hardware_ready,
                 "location": settings.app_env,
+                "audio_input": {
+                    "backend": settings.audio_input,
+                    "ready": controller.microphone.ready(),
+                },
             },
         )
 
@@ -102,6 +128,10 @@ def create_app(settings=None, clients=None, hardware=None):
     @app.post("/api/cancel", response_model=StateSnapshot)
     async def cancel(body: CancelInput):
         return await controller.cancel(body.session_id)
+
+    @app.post("/api/voice/listen", status_code=202, response_model=StateSnapshot)
+    async def listen(body: ListenInput):
+        return await controller.listen(body)
 
     @app.post("/api/transcribe")
     async def transcribe(file: UploadFile = File(...)):

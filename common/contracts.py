@@ -122,6 +122,11 @@ class CancelInput(Contract):
     session_id: str = Field(min_length=1, max_length=100)
 
 
+class ListenInput(TargetInput):
+    session_id: str = Field(min_length=1, max_length=100)
+    sequence: int = Field(ge=0)
+
+
 class ErrorBody(Contract):
     code: str
     message: str
@@ -133,6 +138,8 @@ Phase = Literal[
     "idle",
     "observing",
     "offered",
+    "listening",
+    "transcribing",
     "interpreting",
     "clarify",
     "card",
@@ -167,6 +174,9 @@ class StateSnapshot(Contract):
     last_error: StateError | None
     sequence: int = Field(ge=0)
     deadline: float | None
+    transcript: str | None = None
+    stt_source: Literal["fixture", "external"] | None = None
+    audio_input: Literal["disabled", "fixture", "alsa"] = "disabled"
 
 
 class StateEvent(Contract):

@@ -27,6 +27,7 @@ class Settings(BaseModel):
     stt_port: int = Field(8002, ge=1, le=65535)
     stt_model_backend: Literal["fixture", "external"] = "fixture"
     stt_adapter: str = ""
+    stt_whisper_url: HttpUrl = "http://127.0.0.1:8178"
     qwen_backend: Literal["fixture", "http"] = "http"
     qwen_base_url: HttpUrl = "http://won-macmini:8000"
     qwen_host: str = "127.0.0.1"
@@ -45,6 +46,13 @@ class Settings(BaseModel):
     hardware_backend: Literal["mock", "bridge"] = "mock"
     bridge_timeout: float = Field(3, gt=0, le=30)
     camera_source: str = ""  # empty = explicit static fixture, no implicit /dev/video0
+    audio_input: Literal["disabled", "fixture", "alsa"] = "disabled"
+    audio_device: str = ""  # explicit ALSA capture device, never guessed
+    audio_format: Literal["S16_LE", "S32_LE"] = "S16_LE"
+    audio_rate: int = Field(48000, ge=8000, le=192000)
+    audio_channels: int = Field(1, ge=1, le=2)
+    audio_seconds: int = Field(6, ge=1, le=15)
+    observe_interval_seconds: float = Field(0, ge=0, le=60)  # zero disables automatic observation
 
     @model_validator(mode="after")
     def adapters_required(self):

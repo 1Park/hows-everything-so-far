@@ -32,7 +32,7 @@ async function api(path, options = {}) {
 }
 function post(path, data) { return api(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)}); }
 async function playPrompt(name) {
-  if (!sound || !audioContext) return;
+  if (!sound || !audioContext) return false;
   const version = ++audioVersion;
   try {
     if (!audioBuffers.has(name)) {
@@ -40,17 +40,37 @@ async function playPrompt(name) {
       if (!response.ok) throw Error('Audio file unavailable');
       audioBuffers.set(name, await audioContext.decodeAudioData(await response.arrayBuffer()));
     }
-    if (!sound || version !== audioVersion) return;
+    if (!sound || version !== audioVersion || audioContext.state !== 'running') return false;
     playingSource?.stop();
     playingSource = audioContext.createBufferSource();
     playingSource.buffer = audioBuffers.get(name);
     playingSource.connect(audioContext.destination);
-    playingSource.start();
+    const source = playingSource;
+    return await new Promise(resolve => {
+      source.onended = () => resolve(sound && version === audioVersion);
+      source.start();
+    });
   } catch {
     if (version !== audioVersion) return;
     setSound(false);
     showError('Sound could not start. Tap Enable sound and check your browser audio permissions.');
+    return false;
   }
+}
+async function announceOffer() {
+  const prompt = state;
+  if (!prompt || prompt.phase !== 'offered' || !connected) return;
+  const finished = await playPrompt('offer');
+  if (!finished || state?.session_id !== prompt.session_id || state.sequence !== prompt.sequence || !connected) return;
+  if (state.audio_input === 'disabled') return;
+  try {
+    const response = await fetch('/api/voice/listen', {method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({session_id:prompt.session_id,scene_id:prompt.scene.scene_id,
+        object_id:prompt.target.object_id,sequence:prompt.sequence})});
+    const body = await response.json();
+    if (response.ok) render(body);
+    else if (response.status !== 409) showError(body.error?.message || 'Board recording could not start.');
+  } catch {showError('Could not reach the board microphone. Please retry.');}
 }
 function modePill(label, source, ready = true) {
   const el = document.createElement('span'); el.className = 'source' + (ready ? '' : ' bad');
@@ -80,16 +100,27 @@ function render(next, authoritative = false) {
     displayedSession = ''; lastPhase = '';
   }
   state = next;
+  const boardAudio = state.audio_input && state.audio_input !== 'disabled';
   $('phase').textContent = state.phase.toUpperCase(); $('message').textContent = state.message;
   const editable = canEdit() && !pendingAction;
   $('utterance').disabled = !editable; $('send').disabled = !editable;
-  $('record').disabled = !editable || micPending || transcribing;
+  $('record').disabled = !editable || micPending || transcribing || (boardAudio && !['offered','clarify','error'].includes(state.phase));
   $('audioFile').disabled = !editable || micPending || transcribing || recorder?.state === 'recording';
   if (!canEdit() || pendingAction) stopRecording(true);
+  $('audioFile').parentElement.hidden = boardAudio;
+  if (boardAudio) {
+    $('record').textContent = 'Retry board recording';
+    $('mediaSupport').textContent = `Microphone: ${state.audio_input === 'fixture' ? 'FIXTURE audio, not a real microphone' : 'board'} · Speaker: this tablet · Recording starts after the offer`;
+    $('recordStatus').textContent = state.phase === 'listening' ? 'Listening on the board…' : state.phase === 'transcribing' ? 'Transcribing…' : '';
+  }
+  if (state.transcript) {
+    $('transcript').textContent = `${state.stt_source.toUpperCase()} STT: “${state.transcript}” — interpreted automatically; review the card before confirming.`;
+    $('transcript').hidden = false;
+  }
   document.querySelectorAll('[data-say]').forEach(b => b.disabled = !editable);
   $('confirm').disabled = !connected || !!pendingAction || state.phase !== 'card';
   $('cancel').disabled = !connected || pendingAction === 'cancel' || ['idle','done','cancelled','declined','skipped','expired'].includes(state.phase);
-  $('start').disabled = !connected || !!pendingAction || ['observing','loading','returning'].includes(state.phase);
+  $('start').disabled = !connected || !!pendingAction || ['observing','listening','transcribing','loading','returning'].includes(state.phase);
   $('start').innerHTML = (state.phase === 'idle' ? 'Start demo' : 'Inspect again') + ' <span>↗</span>';
   if (state.snapshot_url && displayedSession !== state.session_id) {
     $('boxes').hidden = true;
@@ -121,10 +152,11 @@ function render(next, authoritative = false) {
     $('targetImage').style.backgroundSize = `${100/width}% ${100/height}%`;
     $('targetImage').style.backgroundPosition = `${width === 1 ? 0 : b.x1/(1-width)*100}% ${height === 1 ? 0 : b.y1/(1-height)*100}%`;
   }
-  const step = ['observing','skipped'].includes(state.phase) ? 0 : ['offered','interpreting','clarify','error'].includes(state.phase) ? 1 : state.phase === 'card' ? 2 : ['loading','returning','done'].includes(state.phase) ? 3 : -1;
+  const step = ['observing','skipped'].includes(state.phase) ? 0 : ['offered','listening','transcribing','interpreting','clarify','error'].includes(state.phase) ? 1 : state.phase === 'card' ? 2 : ['loading','returning','done'].includes(state.phase) ? 3 : -1;
   document.querySelectorAll('[data-step]').forEach(e => e.classList.toggle('active', Number(e.dataset.step) <= step));
   if (lastPhase !== state.phase) {
-    if (state.phase === 'offered') playPrompt('offer');
+    if (lastPhase === 'offered') {audioVersion++; playingSource?.stop();}
+    if (state.phase === 'offered') announceOffer();
     if (state.phase === 'card') playPrompt('review');
     if (state.phase === 'done') playPrompt('done');
     if (state.phase === 'cancelled') playPrompt('cancelled');
@@ -141,9 +173,9 @@ $('sceneImage').onerror = () => {
 function connect() {
   clearTimeout(retryTimer);
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
-  ws.onopen = () => {connected=true; $('connection').textContent='● Connected'; $('connection').classList.add('online'); checkConnection();};
+  ws.onopen = () => {connected=true; lastPhase=''; $('connection').textContent='● Connected'; $('connection').classList.add('online'); checkConnection();};
   ws.onmessage = event => {const data=JSON.parse(event.data); if(data.type==='state') render(data.state, true);};
-  ws.onclose = () => {connected=false; $('connection').textContent='Reconnecting…'; $('connection').classList.remove('online'); if(state) render(state); retryTimer=setTimeout(connect,1500);};
+  ws.onclose = () => {connected=false; audioVersion++; playingSource?.stop(); $('connection').textContent='Reconnecting…'; $('connection').classList.remove('online'); if(state) render(state); retryTimer=setTimeout(connect,1500);};
   ws.onerror = () => ws.close();
 }
 async function observe() {
@@ -182,7 +214,7 @@ $('audioToggle').onclick = () => {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) {setSound(false); showError('This browser does not support audio playback.'); return;}
     audioContext ||= new AudioContextClass();
-    audioContext.resume().then(()=>playPrompt('welcome')).catch(()=>showError('Tap Enable sound to activate audio.'));
+    audioContext.resume().then(()=>state?.phase === 'offered' ? announceOffer() : playPrompt('welcome')).catch(()=>showError('Tap Enable sound to activate audio.'));
   } else {playingSource?.stop(); playingSource=null;}
 };
 $('livePreview').parentElement.addEventListener('toggle', event => {if(event.target.open) $('livePreview').src='/api/video'; else $('livePreview').removeAttribute('src');});
@@ -201,6 +233,14 @@ async function transcribe(blob) {
 $('utterance').addEventListener('input', () => {draftVersion++; $('transcript').hidden = true;});
 $('audioFile').onchange = () => {if($('audioFile').files[0]) transcribe($('audioFile').files[0]).catch(()=>{});};
 $('record').onclick = async () => {
+  if (state?.audio_input && state.audio_input !== 'disabled') {
+    if (canEdit() && !pendingAction) {
+      const current = state;
+      await action('listen', () => post('/api/voice/listen', {session_id:current.session_id,
+        scene_id:current.scene.scene_id,object_id:current.target.object_id,sequence:current.sequence})).catch(()=>{});
+    }
+    return;
+  }
   if(recorder?.state==='recording') {recorder.stop(); return;}
   if (!canEdit() || pendingAction || micPending || transcribing) return;
   const version = ++micVersion, session = state.session_id, sequence = state.sequence;
