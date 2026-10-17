@@ -4,6 +4,7 @@ from collections import deque
 
 from app.hardware.io import BridgeHardware, MockHardware
 from app.audio import BoardMicrophone
+from app.events import EventLog
 from common.api import ApiError, log
 from common.contracts import CurrentRequest, RequestCard, StateEvent, uid
 
@@ -53,6 +54,7 @@ class Controller:
         self.tasks = set()
         self.subscribers = set()
         self.events = deque(maxlen=100)
+        self.event_log = EventLog(settings.event_log_path)
         self.sequence, self.token = 0, 0
         self.instance_id = uid()
         self.session_id = uid()
@@ -115,6 +117,7 @@ class Controller:
         self.show_phase_led(phase)
         event = StateEvent(sequence=self.sequence, state=self.state()).model_dump()
         self.events.append(event)
+        self.event_log.record(event["state"])
         for queue in self.subscribers:
             if queue.full():
                 queue.get_nowait()

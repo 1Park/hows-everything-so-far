@@ -24,6 +24,7 @@ python -m uvicorn services.vision.server:create_app --factory --host 127.0.0.1 -
 
 - 흐름: 이미지 bytes → 컵 박스 (`boxes.mode`: `yolo` .pte / 고정 `rois` / `center`) → crop (`yolo`는 기본 `crop_mode: pad` = 박스×1.15 + 회색 패딩) → DINOv2 .pte → head → `item`·`fill_ratio`·`confidence`·`item_confidence` ([labels.py](labels.py)).
 - head에 `other` 클래스(캔·병)가 있으면 p(other) ≥ 0.5인 박스는 결과에서 뺀다. object_id는 남은 컵 기준으로 다시 매긴다.
+- YOLO 모드 head는 추론과 같은 crop으로 학습한다 (`ml/training/make_crops.py` → `make_head --data data/crops`). 보드 배포 bundle: `models/board/vision/dinov2-qnn-v3`.
 - runner: `py` = `executorch.runtime` (모델 1회 로드 후 재사용, torch 필요) / `cli` = `qnn_executor_runner` 규칙(`input_list.txt` 한 줄=1회, `outputs/output_{i}_0.raw`), 컵 N개를 1회 실행으로 묶음. 보드에 Python 바인딩이 있는지 먼저 확인.
 - 의존성: numpy + Pillow (OpenCV·ultralytics 불필요). 추론은 전용 스레드 1개에서 직렬 실행.
 - bundle 없음·로드 실패 → `/ready` 503, `/v1/analyze` 503 `vision_not_ready`. fixture 자동 전환 없음.
