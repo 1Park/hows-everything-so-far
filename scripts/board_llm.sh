@@ -47,6 +47,20 @@ cmd_use() {
   mkdir -p "$(dirname "$STATE")"; echo "$1" > "$STATE"; echo "selected: $1"
 }
 
+# JSON configuration for the persistent API. No inference or allocation.
+cmd_config() {
+  local sel name dir worker
+  sel="${LLM_SELECTION:-$(selected)}"
+  name="${1:-$(resolve "$sel")}"
+  dir=$(field "$name" 2)
+  [ -n "$dir" ] || { echo "Unknown board LLM: $name" >&2; exit 2; }
+  worker="${QNN_LLM_WORKER:-$ET/examples/qualcomm/oss_scripts/llama/qnn_llm_runner_host}"
+  python3 - "$sel" "$name" "$dir/$(field "$name" 3)" "$dir/tokenizer.json" "$worker" "$LD_LIBRARY_PATH" "$ADSP_LIBRARY_PATH" <<'PY'
+import json, sys
+print(json.dumps(dict(zip(('selection', 'name', 'model_path', 'tokenizer_path', 'worker', 'ld_library_path', 'adsp_library_path'), sys.argv[1:]))))
+PY
+}
+
 cmd_ask() {
   local model="" system="" seq="" raw=0
   while [ $# -gt 0 ]; do
@@ -96,6 +110,6 @@ PY
 }
 
 case "${1:-status}" in
-  status) cmd_status;; use) shift; cmd_use "$@";; ask) shift; cmd_ask "$@";;
+  status) cmd_status;; use) shift; cmd_use "$@";; config) shift; cmd_config "$@";; ask) shift; cmd_ask "$@";;
   *) sed -n '2,12p' "$0"; exit 2;;
 esac

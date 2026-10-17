@@ -42,6 +42,7 @@ def create_app(settings=None, backend=None):
                 "model": settings.qwen_model,
                 "pending": gate.pending,
                 "capacity": gate.capacity,
+                "runner": getattr(backend, "status", None),
             },
         )
 
@@ -49,11 +50,12 @@ def create_app(settings=None, backend=None):
     async def models():
         if not await backend.ready():
             raise ApiError("not_ready", "Qwen backend is not ready", 503, True)
-        return {"object": "list", "source": backend.source, "data": [{"id": settings.qwen_model}]}
+        ids = dict.fromkeys([settings.qwen_model, *getattr(backend, "model_ids", ())])
+        return {"object": "list", "source": backend.source, "data": [{"id": m} for m in ids]}
 
     @app.post("/v1/chat/completions")
     async def complete(body: Generation):
-        if body.model != settings.qwen_model:
+        if body.model != settings.qwen_model and body.model not in getattr(backend, "model_ids", ()):
             raise ApiError("unknown_model", "Requested model is not configured", 422)
         async with gate.slot():
             result = await backend.generate(body)
