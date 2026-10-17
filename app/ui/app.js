@@ -86,13 +86,9 @@ async function checkConnection() {
     $('imageCredit').textContent = info.video.mode === 'fixture-image' ? 'AI-generated sample · illustrative fixture' : 'Captured by the server · single video owner';
     $('liveStatus').textContent = info.video.error || 'Server capture · camera is opened once · 5 fps preview';
     liveSource = info.video.mode !== 'fixture-image';
-    $('liveRibbon').hidden = !liveSource || !state?.snapshot_url;
-    if (liveSource) {
-      // The small panel only earns its space once the main one is frozen.
-      if (state?.snapshot_url) attachStream($('liveFeed'));
-      else detachStream($('liveFeed'));
-      if (!state?.snapshot_url) attachStream($('sceneImage'));
-    }
+    // One panel: live until a capture freezes it, so there is never a question
+    // about which frame the request refers to.
+    if (liveSource && !state?.snapshot_url) attachStream($('sceneImage'));
   } catch { $('sources').textContent = 'Cannot reach the Controller. Reconnecting…'; }
 }
 function render(next, authoritative = false) {
