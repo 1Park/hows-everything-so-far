@@ -46,7 +46,7 @@ docker build --platform linux/amd64 -t refill-ml-export ml                      
 
 | 단계 | 명령 | 산출물 |
 |---|---|---|
-| 데이터 수집 | `python -m ml.tools.camera collect --drinks water coke coffee` (iTerm/터미널.app — 카메라 권한) | `data/real/<drink>__<level>/` |
+| 데이터 수집 | `python -m ml.tools.camera collect --drinks water coke coffee` (iTerm/터미널.app — 카메라 권한). 캔·병은 `--classes other` | `data/real/<drink>__<level>/`, `data/real/other/` |
 | 합성 데이터 | `python -m ml.training.gen_synthetic` | `data/synthetic/` (파이프라인 검증용) |
 | 정확도 | `python -m ml.evaluation.eval_fewshot --data data/real --shots 3 5 10` | `models/experiments/vision/fewshot_*.json` |
 | 컵 검출 | `python -m ml.evaluation.detect_test` | COCO YOLO가 컵을 잡는지 |

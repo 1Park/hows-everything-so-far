@@ -1,6 +1,7 @@
 """모델 내부 클래스 확률 → 공개 계약 필드 (item, fill_ratio, confidence).
 
-내부 클래스 이름 규칙: "<drink>__<level>" (예: "coke__low") 또는 "empty".
+내부 클래스 이름 규칙: "<drink>__<level>" (예: "coke__low"), "empty", 또는 "other"(컵이 아닌 물체: 캔·병).
+  other    : YOLO가 cup으로 잘못 잡는 물체. split_other()로 먼저 걸러내고, 남은 확률을 정규화해 아래 값을 계산한다.
   item       : drink별 확률을 합한 marginal의 최댓값. empty가 가장 크면 "unknown".
   fill_ratio : level별 대표 비율의 기대값 Σ p(class)·ratio(level). 계약은 0..1 연속값이라 단계 라벨을 비율로 바꾼다.
   confidence : min(item marginal 최댓값, level marginal 최댓값) — 종류·잔량 둘 다 확신할 때만 높다.
@@ -20,6 +21,22 @@ def parse(label):
         return "unknown", "empty"
     drink, _, level = label.partition("__")
     return (drink if drink in DRINKS else "unknown"), level
+
+
+OTHER = "other"
+OTHER_DROP = 0.5  # p(other) 가 이 이상이면 컵이 아닌 것으로 보고 결과에서 뺀다
+
+
+def split_other(probs, classes, drop=OTHER_DROP):
+    """→ (컵이 아님 여부, other 를 뺀 확률, other 를 뺀 클래스). other 클래스가 없는 head 면 그대로."""
+    if OTHER not in classes:
+        return False, list(probs), list(classes)
+    i = classes.index(OTHER)
+    p_other = float(probs[i])
+    rest = [float(p) for j, p in enumerate(probs) if j != i]
+    cls = [c for j, c in enumerate(classes) if j != i]
+    total = sum(rest)
+    return p_other >= drop, ([p / total for p in rest] if total > 0 else rest), cls
 
 
 def to_observation(probs, classes, fill_ratio=None):

@@ -5,7 +5,7 @@ bundle (VISION_MODEL_PATH 디렉터리, ml/export/make_bundle.py 가 생성) 의
   "version": 1,
   "boxes": {"mode": "yolo" | "rois" | "center",
             "pte": "detector.pte", "runner": "py" | "cli",           # mode=yolo
-            "det_conf": 0.25, "crop_scale": 1.35, "max_objects": 6,
+            "det_conf": 0.25, "crop_mode": "pad" | "square", "crop_scale": 1.15, "max_objects": 6,
             "rois": [[x, y, w, h], ...]},                               # mode=rois, 이미지 대비 비율
   "dino": {"pte": "dino.pte", "runner": "py" | "cli", "out_shape": [1, 384]},
   "head": "head.json",
@@ -23,8 +23,8 @@ import numpy as np
 from PIL import Image
 
 from services.vision.head import Head
-from services.vision.labels import to_observation
-from services.vision.preprocess import center_box, dino_input, letterbox, square_crop_box
+from services.vision.labels import split_other, to_observation
+from services.vision.preprocess import center_box, dino_input, letterbox, pad_crop, square_crop_box
 from services.vision.runners import make_runner
 
 
@@ -78,7 +78,15 @@ class VisionPipeline:
         x, meta = letterbox(img)
         dets = postprocess(self.detector.run([x])[0], meta, (w, h), conf=b.get("det_conf", 0.25))
         dets = sorted(dets[: b.get("max_objects", 6)], key=lambda d: d[0][0])
+        if b.get("crop_mode", "pad") == "pad":  # None → analyze()에서 pad_crop
+            return [(None, d[0]) for d in dets]
         return [(square_crop_box(d[0], (w, h), b.get("crop_scale", 1.35)), d[0]) for d in dets]
+
+    def crop(self, img, square, xyxy):
+        if square is None:
+            return pad_crop(img, xyxy, self.boxes_cfg.get("crop_scale", 1.15))
+        x, y, s = square
+        return img.crop((x, y, x + s, y + s))
 
     def analyze(self, img: Image.Image):
         """→ 계약 objects (bbox는 원본 전체 이미지 기준 normalized xyxy)."""
@@ -87,20 +95,25 @@ class VisionPipeline:
         t0 = time.perf_counter()
         bx = self.boxes(img)
         t1 = time.perf_counter()
-        xs = [dino_input(img.crop((x, y, x + s, y + s))) for (x, y, s), _ in bx]
+        xs = [dino_input(self.crop(img, sq, xyxy)) for sq, xyxy in bx]
         feats = self.dino.run(xs) if xs else []
         t2 = time.perf_counter()
         objects = []
+        self.dropped = 0  # other(캔·병)로 판정돼 뺀 박스 수
         if feats:
             probs = self.head.predict_proba(np.stack([f.reshape(-1) for f in feats]))
-            for i, ((_, (x0, y0, x1, y1)), p) in enumerate(zip(bx, probs)):
+            for (_, (x0, y0, x1, y1)), p in zip(bx, probs):
+                not_cup, p, classes = split_other(p, self.head.classes)
+                if not_cup:  # 캔·병 등 — 컵이 아니므로 장면 결과에서 뺀다
+                    self.dropped += 1
+                    continue
                 bbox = dict(x1=x0 / w, y1=y0 / h, x2=x1 / w, y2=y1 / h)
                 bbox = {k: round(min(max(v, 0.0), 1.0), 5) for k, v in bbox.items()}
                 if bbox["x2"] <= bbox["x1"] or bbox["y2"] <= bbox["y1"]:
                     continue
-                objects.append(dict(object_id=f"cup-{i}", bbox=bbox,
-                                    **to_observation(p, self.head.classes, self.cfg.get("fill_ratio"))))
-        self.timing = dict(boxes_ms=(t1 - t0) * 1000, dino_ms=(t2 - t1) * 1000, total_ms=(time.perf_counter() - t0) * 1000)
+                objects.append(dict(object_id=f"cup-{len(objects)}", bbox=bbox,
+                                    **to_observation(p, classes, self.cfg.get("fill_ratio"))))
+        self.timing = dict(dropped=self.dropped, boxes_ms=(t1 - t0) * 1000, dino_ms=(t2 - t1) * 1000, total_ms=(time.perf_counter() - t0) * 1000)
         return objects
 
     def close(self):

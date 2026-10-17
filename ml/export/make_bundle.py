@@ -40,7 +40,9 @@ def main():
     ap.add_argument("--yolo-pte")
     ap.add_argument("--yolo-runner", choices=["py", "cli"], default="py")
     ap.add_argument("--det-conf", type=float, default=0.25)
-    ap.add_argument("--crop-scale", type=float, default=1.35)
+    ap.add_argument("--crop-mode", choices=["pad", "square"], default="pad",
+                    help="yolo 모드 crop: pad=박스×scale + 회색 패딩(기본, 옆 물체 차단) / square=정사각형 확장(이전 방식)")
+    ap.add_argument("--crop-scale", type=float, default=None, help="기본 pad 1.15 / square 1.35")
     ap.add_argument("--max-objects", type=int, default=6)
     ap.add_argument("--rois", help="ml.tools.camera rois 로 만든 rois.json")
     ap.add_argument("--note", default="", help="provenance 메모 (quant, target SoC, SDK 버전 등)")
@@ -48,7 +50,10 @@ def main():
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    boxes = {"mode": args.boxes, "crop_scale": args.crop_scale if args.boxes == "yolo" else 1.0}
+    scale = args.crop_scale or (1.15 if args.crop_mode == "pad" else 1.35)
+    boxes = {"mode": args.boxes, "crop_scale": scale if args.boxes == "yolo" else 1.0}
+    if args.boxes == "yolo":
+        boxes["crop_mode"] = args.crop_mode
     if args.boxes == "yolo":
         if not args.yolo_pte:
             raise SystemExit("--boxes yolo 는 --yolo-pte 필요")
