@@ -1,2 +1,2 @@
 # hows-everything-so-far
-How's everything so far?
+Automatic food monitoring & refilling, without having to ask.
