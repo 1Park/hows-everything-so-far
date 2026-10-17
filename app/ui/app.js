@@ -145,6 +145,7 @@ function render(next, authoritative = false) {
     detachStream($('sceneImage'));
     $('sceneImage').src = state.snapshot_url; displayedSession = state.session_id;
     $('videoMode').textContent = 'Analyzed frame · frozen';
+    $('backToLive').hidden = !liveSource;
   } else if (!state.snapshot_url && liveSource) {
     // Before a capture the panel shows what the camera sees, so pressing Start
     // visibly freezes the frame the board actually analyzed.
@@ -152,6 +153,7 @@ function render(next, authoritative = false) {
     $('boxes').hidden = true;
     attachStream($('sceneImage'));
     $('videoMode').textContent = 'Live source';
+    $('backToLive').hidden = true;
   }
   const boxes = $('boxes'); boxes.replaceChildren(); const objects = $('objects'); objects.replaceChildren();
   for (const obj of state.scene?.objects || []) {
@@ -315,6 +317,18 @@ function renderVoiceBanner(state) {
   renderVoiceBanner.timer = setInterval(tick, 200);
   tick();
 }
+
+// Viewing live again is only a change of view: the analyzed frame, the target and
+// the card are untouched, so the boxes come off to avoid implying they still match.
+$('backToLive').onclick = () => {
+  if (!liveSource || !state) return;
+  $('boxes').hidden = true;
+  // Claim this session as displayed so render() does not re-freeze the panel.
+  displayedSession = state.session_id;
+  attachStream($('sceneImage'));
+  $('videoMode').textContent = 'Live source';
+  $('backToLive').hidden = true;
+};
 
 $('record').onclick = async () => {
   if (state?.audio_input && state.audio_input !== 'disabled') {
