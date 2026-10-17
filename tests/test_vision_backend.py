@@ -84,6 +84,16 @@ def test_missing_bundle_is_not_ready_without_fallback(tmp_path):
     assert r.status_code == 503 and "fixture" not in r.text
 
 
+def test_bundle_path_from_settings(tmp_path):
+    """.env.board 처럼 env 파일에만 적은 VISION_MODEL_PATH 도 backend 가 읽는다 (os.environ 아님)."""
+    bundle = make_bundle(tmp_path, {"mode": "center"})
+    settings = Settings(vision_model_path=str(bundle), vision_runner_bin="/opt/runner")
+    backend = DinoVisionBackend(runners={"dino": FakeDino()}, settings=settings)
+    assert backend.path == bundle and backend.runner_bin == "/opt/runner"
+    _, r = analyze(backend)
+    assert r.status_code == 200 and len(r.json()["objects"]) == 1
+
+
 def test_label_conversion():
     obs = to_observation([0.05, 0.05, 0.9], ["water__full", "coke__mid", "empty"])
     assert obs["item"] == "unknown" and obs["fill_ratio"] < 0.1 and obs["confidence"] == pytest.approx(0.9)

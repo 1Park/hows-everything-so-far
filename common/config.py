@@ -21,6 +21,8 @@ class Settings(BaseModel):
     vision_port: int = Field(8001, ge=1, le=65535)
     vision_model_backend: Literal["fixture", "external"] = "fixture"
     vision_adapter: str = ""
+    vision_model_path: str = ""  # services.vision.backend bundle directory (bundle.json)
+    vision_runner_bin: str = ""  # only for bundles using the CLI runner (qnn_executor_runner)
     stt_backend: Literal["fixture", "http"] = "fixture"
     stt_base_url: HttpUrl = "http://127.0.0.1:8002"
     stt_host: str = "127.0.0.1"

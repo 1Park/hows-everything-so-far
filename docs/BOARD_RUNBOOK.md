@@ -18,7 +18,8 @@ python scripts/diagnose.py
 ```sh
 export QNN_EXECUTOR_RUNNER='<actual executable path>'
 export QNN_LLAMA_RUNNER='<actual executable path>'
-export VISION_MODEL_PATH='<actual DINO bundle .pte>'
+export VISION_MODEL_PATH='<Vision bundle directory containing bundle.json>'
+export VISION_RUNNER_BIN='<qnn_executor_runner path, only for cli-runner bundles>'
 export QWEN_MODEL_PATH='<actual Qwen .pte>'
 export QWEN_TOKENIZER_PATH='<actual tokenizer path>'
 export LD_LIBRARY_PATH='<actual host library paths>'
@@ -33,6 +34,8 @@ smoke는 한 입력·출력/exit code/시간만 logs에 저장한다. 모델 로
 ## 2. 모델 연결
 
 Vision/STT 담당자는 [API·async 계약](CONTRACTS.md)을 구현한다. factory/HTTP를 연결하고 실제 source=external/readiness를 확인한다. DINO output이 embedding인지 classification logits인지 bundle을 보고 결정하며 담당자 전처리를 서비스가 대체하지 않는다.
+
+Vision(DINOv2): `VISION_MODEL_BACKEND=external`, `VISION_ADAPTER=services.vision.backend:create_backend`, `VISION_MODEL_PATH=models/board/vision/<bundle>`(bundle 디렉터리, `.pte` 파일 아님). bundle은 `ml/export/make_bundle.py`로 만들고, head는 **보드에서 돌릴 `.pte`의 특징으로** `ml/training/make_head.py`로 학습한다(fp32 head를 양자화 모델에 쓰면 크게 떨어짐). bundle 없음/로드 실패는 ready503. 세부는 [services/vision](../services/vision/README.md)·[ml](../ml/README.md)·[평가 기록](vision_evaluation/README.md).
 
 Qwen ExecuTorch는 common/backends.py의 ExecuTorchBackend 경계에 실제 runtime을 연결한다. 토크나이저·chat template·생성 옵션·취소/timeout·상주 실행·원본 output을 확인한다. 일회성 CLI를 감싼 HTTP 상주만으로 모델 상주를 주장하지 않는다. .env.board는 QWEN_MODEL_BACKEND=executorch라서 연결 전 ready503을 반환하며 Mac/fixture로 자동 전환하지 않는다. 실제 보드 bundle의 공개 model ID는 확인 후 설정한다.
 
