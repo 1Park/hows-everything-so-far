@@ -90,3 +90,7 @@ def test_label_conversion():
     obs = to_observation([0.5, 0.5], ["coffee__low", "coffee__full"])
     assert obs["item"] == "coffee" and obs["confidence"] == pytest.approx(0.5)
     assert obs["fill_ratio"] == pytest.approx((0.18 + 0.85) / 2)
+    assert obs["item_confidence"] == pytest.approx(1.0)  # 음료는 확실, 잔량만 애매
+    obs = to_observation([0.6, 0.3, 0.1], ["coke__low", "coffee__low", "empty"])
+    assert obs["item"] == "coke" and obs["item_confidence"] == pytest.approx(0.6 / 0.9, abs=1e-3)
+    assert to_observation([0.1, 0.9], ["coke__low", "empty"])["item_confidence"] is None
