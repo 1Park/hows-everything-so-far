@@ -73,4 +73,5 @@ main{padding:12px 24px 22px}
 .dev-tools{margin-top:14px;padding:10px 16px}
 .dev-tools .sources{justify-content:flex-start;margin:10px 0}
 .footer{margin-top:14px}
-.heading-right #backToLive{padding:6px 10px;font-size:11px;border-radius:6px}
+.scene-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.scene-actions #backToLive{padding:12px 14px;font-size:12px;white-space:nowrap}
