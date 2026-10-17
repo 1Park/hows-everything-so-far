@@ -3,9 +3,10 @@ from contextlib import asynccontextmanager
 from fastapi.responses import JSONResponse
 
 from common.api import ApiError, InferenceGate, create_api
-from common.backends import ExecuTorchBackend, FixtureTextBackend, MLXBackend
+from common.backends import FixtureTextBackend, MLXBackend
 from common.config import load_settings
 from common.contracts import Generation
+from services.qwen.board_llm import BoardLLMBackend
 
 
 def create_app(settings=None, backend=None):
@@ -14,7 +15,7 @@ def create_app(settings=None, backend=None):
         backend
         or {
             "fixture": lambda: FixtureTextBackend(),
-            "executorch": lambda: ExecuTorchBackend(),
+            "executorch": lambda: BoardLLMBackend(),
             "mlx": lambda: MLXBackend(
                 str(settings.qwen_upstream_url), settings.qwen_model, settings.inference_timeout
             ),

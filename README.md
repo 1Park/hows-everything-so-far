@@ -1,6 +1,6 @@
 # How’s Everything So Far — Refill Assist
 
-여러 컵·접시의 종류/잔량을 관찰하고, 고객 요청을 해석한 뒤 **명시적 확인을 받아 mock 적재·주방 복귀**를 시연하는 4인 해커톤 프로젝트다. 목표 보드는 Arduino VENTUNO Q 한 대, 비전 DINOv2, 요청 해석 Qwen3-0.6B, 주요 음료 water/coke/coffee다. UI·스피커는 태블릿 브라우저, 마이크 녹음은 보드가 담당한다.
+여러 컵·접시의 종류/잔량을 관찰하고, 고객 요청을 해석한 뒤 **명시적 확인을 받아 mock 적재·주방 복귀**를 시연하는 4인 해커톤 프로젝트다. 목표 보드는 Arduino VENTUNO Q 한 대, 비전 DINOv2, 요청 해석 LLM(보드는 주최 측 Gemma, 개발 중엔 Mac Qwen3-0.6B — 보드용 Qwen `.pte`가 없어 보드에선 Qwen 안 씀), 주요 음료 water/coke/coffee다. UI·스피커는 태블릿 브라우저, 마이크 녹음은 보드가 담당한다.
 
 현재 보드 없이 실행 가능하다. 기본은 **Vision/STT fixture + 실제 Mac Qwen HTTP + mock HardwareIO**. Vision/STT 모델 자체는 다른 팀원 소유이며 이 레포 구현은 서비스 계층이다. 보드 ExecuTorch/카메라/Bridge 실기 검증은 별도다. fixture 결과를 실제 인식으로 표시하지 않는다.
 
