@@ -44,3 +44,6 @@ recordings/
 Thumbs.db
 .idea/
 .vscode/
+
+# Accuracy-check takes are data written by the running board, not source.
+docs/stt_evaluation/takes.json
