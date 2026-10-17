@@ -16,8 +16,10 @@
 - [x] 검증: 정상/수정/거절/취소/모호/충분/불확실, malformed/API 장애/timeout/중복/오래된 확인/늦은 결과
 - [x] 검증: 실제 서버 통합, 실제 브라우저 UI/영상/bbox/오디오/반응형, 시작→데모→종료→재시작→데모
 - [x] 정리: README/폴더 문서/아키텍처/설명 HTML 최종 일치, 외부 blocker·보드 잔여 작업 기록
-- [ ] 정리: 테스트/서버 프로세스 종료, Git commit/push
+- [x] 정리: 테스트/서버 프로세스 종료, Git commit/push
 
 고정 범위: 4인/VENTUNO Q 1대, DINOv2/Qwen3-0.6B, water/coke/coffee, FastAPI/Uvicorn/Ubuntu/venv/localhost. ROS·앱 Docker·실제 주행/집기 없음. Vision/STT 모델은 다른 담당자 소유. 제품 영어. fixture와 실제 추론을 혼동하지 않음.
 
 검증 근거는 [VALIDATION.md](VALIDATION.md), API/담당자 연결은 [CONTRACTS.md](CONTRACTS.md), 태블릿 요구사항은 [TABLET_DEMO.md](TABLET_DEMO.md). 위 체크는 보드 전 범위 기준이며 보드/물리 태블릿 실기 미검증을 완료로 바꾸지 않는다.
+
+구현 커밋 a6f86b0을 origin/main에 push했다. 테스트/앱 supervisor 종료, lock 제거 및 사용한 로컬 포트8000/8001/8002/8080/18081 종료를 확인했다. 외부 Mac 공유 모델 서버는 변경/종료하지 않았다.

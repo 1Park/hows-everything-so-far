@@ -54,3 +54,5 @@ CAMERA_SOURCE에 샘플 AVI 파일을 지정한 실제 서버에서도 전체 fi
 | 물리 태블릿 | Chromium 실제 UI·녹음 transport·WebAudio·태블릿 너비 검증. iPad/Android 권한·실제 mic/speaker·HTTPS tailnet 설정은 현장 장치 필요 |
 
 구체적인 연결 순서는 [보드 runbook](BOARD_RUNBOOK.md), [태블릿 runbook](TABLET_DEMO.md), [담당자 계약](CONTRACTS.md). Tailscale Serve는 기존 tailnet 서비스 설정을 자동 변경하지 않았고 설치·HTTPS 명령을 문서화했다. 앱/테스트 프로세스는 검증 종료 후 모두 정리한다. logs/와 tmp/ QA 산출물만 남기고 Mac 공유 모델 서버는 건드리지 않는다.
+
+최종 정리 확인: 모든 앱 supervisor 정상 종료, tmp의 supervisor lock 없음, 사용한 로컬 포트8000/8001/8002/8080/18081에 listener 없음. 유지한 앱/테스트 프로세스는 없다. 실행을 재개하려면 루트 README의 명령을 사용한다. 구현은 a6f86b0으로 main에 commit/push했다.
