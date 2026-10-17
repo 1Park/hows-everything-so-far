@@ -59,7 +59,7 @@ main{padding:18px 28px 28px}
 }
 
 /* Tighter chrome: the frame and the request deserve the height, not the headers. */
-header{padding:10px 24px 8px}
+header{padding:10px 24px 8px;border-bottom:0}
 header h1{font-size:clamp(20px,2.2vw,28px);letter-spacing:-1px}
 main{padding:12px 24px 22px}
 .workspace{gap:14px}
