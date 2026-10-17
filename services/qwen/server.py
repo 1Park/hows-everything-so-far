@@ -14,7 +14,7 @@ def create_app(settings=None, backend=None):
         backend
         or {
             "fixture": lambda: FixtureTextBackend(),
-            "executorch": lambda: ExecuTorchBackend(),
+            "executorch": lambda: ExecuTorchBackend(settings),
             "mlx": lambda: MLXBackend(
                 str(settings.qwen_upstream_url), settings.qwen_model, settings.inference_timeout
             ),
