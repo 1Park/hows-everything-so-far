@@ -157,6 +157,29 @@ def create_app(settings=None, clients=None, hardware=None):
                 "stt_timeout", "Audio transcription timed out. Please retry", 504, True
             ) from None
 
+    @app.post("/api/stt/check")
+    async def stt_check():
+        """Record from the board microphone and transcribe it, outside the demo flow.
+
+        The refill path only listens while an offer is on screen and moves the
+        controller through phases, which makes it useless for measuring the model.
+        This records and transcribes and changes nothing else.
+        """
+        audio = await controller.microphone.capture()
+        try:
+            async with asyncio.timeout(settings.inference_timeout):
+                result = await clients.stt(audio, "audio/wav")
+        except TimeoutError:
+            raise ApiError(
+                "stt_timeout", "Audio transcription timed out. Please retry", 504, True
+            ) from None
+        return {
+            "text": result.text,
+            "source": result.source,
+            "seconds": settings.audio_seconds,
+            "bytes": len(audio),
+        }
+
     @app.get("/api/frame")
     async def frame():
         data, mime = video.frame()
