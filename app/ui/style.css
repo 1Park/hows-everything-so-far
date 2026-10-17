@@ -2,3 +2,62 @@
 .audio-controls button{min-height:44px;padding:10px 16px;border:1px solid #c3d2b4;border-radius:8px;background:#edf3e2;font-size:13px}.upload-audio{min-height:44px;display:flex;align-items:center}.suggestions button{min-height:36px}.live-ribbon{display:flex;gap:14px;align-items:center;border-top:1px solid var(--line);padding:16px 24px}.live-ribbon img{width:38%;border-radius:7px}.live-ribbon p{font-size:11px;color:var(--muted);margin:5px 0}.live-ribbon strong{font-size:12px}
 
 .voice-banner{display:flex;align-items:center;gap:13px;margin:14px 24px;padding:14px 16px;border-radius:10px;background:#f6ece4;border:1px solid #e0c3b2}.voice-banner strong{display:block;font-size:14px;color:#8d3f22}.voice-banner p{margin:3px 0 0;font-size:11px;color:var(--muted)}.voice-dot{width:14px;height:14px;border-radius:50%;background:#c0392b;flex-shrink:0;animation:voicePulse 1s ease-in-out infinite}.voice-count{margin-left:auto;font:22px ui-monospace,monospace;color:#8d3f22}.voice-banner.working{background:#f2f5e9;border-color:#cdd9b8}.voice-banner.working strong{color:var(--green)}.voice-banner.working .voice-dot{background:#739656}@keyframes voicePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.8)}}@media(prefers-reduced-motion:reduce){.voice-dot{animation:none}}.transcript{font-size:13px;padding:13px;background:#eef3e5;border:1px solid #cfdcbb}.transcript .transcript-label{display:block;font-size:9px;letter-spacing:1.6px;color:var(--muted);margin-bottom:5px}.transcript .transcript-text{font:19px/1.35 Georgia,serif;color:var(--ink)}.transcript .transcript-note{display:block;font-size:10px;color:var(--muted);margin-top:7px}
+
+/* --- Tablet layout: capture is the subject, audio is the conversation --- */
+header{display:block;padding:18px 28px}
+.title-row{display:flex;align-items:baseline;justify-content:space-between;gap:16px}
+header h1{font:normal clamp(26px,3.2vw,40px)/1.05 Georgia,serif;letter-spacing:-1.4px;margin:0}
+header .sources{justify-content:flex-start;margin-top:12px}
+main{padding:18px 28px 28px}
+.workspace{grid-template-columns:minmax(0,1.5fr) minmax(330px,1fr);gap:18px;align-items:start}
+.capture-column{display:grid;gap:18px;min-width:0}
+.panel-heading h2{font-size:13px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted)}
+.heading-right{display:flex;align-items:center;gap:8px}
+.capture-panel .scene>img{max-height:58vh;object-fit:contain;background:#e3e0d5}
+.live-panel{padding:0 0 14px}
+.live-panel img{display:block;width:100%;border-top:1px solid var(--line)}
+.live-panel p{font-size:11px;color:var(--muted);margin:10px 20px 0}
+.audio-panel{padding-bottom:20px;position:sticky;top:14px}
+
+/* Stage: always visible, so a silent moment still reads as progress. */
+.stage{list-style:none;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:4px 20px 16px;padding:0;font-size:10px;color:var(--muted)}
+.stage li{display:flex;align-items:center;gap:6px;border-top:3px solid #e8eadf;padding-top:8px;letter-spacing:.3px}
+.stage .stage-dot{width:7px;height:7px;border-radius:50%;background:#d3d7cb;flex-shrink:0}
+.stage li.active{color:var(--green);font-weight:600;border-color:#739656}
+.stage li.active .stage-dot{background:#739656}
+.stage li.live{color:#8d3f22;border-color:#c0392b}
+.stage li.live .stage-dot{background:#c0392b;animation:voicePulse 1s ease-in-out infinite}
+
+.voice-banner{display:block;margin:0 20px 14px}
+.voice-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.waveform{display:flex;align-items:center;justify-content:center;gap:4px;height:44px;margin-top:12px}
+.waveform i{display:block;width:5px;height:18%;border-radius:3px;background:#c0392b;animation:waveBar .9s ease-in-out infinite}
+.waveform i:nth-child(2n){background:#d2694f}
+.waveform i:nth-child(1){animation-delay:-.80s}.waveform i:nth-child(2){animation-delay:-.15s}
+.waveform i:nth-child(3){animation-delay:-.45s}.waveform i:nth-child(4){animation-delay:-.70s}
+.waveform i:nth-child(5){animation-delay:-.25s}.waveform i:nth-child(6){animation-delay:-.60s}
+.waveform i:nth-child(7){animation-delay:-.05s}.waveform i:nth-child(8){animation-delay:-.50s}
+.waveform i:nth-child(9){animation-delay:-.35s}.waveform i:nth-child(10){animation-delay:-.75s}
+.waveform i:nth-child(11){animation-delay:-.20s}.waveform i:nth-child(12){animation-delay:-.55s}
+@keyframes waveBar{0%,100%{height:16%}50%{height:100%}}
+@media(prefers-reduced-motion:reduce){.waveform i{animation:none;height:45%}}
+
+.audio-panel .message{font-size:19px;margin:4px 20px 16px;min-height:0;text-align:left}
+.audio-panel .audio-controls{margin:0 20px 14px}
+.audio-panel .transcript{margin:0 20px 12px}
+.audio-panel form{margin:0 20px}
+.audio-panel .request-card{margin:14px 20px 0}
+.audio-panel .actions{margin:16px 20px 0}
+.audio-panel .progress{margin:16px 20px 0}
+
+.dev-tools{margin-top:18px;border:1px solid var(--line);border-radius:12px;background:var(--white);padding:14px 18px;font-size:12px;color:var(--muted)}
+.dev-tools>summary{color:var(--ink);font-size:12px}
+.tool-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.tool-row .secondary{padding:8px 12px;font-size:11px}
+.dev-tools #livePreview{width:min(100%,420px)}
+
+@media(max-width:900px){
+  .workspace{grid-template-columns:1fr}
+  .audio-panel{position:static}
+  .capture-panel .scene>img{max-height:42vh}
+}

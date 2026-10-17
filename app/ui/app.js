@@ -262,24 +262,36 @@ let listeningSince = null;
 
 function renderVoiceBanner(state) {
   const banner = $('voiceBanner');
-  if (state.phase !== 'listening' && state.phase !== 'transcribing') {
+  const wave = $('waveform');
+  const stage = {idle: $('stageIdle'), listening: $('stageListening'),
+                 transcribing: $('stageTranscribing'), result: $('stageResult')};
+  const current = state.phase === 'listening' ? 'listening'
+    : state.phase === 'transcribing' ? 'transcribing'
+    : state.transcript ? 'result' : 'idle';
+  for (const [name, node] of Object.entries(stage)) {
+    node.classList.toggle('active', name === current);
+    node.classList.toggle('live', name === current && name === 'listening');
+  }
+
+  if (current !== 'listening' && current !== 'transcribing') {
     listeningSince = null;
     clearInterval(renderVoiceBanner.timer);
     banner.hidden = true;
+    wave.hidden = true;
     return;
   }
   banner.hidden = false;
-  if (state.phase === 'transcribing') {
+  if (current === 'transcribing') {
     listeningSince = null;
     clearInterval(renderVoiceBanner.timer);
-    banner.classList.add('working');
+    wave.hidden = true;
     $('voiceTitle').textContent = 'Transcribing…';
     $('voiceDetail').textContent = 'The board is turning your words into text.';
     $('voiceCount').textContent = '';
     return;
   }
-  banner.classList.remove('working');
-  $('voiceTitle').textContent = 'Recording — please speak now';
+  wave.hidden = false;
+  $('voiceTitle').textContent = 'Listening — please speak now';
   $('voiceDetail').textContent = 'The board microphone is open. It stops on its own.';
   const total = state.audio_seconds || 6;
   listeningSince ||= Date.now();
@@ -291,25 +303,6 @@ function renderVoiceBanner(state) {
   clearInterval(renderVoiceBanner.timer);
   renderVoiceBanner.timer = setInterval(tick, 200);
   tick();
-}
-
-// An <img> MJPEG stream never retries by itself, so a single dropped connection
-// used to leave a dead feed until the page was reloaded.
-function attachStream(image) {
-  if (image.dataset.streaming) return;
-  image.dataset.streaming = '1';
-  // The query string stops the browser from reusing the dead response.
-  image.src = `/api/video?t=${Date.now()}`;
-  image.onerror = () => {
-    delete image.dataset.streaming;
-    image.removeAttribute('src');
-    setTimeout(() => {
-      // Only reconnect while the element is still meant to be showing a feed.
-      if (!image.isConnected || image.closest('[hidden]')) return;
-      if (image.id === 'livePreview' && !image.parentElement.open) return;
-      attachStream(image);
-    }, 1000);
-  };
 }
 
 $('record').onclick = async () => {
