@@ -5,8 +5,14 @@ let audioContext = null, playingSource = null;
 let draftVersion = 0, transcriptionVersion = 0, micVersion = 0;
 let micPending = false, transcribing = false, pendingAction = null;
 let audioVersion = 0;
+let policy = {min_confidence: 0.7, low_fill_threshold: 0.3};  // /ready 값으로 덮어씀
 const audioBuffers = new Map();
 const editablePhases = ['offered','card','not_understood','error'];
+// 사진틀 비율을 실제 사진(카메라 4:3, fixture 등) 비율에 맞춘다 → 박스 좌표가 사진과 일치
+function syncFrameRatio() {
+  const img = $('sceneImage');
+  if (img?.naturalWidth && img.naturalHeight) $('scene').style.setProperty('--ar', String(img.naturalWidth / img.naturalHeight));
+}
 function canEdit() { return connected && !!state?.target && editablePhases.includes(state.phase); }
 function stopRecording(discard = false) {
   micVersion++;
@@ -78,15 +84,18 @@ function modePill(label, source, ready = true) {
 }
 async function checkConnection() {
   try {
-    const response = await fetch('/ready'); const info = await response.json();
+    const response = await fetch('/ready'); const info = await response.json(); if (info.policy) policy = info.policy;
     const sources = $('sources'); sources.replaceChildren();
     for (const [name, data] of Object.entries(info.dependencies)) sources.append(modePill(name.toUpperCase(), data.source, data.ready));
     sources.append(modePill('Hardware', info.hardware, info.hardware_ready)); sources.append(modePill('Location', info.location));
     $('videoMode').textContent = state?.snapshot_url ? 'Analyzed frame · frozen' : info.video.mode === 'fixture-image' ? 'Sample image' : 'Live source';
     $('imageCredit').textContent = info.video.mode === 'fixture-image' ? 'AI-generated sample · illustrative fixture' : 'Captured by the server · single video owner';
     $('liveStatus').textContent = info.video.error || 'Server capture · camera is opened once · 5 fps preview';
-    $('liveRibbon').hidden = info.video.mode === 'fixture-image';
-    if (info.video.mode !== 'fixture-image' && !$('liveFeed').getAttribute('src')) $('liveFeed').src='/api/video';
+    liveSource = info.video.mode !== 'fixture-image';
+    // One panel: live until a capture freezes it, so there is never a question
+    // about which frame the request refers to.
+    if (liveSource && !state?.snapshot_url) attachStream($('sceneImage'));
+    showBackToLive();
   } catch { $('sources').textContent = 'Cannot reach the Controller. Reconnecting…'; }
 }
 function render(next, authoritative = false) {
@@ -113,11 +122,25 @@ function render(next, authoritative = false) {
   if (boardAudio) {
     $('record').textContent = 'Retry board recording';
     $('mediaSupport').textContent = `Microphone: ${state.audio_input === 'fixture' ? 'FIXTURE audio, not a real microphone' : 'board'} · Speaker: this tablet · Recording starts after the offer`;
-    $('recordStatus').textContent = state.phase === 'listening' ? 'Listening on the board…' : state.phase === 'transcribing' ? 'Transcribing…' : '';
+    $('recordStatus').textContent = '';
   }
+  renderVoiceBanner(state);
   if (state.transcript) {
-    $('transcript').textContent = `${state.stt_source.toUpperCase()} STT: “${state.transcript}” — interpreted automatically; review the card before confirming.`;
+    $('transcript').innerHTML = '';
+    const label = document.createElement('span');
+    label.className = 'transcript-label';
+    label.textContent = `HEARD · ${state.stt_source.toUpperCase()} STT`;
+    const text = document.createElement('span');
+    text.className = 'transcript-text';
+    text.textContent = `\u201C${state.transcript}\u201D`;
+    const note = document.createElement('span');
+    note.className = 'transcript-note';
+    note.textContent = 'Interpreted automatically. Review the card before confirming.';
+    $('transcript').append(label, text, note);
     $('transcript').hidden = false;
+  } else {
+    // Without this a previous answer stays on screen through the next recording.
+    $('transcript').hidden = true;
   }
   document.querySelectorAll('[data-say]').forEach(b => b.disabled = !editable);
   $('confirm').disabled = !connected || !!pendingAction || state.phase !== 'card';
@@ -126,17 +149,31 @@ function render(next, authoritative = false) {
   $('start').innerHTML = (state.phase === 'idle' ? 'Start demo' : 'Inspect again') + ' <span>↗</span>';
   if (state.snapshot_url && displayedSession !== state.session_id) {
     $('boxes').hidden = true;
+    detachStream($('sceneImage'));
     $('sceneImage').src = state.snapshot_url; displayedSession = state.session_id;
     $('videoMode').textContent = 'Analyzed frame · frozen';
+  } else if (!state.snapshot_url && liveSource) {
+    // Before a capture the panel shows what the camera sees, so pressing Start
+    // visibly freezes the frame the board actually analyzed.
+    displayedSession = null;
+    $('boxes').hidden = true;
+    attachStream($('sceneImage'));
+    $('videoMode').textContent = 'Live source';
   }
+  showBackToLive();
+  syncFrameRatio();
   const boxes = $('boxes'); boxes.replaceChildren(); const objects = $('objects'); objects.replaceChildren();
   for (const obj of state.scene?.objects || []) {
     const selected = obj.object_id === state.target?.object_id;
-    const box = document.createElement('div'); box.className = 'bbox' + (selected ? ' selected' : '');
+    // 리필 필요 = Controller 정책과 같은 잔량·confidence 기준 (빈 잔 unknown도 눈으로는 리필 대상이라 표시)
+    // Vision은 빈 잔을 item unknown으로 보낸다 (계약에 empty 없음) → 화면에서만 empty로 표시
+    const item = obj.item === 'unknown' && obj.fill_ratio !== null && obj.fill_ratio <= 0.1 ? 'empty' : obj.item;
+    const refill = obj.fill_ratio !== null && obj.fill_ratio <= policy.low_fill_threshold && obj.confidence >= policy.min_confidence;
+    const box = document.createElement('div'); box.className = 'bbox' + (selected ? ' selected' : '') + (refill ? ' refill' : '');
     const b = obj.bbox; Object.assign(box.style, {left:`${b.x1*100}%`, top:`${b.y1*100}%`, width:`${(b.x2-b.x1)*100}%`, height:`${(b.y2-b.y1)*100}%`});
-    const label = document.createElement('span'); label.className = 'box-label'; label.textContent = `${obj.object_id} · ${obj.item}`; box.append(label); boxes.append(box);
+    const label = document.createElement('span'); label.className = 'box-label'; label.textContent = `${obj.object_id} · ${item}${refill ? ' · REFILL' : ''}\n${obj.fill_ratio === null ? 'fill ?' : Math.round(obj.fill_ratio*100)+'% left'} · conf ${Math.round(obj.confidence*100)}%`; box.append(label); boxes.append(box);
     const card = document.createElement('div'); card.className = 'object' + (selected ? ' target' : '');
-    const title = document.createElement('strong'); title.textContent = obj.item; card.append(title);
+    const title = document.createElement('strong'); title.textContent = item; card.append(title);
     const small = document.createElement('small'); small.textContent = obj.object_id; card.append(small);
     const bar = document.createElement('div'); bar.className='fill'; const fill = document.createElement('span'); fill.style.width=`${(obj.fill_ratio || 0)*100}%`; bar.append(fill); card.append(bar);
     const details = document.createElement('span'); details.textContent = `${obj.fill_ratio === null ? 'Unknown fill' : Math.round(obj.fill_ratio*100)+'% left'} · ${Math.round(obj.confidence*100)}% confidence`; card.append(details); objects.append(card);
@@ -166,12 +203,14 @@ function render(next, authoritative = false) {
   }
 }
 $('sceneImage').onload = () => {
+  syncFrameRatio();
   if ($('sceneImage').getAttribute('src') === state?.snapshot_url) $('boxes').hidden = false;
 };
-$('sceneImage').onerror = () => {
+function sceneImageError() {
   $('boxes').hidden = true;
   showError('The scene image could not load. Inspect the scene again to retry.');
-};
+}
+$('sceneImage').onerror = sceneImageError;
 function connect() {
   clearTimeout(retryTimer);
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
@@ -224,7 +263,10 @@ $('audioToggle').onclick = () => {
     audioContext.resume().then(()=>state?.phase === 'offered' ? announceOffer() : playPrompt('welcome')).catch(()=>showError('Tap Enable sound to activate audio.'));
   } else {playingSource?.stop(); playingSource=null;}
 };
-$('livePreview').parentElement.addEventListener('toggle', event => {if(event.target.open) $('livePreview').src='/api/video'; else $('livePreview').removeAttribute('src');});
+$('livePreview').parentElement.addEventListener('toggle', event => {
+  if (event.target.open) attachStream($('livePreview'));
+  else {$('livePreview').removeAttribute('src'); delete $('livePreview').dataset.streaming;}
+});
 async function transcribe(blob) {
   if (!canEdit() || pendingAction) return;
   const session = state.session_id, sequence = state.sequence, draft = draftVersion;
@@ -239,6 +281,103 @@ async function transcribe(blob) {
 }
 $('utterance').addEventListener('input', () => {draftVersion++; $('transcript').hidden = true;});
 $('audioFile').onchange = () => {if($('audioFile').files[0]) transcribe($('audioFile').files[0]).catch(()=>{});};
+// The board records for a fixed number of seconds with no browser-side signal,
+// so the page has to show that time passing or the demo looks frozen.
+let listeningSince = null;
+
+function renderVoiceBanner(state) {
+  const banner = $('voiceBanner');
+  const wave = $('waveform');
+  const stage = {idle: $('stageIdle'), listening: $('stageListening'),
+                 transcribing: $('stageTranscribing'), result: $('stageResult')};
+  const current = state.phase === 'listening' ? 'listening'
+    : state.phase === 'transcribing' ? 'transcribing'
+    : state.transcript ? 'result' : 'idle';
+  for (const [name, node] of Object.entries(stage)) {
+    node.classList.toggle('active', name === current);
+    node.classList.toggle('live', name === current && name === 'listening');
+  }
+
+  if (current !== 'listening' && current !== 'transcribing') {
+    listeningSince = null;
+    clearInterval(renderVoiceBanner.timer);
+    banner.hidden = true;
+    wave.hidden = true;
+    return;
+  }
+  banner.hidden = false;
+  if (current === 'transcribing') {
+    listeningSince = null;
+    clearInterval(renderVoiceBanner.timer);
+    wave.hidden = true;
+    $('voiceTitle').textContent = 'Transcribing…';
+    $('voiceDetail').textContent = 'The board is turning your words into text.';
+    $('voiceCount').textContent = '';
+    return;
+  }
+  wave.hidden = false;
+  $('voiceTitle').textContent = 'Listening — please speak now';
+  $('voiceDetail').textContent = 'The board microphone is open. It stops on its own.';
+  const total = state.audio_seconds || 6;
+  listeningSince ||= Date.now();
+  const tick = () => {
+    const left = Math.max(0, total - Math.floor((Date.now() - listeningSince) / 1000));
+    $('voiceCount').textContent = `${left}s`;
+    if (!left) clearInterval(renderVoiceBanner.timer);
+  };
+  clearInterval(renderVoiceBanner.timer);
+  renderVoiceBanner.timer = setInterval(tick, 200);
+  tick();
+}
+
+let liveSource = false;
+
+function detachStream(image) {
+  delete image.dataset.streaming;
+  // Hand the element back to its own error handling; while streaming, attachStream
+  // owns onerror so a dropped feed reconnects instead of raising a scene error.
+  image.onerror = image.id === 'sceneImage' ? sceneImageError : null;
+  if (image.getAttribute('src')?.startsWith('/api/video')) image.removeAttribute('src');
+}
+
+// An <img> MJPEG stream never retries by itself, so a single dropped connection
+// used to leave a dead feed until the page was reloaded.
+function attachStream(image) {
+  if (image.dataset.streaming) return;
+  image.dataset.streaming = '1';
+  // The query string stops the browser from reusing the dead response.
+  image.src = `/api/video?t=${Date.now()}`;
+  image.onerror = () => {
+    delete image.dataset.streaming;
+    image.removeAttribute('src');
+    setTimeout(() => {
+      // Only reconnect while the element is still meant to be showing a feed.
+      if (!image.isConnected || image.closest('[hidden]')) return;
+      if (image.id === 'livePreview' && !image.parentElement.open) return;
+      attachStream(image);
+    }, 1000);
+  };
+}
+
+// Recomputed on every render: readiness and state arrive in either order, and the
+// freeze branch only runs once, so deciding there left the button stuck hidden.
+function showBackToLive() {
+  $('backToLive').hidden =
+    !liveSource || !state?.snapshot_url || !!$('sceneImage').dataset.streaming;
+}
+
+// Viewing live again is only a change of view: the analyzed frame, the target and
+// the card are untouched, so the boxes come off to avoid implying they still match.
+$('backToLive').onclick = () => {
+  if (!liveSource || !state) return;
+  $('boxes').hidden = true;
+  // Claim this session as displayed so render() does not re-freeze the panel.
+  displayedSession = state.session_id;
+  attachStream($('sceneImage'));
+  $('videoMode').textContent = 'Live source';
+  showBackToLive();
+};
+
 $('record').onclick = async () => {
   if (state?.audio_input && state.audio_input !== 'disabled') {
     if (canEdit() && !pendingAction) {

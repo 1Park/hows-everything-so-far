@@ -21,6 +21,8 @@ class Settings(BaseModel):
     vision_port: int = Field(8001, ge=1, le=65535)
     vision_model_backend: Literal["fixture", "external"] = "fixture"
     vision_adapter: str = ""
+    vision_model_path: str = ""  # services.vision.backend bundle directory (bundle.json)
+    vision_runner_bin: str = ""  # only for bundles using the CLI runner (qnn_executor_runner)
     stt_backend: Literal["fixture", "http"] = "fixture"
     stt_base_url: HttpUrl = "http://127.0.0.1:8002"
     stt_host: str = "127.0.0.1"
@@ -32,7 +34,7 @@ class Settings(BaseModel):
     qwen_base_url: HttpUrl = "http://won-macmini:8000"
     qwen_host: str = "127.0.0.1"
     qwen_port: int = Field(8000, ge=1, le=65535)
-    qwen_model_backend: Literal["mlx", "fixture", "executorch", "board"] = "mlx"
+    qwen_model_backend: Literal["mlx", "fixture", "executorch", "board", "qwen_cli"] = "mlx"
     qwen_upstream_url: HttpUrl = "http://won-macmini:8000"
     qwen_model: str = "mlx-community/Qwen3-0.6B-4bit"
     qnn_llama_runner: str = ""
@@ -47,11 +49,18 @@ class Settings(BaseModel):
     max_audio_bytes: int = Field(10_000_000, ge=1024, le=25_000_000)
     min_confidence: float = Field(0.7, ge=0, le=1)
     low_fill_threshold: float = Field(0.3, ge=0, le=1)
+    # Ask the customer which drink when Vision reports coke/coffee with item_confidence below this.
+    # 0.8 from real-photo CV (190 coke/coffee): asks 17%, catches 87% of coke<->coffee mix-ups.
+    item_confirm_threshold: float = Field(0.8, ge=0, le=1)
     response_timeout: float = Field(60, gt=0, le=600)
     mock_step_seconds: float = Field(0.8, gt=0, le=20)
     hardware_backend: Literal["mock", "bridge"] = "mock"
     bridge_timeout: float = Field(3, gt=0, le=30)
     camera_source: str = ""  # empty = explicit static fixture, no implicit /dev/video0
+    # Capture faster than the stream so a streamed frame is never a stale one.
+    # Tune on the board: the encode loop is the cost, not the network.
+    camera_fps: float = Field(20, gt=0, le=60)
+    video_stream_fps: float = Field(15, gt=0, le=60)
     audio_input: Literal["disabled", "fixture", "alsa"] = "disabled"
     audio_device: str = ""  # explicit ALSA capture device, never guessed
     audio_format: Literal["S16_LE", "S32_LE"] = "S16_LE"
@@ -59,6 +68,8 @@ class Settings(BaseModel):
     audio_channels: int = Field(1, ge=1, le=2)
     audio_seconds: int = Field(6, ge=1, le=15)
     observe_interval_seconds: float = Field(0, ge=0, le=60)  # zero disables automatic observation
+    # JSON Lines history of Controller phase changes (app/events.py). Empty disables.
+    event_log_path: str = ""
 
     @model_validator(mode="after")
     def adapters_required(self):

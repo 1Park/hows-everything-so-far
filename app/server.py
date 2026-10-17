@@ -1,7 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import File, Form, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import File, Form, Query, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -26,7 +26,7 @@ def create_app(settings=None, clients=None, hardware=None):
     settings = settings or load_settings()
     clients = clients or ModelClients(settings)
     controller = Controller(settings, clients, hardware)
-    video = VideoSource(settings.camera_source)
+    video = VideoSource(settings.camera_source, settings.camera_fps, settings.video_stream_fps)
 
     @asynccontextmanager
     async def lifespan(app):
@@ -58,11 +58,27 @@ def create_app(settings=None, clients=None, hardware=None):
     app = create_api("Controller", lifespan)
     app.state.controller, app.state.video = controller, video
 
+    # The tablet kept running an older app.js after a deploy because the browser
+    # revalidated into a 304. The UI is tiny and served over a direct link, so
+    # always send the current bytes rather than debug a stale page mid-demo.
+    no_store = {"Cache-Control": "no-store"}
+
     @app.get("/")
     async def index():
-        return FileResponse(ROOT / "app/ui/index.html")
+        return FileResponse(ROOT / "app/ui/index.html", headers=no_store)
 
-    app.mount("/ui", StaticFiles(directory=ROOT / "app/ui"), name="ui")
+    class FreshStaticFiles(StaticFiles):
+        def file_response(self, *args, **kwargs):
+            response = super().file_response(*args, **kwargs)
+            response.headers.update(no_store)
+            return response
+
+        def is_not_modified(self, *args, **kwargs):
+            # no-store alone was not enough: a copy cached before the header existed
+            # still revalidated into a 304, so the tablet kept running old code.
+            return False
+
+    app.mount("/ui", FreshStaticFiles(directory=ROOT / "app/ui"), name="ui")
 
     @app.get("/ready")
     async def ready():
@@ -87,6 +103,11 @@ def create_app(settings=None, clients=None, hardware=None):
                 "ready": ok,
                 "dependencies": dependencies,
                 "video": {"mode": video.mode, "error": video.error},
+                # UI가 리필 대상 박스를 Controller와 같은 기준으로 표시하도록
+                "policy": {
+                    "min_confidence": settings.min_confidence,
+                    "low_fill_threshold": settings.low_fill_threshold,
+                },
                 "hardware": settings.hardware_backend,
                 "hardware_ready": hardware_ready,
                 "location": settings.app_env,
@@ -145,6 +166,30 @@ def create_app(settings=None, clients=None, hardware=None):
             raise ApiError(
                 "stt_timeout", "Audio transcription timed out. Please retry", 504, True
             ) from None
+
+    @app.post("/api/stt/check")
+    async def stt_check(seconds: int = Query(default=0, ge=0, le=15)):
+        """Record from the board microphone and transcribe it, outside the demo flow.
+
+        The refill path only listens while an offer is on screen and moves the
+        controller through phases, which makes it useless for measuring the model.
+        This records and transcribes and changes nothing else.
+        """
+        length = seconds or settings.audio_seconds
+        audio = await controller.microphone.capture(length)
+        try:
+            async with asyncio.timeout(settings.inference_timeout):
+                result = await clients.stt(audio, "audio/wav")
+        except TimeoutError:
+            raise ApiError(
+                "stt_timeout", "Audio transcription timed out. Please retry", 504, True
+            ) from None
+        return {
+            "text": result.text,
+            "source": result.source,
+            "seconds": length,
+            "bytes": len(audio),
+        }
 
     @app.get("/api/frame")
     async def frame():

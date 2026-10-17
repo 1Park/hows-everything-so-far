@@ -179,3 +179,36 @@ async def test_language_timeout_and_state_responsive(controller):
     assert c.state()["phase"] == "interpreting"
     await settled(c)
     assert c.phase == "error" and c.last_error["code"] == "qwen_timeout"
+
+
+def scene(item, item_confidence, fill=0.15):
+    from common.contracts import VisionResult
+
+    async def fake(data, content_type, scene_id, scenario):
+        return VisionResult.model_validate({
+            "scene_id": scene_id, "source": "external",
+            "objects": [{"object_id": "cup-0", "bbox": {"x1": 0.1, "y1": 0.2, "x2": 0.3, "y2": 0.7},
+                         "item": item, "fill_ratio": fill, "confidence": 0.9,
+                         "item_confidence": item_confidence}],
+        })
+    return fake
+
+
+@pytest.mark.parametrize(
+    ("item", "item_confidence", "asks"),
+    [("coke", 0.6, True), ("coffee", 0.79, True), ("coke", 0.95, False),
+     ("coke", None, False), ("water", 0.5, False)],
+)
+async def test_offer_asks_drink_when_coke_coffee_uncertain(controller, item, item_confidence, asks):
+    c = controller
+    c.clients.vision = scene(item, item_confidence)
+    await observe(c)
+    assert c.phase == "offered"
+    message = c.state()["message"]
+    if asks:
+        assert "coke or coffee" in message
+    else:
+        assert message == f"Would you like a refill of {item}?"
+    # 묻는 경우에도 추정 음료로 카드를 만들고, 고객이 바꿀 수 있다
+    await say(c, "Coffee, please")
+    assert c.phase == "card" and c.card.item == "coffee"

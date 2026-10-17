@@ -6,7 +6,7 @@
 
 4명이 Arduino VENTUNO Q 한 대를 사용한다. 여러 컵·접시 검출→객체별 crop→DINOv2 종류·잔량 판단은 **Vision 팀원 소유**. 우리 구현은 원본 이미지 입력·객체 결과 계약·검증·fixture·adapter·timeout/readiness이며 검출/crop/모델 전후처리를 구현하지 않는다. STT 모델·오디오 전처리도 담당자 소유다. 주요 음료 water/coke/coffee. 요청 분량은 구분하지 않는다. 모델 내부 라벨/출력 해석은 담당자가 adapter에서 변환한다.
 
-요청 해석 Qwen3-0.6B 유지. 앱은 현재 요청+새 영어 발화를 전달하고 strict JSON·허용 메뉴를 검사한다. 이해하지 못한 요청은 not_understood로 재입력을 요청한다. 관측 음료와 고객 요청은 별개. 충분한 잔량·불확실 판단은 skip. 고객 입력→수정 카드→**명시 Confirm** 전에는 시퀀스를 시작하지 않는다. 실제 주행/집기 없음.
+요청 해석 LLM: 개발 중 Mac Qwen3-0.6B, 보드는 주최 측 Gemma(Qwen 서비스 경계 뒤 `services/qwen/board_llm.py`). 앱은 현재 요청+새 영어 발화를 전달하고 strict JSON·허용 메뉴를 검사한다. 이해하지 못한 요청은 not_understood로 재입력을 요청한다. 관측 음료와 고객 요청은 별개. 충분한 잔량·불확실 판단은 skip. 고객 입력→수정 카드→**명시 Confirm** 전에는 시퀀스를 시작하지 않는다. 실제 주행/집기 없음.
 
 ## 구성·소유
 
@@ -39,7 +39,7 @@ flowchart TD
 | 구성 | 개인 개발 | 보드 |
 | --- | --- | --- |
 | Controller/UI | 개발자 노트북, UI는 태블릿 또는 로컬 브라우저 | Ubuntu, 태블릿 HTTP 또는 HTTPS 접속 |
-| Qwen | 실제 Mac mini HTTP; 선택 우리 proxy 또는 명시 fixture | localhost API + native ExecuTorch runner adapter (실기 미검증) |
+| Qwen | 실제 Mac mini HTTP; 선택 우리 proxy 또는 명시 fixture | localhost API + Gemma adapter(`board_llm.py`, 서버 시작 시 Gemma4 로드, 상주 qnn_llm_runner_host 재사용) |
 | Vision/STT | fixture 또는 담당자 async backend/HTTP 서버 | localhost API + 담당자 실제 모델 |
 | HardwareIO | 상태 mock | 명시 Bridge 선택 후 MCU mock sequence |
 | Mic/speaker | fixture 또는 선택 브라우저 녹음 / 브라우저 재생 | 보드 마이크 / 태블릿 스피커 |
@@ -83,6 +83,10 @@ fixture 모드는 Vision/STT fixture와 Hardware mock을 강제하고 Qwen은 �
 
 <!-- Native runner implementation status -->
 ### Native ExecuTorch runner status
+
+The board uses resident Gemma4 (`board`, or the legacy `executorch` backend),
+preloaded at server startup. The Qwen CLI adapter below is optional (`qwen_cli`)
+and is not the default board path.
 
 Qwen's former placeholder now invokes the QC native runner via
 `common/backends.py:ExecuTorchBackend`; configure actual runner/model/tokenizer

@@ -1,10 +1,14 @@
-"""Contract adapter for an existing whisper.cpp server, with no model/preprocessing."""
+"""Contract adapter for an existing whisper.cpp server, with no model/preprocessing.
+
+The transcript is post-processed by services.stt.normalize (drink-name fixes only).
+"""
 
 import httpx
 
 from common.api import ApiError
 from common.config import load_settings
 from common.contracts import STTResult
+from services.stt.normalize import normalize
 
 
 class WhisperHTTP:
@@ -27,10 +31,10 @@ class WhisperHTTP:
                     data={"language": "en", "response_format": "json", "temperature": "0"},
                 )
                 response.raise_for_status()
-                text = response.json()["text"].strip()
+                text = normalize(response.json()["text"]).text
             except httpx.TimeoutException:
                 raise ApiError("stt_timeout", "Speech recognition timed out", 504, True) from None
-            except (httpx.HTTPError, ValueError, KeyError, AttributeError):
+            except (httpx.HTTPError, ValueError, KeyError, AttributeError, TypeError):
                 raise ApiError(
                     "stt_unavailable", "Speech recognition returned an invalid response", 502, True
                 ) from None

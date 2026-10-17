@@ -45,3 +45,9 @@ def test_raw_body_transport_limit():
             headers={"content-type": "application/octet-stream"},
         )
         assert r.status_code == 413 and r.json()["error"]["code"] == "invalid_size"
+
+
+def test_ready_exposes_refill_policy_for_ui_boxes():
+    settings = Settings(qwen_backend="fixture", min_confidence=0.65, low_fill_threshold=0.35)
+    with TestClient(create_app(settings)) as c:
+        assert c.get("/ready").json()["policy"] == {"min_confidence": 0.65, "low_fill_threshold": 0.35}

@@ -1,0 +1,274 @@
+[
+  {
+    "utterance": "A small coffee instead, please.",
+    "elapsed": 5.606,
+    "model": "mlx-community/Qwen3-0.6B-4bit",
+    "runner": {
+      "resident": true,
+      "llm": "gemma4",
+      "pid": 122266,
+      "cold_start": true,
+      "load_seconds": 2.89,
+      "stats": {
+        "completion_tokens": 14,
+        "decode_ms": 996.081014,
+        "decode_tok_s": 14.055081668286872,
+        "done": true,
+        "finish_reason": "stop",
+        "generated_token_ids": [
+          14937,
+          31871,
+          12375,
+          1811,
+          644,
+          4337,
+          1582,
+          12375,
+          46116,
+          4337,
+          33768,
+          12375,
+          10732,
+          25938
+        ],
+        "prefill_ms": 1550.429985,
+        "prefill_tok_s": 365.7050015064047,
+        "prefilled_prompt_tokens": 567,
+        "prompt_tokens": 567,
+        "reused_prompt_tokens": 0,
+        "session_reset_reason": "new",
+        "total_ms": 2550.803738
+      }
+    },
+    "choices": [
+      {
+        "message": {
+          "role": "assistant",
+          "content": "{\"intent\":\"refill\",\"item\":\"coffee\",\"portion\":\"small\"}"
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "source": "executorch"
+  },
+  {
+    "utterance": "No thanks.",
+    "elapsed": 1.863,
+    "model": "mlx-community/Qwen3-0.6B-4bit",
+    "runner": {
+      "resident": true,
+      "llm": "gemma4",
+      "pid": 122266,
+      "cold_start": false,
+      "load_seconds": 0,
+      "stats": {
+        "completion_tokens": 14,
+        "decode_ms": 1084.551373,
+        "decode_tok_s": 12.908563253462406,
+        "done": true,
+        "finish_reason": "stop",
+        "generated_token_ids": [
+          14937,
+          31871,
+          12375,
+          893,
+          26888,
+          4337,
+          1582,
+          1083,
+          6455,
+          2098,
+          33768,
+          1083,
+          6455,
+          236783
+        ],
+        "prefill_ms": 673.195842,
+        "prefill_tok_s": 836.3093840974734,
+        "prefilled_prompt_tokens": 563,
+        "prompt_tokens": 563,
+        "reused_prompt_tokens": 0,
+        "session_reset_reason": "new",
+        "total_ms": 1761.885161
+      }
+    },
+    "choices": [
+      {
+        "message": {
+          "role": "assistant",
+          "content": "{\"intent\":\"decline\",\"item\":null,\"portion\":null}"
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "source": "executorch"
+  },
+  {
+    "utterance": "A small coffee instead, please.",
+    "elapsed": 1.881,
+    "model": "mlx-community/Qwen3-0.6B-4bit",
+    "runner": {
+      "resident": true,
+      "llm": "gemma4",
+      "pid": 122266,
+      "cold_start": false,
+      "load_seconds": 0,
+      "stats": {
+        "completion_tokens": 14,
+        "decode_ms": 1010.526978,
+        "decode_tok_s": 13.854157587864023,
+        "done": true,
+        "finish_reason": "stop",
+        "generated_token_ids": [
+          14937,
+          31871,
+          12375,
+          1811,
+          644,
+          4337,
+          1582,
+          12375,
+          46116,
+          4337,
+          33768,
+          12375,
+          10732,
+          25938
+        ],
+        "prefill_ms": 771.698462,
+        "prefill_tok_s": 734.7429441941794,
+        "prefilled_prompt_tokens": 567,
+        "prompt_tokens": 567,
+        "reused_prompt_tokens": 0,
+        "session_reset_reason": "new",
+        "total_ms": 1785.983176
+      }
+    },
+    "choices": [
+      {
+        "message": {
+          "role": "assistant",
+          "content": "{\"intent\":\"refill\",\"item\":\"coffee\",\"portion\":\"small\"}"
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "source": "executorch"
+  },
+  {
+    "utterance": "No thanks.",
+    "elapsed": 4.418,
+    "model": "gemma3",
+    "runner": {
+      "resident": true,
+      "llm": "gemma3",
+      "pid": 122395,
+      "cold_start": true,
+      "load_seconds": 2.682,
+      "stats": {
+        "completion_tokens": 26,
+        "decode_ms": 993.922821,
+        "decode_tok_s": 26.158972759918147,
+        "done": true,
+        "finish_reason": "stop",
+        "generated_token_ids": [
+          14937,
+          4002,
+          236779,
+          4764,
+          1083,
+          3714,
+          1582,
+          1083,
+          623,
+          7632,
+          827,
+          623,
+          33768,
+          1083,
+          623,
+          16749,
+          23179,
+          623,
+          9221,
+          831,
+          1083,
+          623,
+          3771,
+          8863,
+          1781,
+          236783
+        ],
+        "prefill_ms": 307.289417,
+        "prefill_tok_s": 1819.1319618403909,
+        "prefilled_prompt_tokens": 559,
+        "prompt_tokens": 559,
+        "reused_prompt_tokens": 0,
+        "session_reset_reason": "new",
+        "total_ms": 1309.931466
+      }
+    },
+    "choices": [
+      {
+        "message": {
+          "role": "assistant",
+          "content": "{\"current_request\": {\"item\": \"water\", \"portion\": \"regular\"}, \"utterance\": \"No thanks.\"}"
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "source": "executorch"
+  },
+  {
+    "utterance": "A small coffee instead, please.",
+    "elapsed": 5.272,
+    "model": "gemma4",
+    "runner": {
+      "resident": true,
+      "llm": "gemma4",
+      "pid": 122451,
+      "cold_start": true,
+      "load_seconds": 3.113,
+      "stats": {
+        "completion_tokens": 14,
+        "decode_ms": 952.227857,
+        "decode_tok_s": 14.70236340712305,
+        "done": true,
+        "finish_reason": "stop",
+        "generated_token_ids": [
+          14937,
+          31871,
+          12375,
+          1811,
+          644,
+          4337,
+          1582,
+          12375,
+          46116,
+          4337,
+          33768,
+          12375,
+          10732,
+          25938
+        ],
+        "prefill_ms": 774.245461,
+        "prefill_tok_s": 732.3258947720199,
+        "prefilled_prompt_tokens": 567,
+        "prompt_tokens": 567,
+        "reused_prompt_tokens": 0,
+        "session_reset_reason": "new",
+        "total_ms": 1730.51418
+      }
+    },
+    "choices": [
+      {
+        "message": {
+          "role": "assistant",
+          "content": "{\"intent\":\"refill\",\"item\":\"coffee\",\"portion\":\"small\"}"
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "source": "executorch"
+  }
+]

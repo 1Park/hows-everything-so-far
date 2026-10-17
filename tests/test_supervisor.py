@@ -195,3 +195,68 @@ def test_fixture_uses_qwen_http_without_silent_fallback():
                 )
                 process.wait(timeout=15)
         assert not (ROOT / f"tmp/dev-{selected}.lock").exists()
+
+
+def test_stop_only_reports_success_once_the_port_is_free():
+    # A restart right after a stop used to fail with "port in use": the lock file
+    # cleared before the listener did. --stop must not return until it is gone.
+    selected = port()
+    env = {**os.environ, "CONTROLLER_PORT": str(selected)}
+    start = [sys.executable, "scripts/dev.py", "--mode", "offline"]
+    stop = [sys.executable, "scripts/dev.py", "--mode", "offline", "--stop"]
+    supervisor = subprocess.Popen(
+        start, cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
+    try:
+        end = time.monotonic() + 25
+        while time.monotonic() < end:
+            assert supervisor.poll() is None
+            try:
+                with httpx.Client(
+                    base_url=f"http://127.0.0.1:{selected}", trust_env=False, timeout=1
+                ) as client:
+                    if client.get("/health").status_code == 200:
+                        break
+            except httpx.HTTPError:
+                pass
+            time.sleep(0.1)
+        else:
+            raise AssertionError("Supervisor failed to start")
+
+        # Hold an open connection: this is what kept the port busy on the board.
+        with httpx.Client(
+            base_url=f"http://127.0.0.1:{selected}", trust_env=False, timeout=5
+        ) as holder:
+            holder.get("/health")
+            assert subprocess.run(stop, cwd=ROOT, env=env, timeout=60).returncode == 0
+
+        assert supervisor.wait(timeout=10) is not None
+
+        # The real requirement: the same port accepts a new supervisor immediately.
+        restarted = subprocess.Popen(
+            start, cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        try:
+            end = time.monotonic() + 25
+            while time.monotonic() < end:
+                assert restarted.poll() is None, "restart refused the just-freed port"
+                try:
+                    with httpx.Client(
+                        base_url=f"http://127.0.0.1:{selected}", trust_env=False, timeout=1
+                    ) as client:
+                        if client.get("/health").status_code == 200:
+                            break
+                except httpx.HTTPError:
+                    pass
+                time.sleep(0.1)
+            else:
+                raise AssertionError("Restart failed to start")
+        finally:
+            subprocess.run(stop, cwd=ROOT, env=env, timeout=60)
+            if restarted.poll() is None:
+                restarted.kill()
+            restarted.wait(timeout=10)
+    finally:
+        if supervisor.poll() is None:
+            supervisor.kill()
+            supervisor.wait(timeout=10)

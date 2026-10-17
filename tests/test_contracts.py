@@ -71,3 +71,17 @@ def test_generation_uses_item_only_context():
     assert json.loads(body.messages[1].content) == {
         "current_request": {"item": "coffee"}, "utterance": "Same again please"
     }
+
+
+def test_item_confidence_is_optional_and_bounded():
+    import pytest
+    from pydantic import ValidationError
+
+    from common.contracts import ObservedObject
+
+    base = {"object_id": "c", "bbox": {"x1": 0.1, "y1": 0.1, "x2": 0.2, "y2": 0.2},
+            "item": "coke", "fill_ratio": 0.2, "confidence": 0.9}
+    assert ObservedObject.model_validate(base).item_confidence is None
+    assert ObservedObject.model_validate({**base, "item_confidence": 0.75}).item_confidence == 0.75
+    with pytest.raises(ValidationError):
+        ObservedObject.model_validate({**base, "item_confidence": 1.2})

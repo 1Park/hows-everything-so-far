@@ -50,7 +50,7 @@ else:
     tokenizer = tmp_path / "tokenizer.bin"
     tokenizer.write_bytes(b"tokenizer")
     return Settings(
-        qwen_model_backend="executorch",
+        qwen_model_backend="qwen_cli",
         qwen_seq_len=512,
         qnn_llama_runner=sys.executable,
         qwen_model_path=str(model),
@@ -78,7 +78,7 @@ async def test_dino_prepared_tensor_to_raw_output(runner):
 
 
 async def test_missing_bundle_no_fallback():
-    backend = ExecuTorchBackend(Settings(qwen_model_backend="executorch"))
+    backend = ExecuTorchBackend(Settings(qwen_model_backend="qwen_cli"))
     assert not await backend.ready()
     with pytest.raises(ApiError) as error:
         await backend.generate(

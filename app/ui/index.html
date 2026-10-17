@@ -2,34 +2,69 @@
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Refill Assist · At your table</title><link rel="stylesheet" href="/ui/style.css"></head>
 <body>
-<header><a class="brand" href="/" aria-label="Refill Assist home"><span class="mark">r.</span> refill assist<span class="edition">AT YOUR TABLE</span></a><span id="connection" class="pill">Connecting…</span></header>
+<header>
+  <div class="title-row">
+    <h1>How’s everything so far?</h1>
+    <span id="connection" class="pill">Connecting…</span>
+  </div>
+</header>
 <main>
-  <section class="intro"><div><p class="eyebrow">A LITTLE ATTENTION GOES A LONG WAY</p><h1>How’s everything<br> so far?</h1><p class="lede">A thoughtful refill, with you in control.</p></div><div class="demo-note"><span class="status-dot"></span> HACKATHON DEMO<p>Drink monitoring · Customer confirmation<br>All loading and movement are simulated.</p></div></section>
   <div class="workspace">
-    <section class="scene-panel panel">
-      <div class="panel-heading"><div><span class="number">01</span><h2>Your table</h2></div><span class="pill" id="videoMode">Sample image</span></div>
-      <div class="scene" id="scene"><img id="sceneImage" src="/api/frame" alt="Three sample cups on a café table"><div id="boxes"></div><span class="image-credit" id="imageCredit">AI-generated sample · illustrative fixture</span></div>
-      <div class="scene-footer"><div><strong id="sceneTitle">Ready when you are</strong><p id="sceneSubtitle">Inspect a scene to see the cups and their fill levels.</p></div><button id="start" class="primary">Start demo <span>↗</span></button></div>
-      <div id="objects" class="objects"></div>
-      <div id="liveRibbon" class="live-ribbon" hidden><img id="liveFeed" alt="Live camera or video file feed"><div><strong>Live feed</strong><p>Video continues while the analyzed frame and request target stay fixed.</p></div></div>
-      <details class="input-options"><summary>Scene input & demo scenarios</summary><div class="options-row"><label>Scenario<select id="scenario"><option value="normal">Low water · normal</option><option value="enough">Enough remaining · skip</option><option value="uncertain">Low confidence · skip</option></select></label><label class="file-label">Image input<input id="imageFile" type="file" accept="image/jpeg,image/png"></label></div><p>Fixture results are predetermined and do not analyze an uploaded image. Choose an external Vision backend for real observations.</p><details><summary>Live source preview</summary><img id="livePreview" alt="Live source preview"><p id="liveStatus">The source is opened by the server once. No browser camera capture.</p></details></details>
-    </section>
-    <aside class="request-panel panel">
-      <div class="panel-heading"><div><span class="number">02</span><h2>A refill for you</h2></div><span id="phase" class="phase">IDLE</span></div>
-      <div class="assistant-icon" aria-hidden="true">✳</div><p class="assistant-label">YOUR TABLE ASSISTANT</p><p id="message" class="message" role="status">Start a demo to inspect the scene.</p>
-      <div id="requestCard" class="request-card" hidden><div class="card-top"><div class="target-image" id="targetImage"></div><div><span class="eyebrow">YOUR REQUEST</span><h3 id="cardDrink"></h3><p>Refill</p></div><span class="card-revision" id="revision"></span></div><p class="target-id" id="targetId"></p></div>
-      <div class="audio-controls"><button id="replayVoice" type="button" title="Play a sample voice prompt">▶ Replay voice</button><audio id="voicePreview" src="/ui/audio/offer.wav" preload="none"></audio><button id="record" disabled>◉ Record request</button><label class="upload-audio">Upload audio<input id="audioFile" type="file" accept="audio/wav,audio/webm,audio/ogg,audio/mp4"></label><span id="recordStatus"></span></div>
-      <p id="mediaSupport" class="confirmation-note">Microphone & speaker: this browser</p>
-      <form id="requestForm"><label for="utterance">Speak after the offer, or type a request</label><div class="text-entry"><textarea id="utterance" rows="2" maxlength="1000" placeholder="A little water, please" disabled></textarea><button id="send" type="submit" aria-label="Send request" disabled>↑</button></div></form>
-      <div class="suggestions"><button data-say="A little water, please">A little water</button><button data-say="Coffee instead, please">Coffee instead</button><button data-say="No thanks">No thanks</button></div>
+      <section class="panel capture-panel">
+        <div class="panel-heading"><h2>Capture</h2><div class="heading-right"><span class="pill" id="videoMode">Sample image</span><span id="phase" class="phase">IDLE</span></div></div>
+        <div class="scene" id="scene"><img id="sceneImage" src="/api/frame" alt="Cups on the table"><div id="boxes"></div><span class="image-credit" id="imageCredit">AI-generated sample · illustrative fixture</span></div>
+        <div class="scene-footer"><div><strong id="sceneTitle">Ready when you are</strong><p id="sceneSubtitle">Inspect a scene to see the cups and their fill levels.</p></div><div class="scene-actions"><button id="backToLive" class="secondary" hidden>↺ Back to live</button><button id="start" class="primary">Start demo <span>↗</span></button></div></div>
+        <div id="objects" class="objects"></div>
+      </section>
+
+    <aside class="panel audio-panel">
+      <div class="panel-heading"><h2>Audio</h2></div>
+
+      <ol class="stage" aria-label="Voice stage">
+        <li id="stageIdle"><span class="stage-dot"></span>Waiting</li>
+        <li id="stageListening"><span class="stage-dot"></span>Listening</li>
+        <li id="stageTranscribing"><span class="stage-dot"></span>Transcribing</li>
+        <li id="stageResult"><span class="stage-dot"></span>Result</li>
+      </ol>
+
+      <div id="voiceBanner" class="voice-banner" role="status" hidden>
+        <div class="voice-head"><strong id="voiceTitle"></strong><span id="voiceCount" class="voice-count"></span></div>
+        <p id="voiceDetail"></p>
+        <!-- Decorative only: the board owns the microphone, so the page cannot read levels. -->
+        <div id="waveform" class="waveform" aria-hidden="true" hidden><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+
+      <p id="message" class="message" role="status">Start a demo to inspect the scene.</p>
+
+      <div class="audio-controls"><button id="record" disabled>◉ Record request</button><span id="recordStatus"></span></div>
+
       <div id="transcript" class="transcript" hidden></div>
+      <form id="requestForm"><label for="utterance">Check what was heard before sending</label><div class="text-entry"><textarea id="utterance" rows="2" maxlength="1000" placeholder="Record a request, then review it here" disabled></textarea><button id="send" type="submit" aria-label="Send request" disabled>↑</button></div></form>
+
+      <div id="requestCard" class="request-card" hidden><div class="card-top"><div class="target-image" id="targetImage"></div><div><span class="eyebrow">YOUR REQUEST</span><h3 id="cardDrink"></h3><p>Refill</p></div><span class="card-revision" id="revision"></span></div><p class="target-id" id="targetId"></p></div>
+
       <div class="actions"><button id="cancel" class="secondary" disabled>Cancel</button><button id="confirm" class="primary" disabled>Confirm refill <span>✓</span></button></div>
       <p class="confirmation-note">Nothing starts until you press Confirm.<br>Changing your request requires a new confirmation.</p>
       <ol class="progress" aria-label="Refill progress"><li data-step="0">Observe</li><li data-step="1">Request</li><li data-step="2">Confirm</li><li data-step="3">Mock return</li></ol>
     </aside>
   </div>
-  <section class="runtime panel"><div><span class="eyebrow">RUNNING THIS DEMO</span><h2>Know what’s connected.</h2></div><div id="sources" class="sources">Checking services…</div><button id="refresh" class="secondary">Check connection</button></section>
-  <div class="footer"><span>REFILL ASSIST / VENTUNO Q</span><span>Board microphone when configured · Tablet speaker · Fixed prompts · No live TTS</span><button id="audioToggle" aria-pressed="false">Enable sound</button></div>
+
+  <details class="dev-tools">
+    <summary>Demo tools &amp; diagnostics</summary>
+    <div id="sources" class="sources">Checking services…</div>
+    <p id="mediaSupport" class="confirmation-note">Microphone &amp; speaker: this browser</p>
+    <div class="options-row">
+      <label>Scenario<select id="scenario"><option value="normal">Low water · normal</option><option value="enough">Enough remaining · skip</option><option value="uncertain">Low confidence · skip</option></select></label>
+      <label class="file-label">Image input<input id="imageFile" type="file" accept="image/jpeg,image/png"></label>
+      <label class="file-label">Upload audio<input id="audioFile" type="file" accept="audio/wav,audio/webm,audio/ogg,audio/mp4"></label>
+    </div>
+    <p>Fixture results are predetermined and do not analyze an uploaded image. Choose an external Vision backend for real observations.</p>
+    <div class="tool-row"><button id="replayVoice" type="button" class="secondary">▶ Replay voice</button><audio id="voicePreview" src="/ui/audio/offer.wav" preload="none"></audio><button id="refresh" class="secondary">Check connection</button><button id="audioToggle" class="secondary" aria-pressed="false">Enable sound</button></div>
+    <div class="suggestions" hidden><button data-say="A little water, please">A little water</button><button data-say="Coffee instead, please">Coffee instead</button><button data-say="No thanks">No thanks</button></div>
+    <details><summary>Live source preview</summary><img id="livePreview" alt="Live source preview"><p id="liveStatus">The source is opened by the server once. No browser camera capture.</p></details>
+  </details>
+
+  <div class="footer"><span>REFILL ASSIST / VENTUNO Q</span><span>Board microphone &amp; camera · Tablet display · Fixed prompts · No live TTS</span></div>
   <div id="error" role="alert" class="error" hidden></div>
 </main><script src="/ui/app.js" defer></script>
 </body></html>
