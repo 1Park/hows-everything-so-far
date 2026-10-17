@@ -5,7 +5,7 @@
 | 도구 | 역할 |
 | --- | --- |
 | dev.py | direct/fixture/offline/proxy/integration/board 모드, 포트·lock 검사, startup 실패 시 자식 정리, 로그 |
-| dev.py --stop | matching mode/port supervisor에 종료 요청; --mode board에는 동일 옵션 사용 |
+| dev.py --stop | matching mode/port supervisor 종료 완료까지 대기 후 반환; --mode board에는 동일 옵션 사용 |
 | start-board.sh / stop-board.sh | Linux native background supervisor, PID·중복 검사·실패/종료 대기 |
 | diagnose.py | OS/arch/Python, 명시 runner/model/library, camera/Bridge/router read-only 진단 |
 | runner_smoke.py -- <실제 runner와 flags> | 단일 입력 실행·시간/출력/오류 logs 기록; CLI를 추측하지 않음 |
