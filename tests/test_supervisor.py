@@ -85,6 +85,10 @@ def test_start_demo_stop_restart_and_duplicate():
                     timeout=10,
                     check=True,
                 )
+                # --stop is synchronous: a following deployment can bind immediately.
+                assert not lock.exists()
+                with socket.socket() as probe:
+                    probe.bind(("127.0.0.1", selected))
                 p.wait(timeout=15)
             assert not lock.exists()
         with socket.socket() as probe:

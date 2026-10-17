@@ -29,8 +29,22 @@ def supervise(args):
         if not lockfile.exists():
             print("No managed supervisor lock found")
             return
-        stopfile.write_text(lockfile.read_text())
-        print("Shutdown requested. Wait for the supervisor lock to disappear.")
+        owner = lockfile.read_text()
+        stopfile.write_text(owner)
+        print("Shutdown requested. Waiting for managed processes to stop...", flush=True)
+        deadline = time.monotonic() + 35
+        while time.monotonic() < deadline:
+            try:
+                if lockfile.read_text() != owner:
+                    break
+            except FileNotFoundError:
+                break
+            time.sleep(0.1)
+        else:
+            raise RuntimeError(
+                f"Shutdown timed out. Check supervisor PID {owner} and logs before restarting"
+            )
+        print("Managed shutdown complete. You can restart now.")
         return
     env = os.environ.copy()
     if args.env_file:
