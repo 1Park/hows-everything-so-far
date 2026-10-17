@@ -100,6 +100,8 @@ function render(next, authoritative = false) {
     displayedSession = ''; lastPhase = '';
   }
   state = next;
+  $('replayVoice').disabled = ['listening','transcribing'].includes(state.phase);
+  if ($('replayVoice').disabled) $('voicePreview').pause();
   const boardAudio = state.audio_input && state.audio_input !== 'disabled';
   $('phase').textContent = state.phase.toUpperCase(); $('message').textContent = state.message;
   const editable = canEdit() && !pendingAction;
@@ -207,6 +209,11 @@ document.querySelectorAll('[data-say]').forEach(b => b.onclick = () => {$('utter
 $('confirm').onclick = async () => {const c=state?.card; if(!c || pendingAction || state.phase !== 'card') return; try {await action('confirm', () => post('/api/confirm', {scene_id:c.scene_id,object_id:c.object_id,request_id:c.request_id,revision:c.revision}));} catch {api('/api/state').then(render).catch(()=>{});}};
 $('cancel').onclick = () => {if(state && pendingAction !== 'cancel') action('cancel', () => post('/api/cancel',{session_id:state.session_id})).catch(()=>{});};
 $('refresh').onclick = checkConnection;
+$('replayVoice').onclick = () => {
+  const preview = $('voicePreview');
+  preview.currentTime = 0;
+  preview.play().catch(() => showError('Voice playback failed. Check your tablet volume and audio output.'));
+};
 $('audioToggle').onclick = () => {
   audioVersion++;
   setSound(!sound);
