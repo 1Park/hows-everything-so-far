@@ -45,3 +45,34 @@ def test_video_file_loop_transport(tmp_path):
         assert second.startswith(b"\xff\xd8") and not source.error
     finally:
         source.close()
+
+
+def test_unavailable_camera_index_never_returns_fixture():
+    # A camera index that is not present must fail loudly, like a missing file does.
+    # CAMERA_SOURCE is left empty until the real index is known, so a wrong value
+    # must not silently degrade into the static fixture image.
+    source = VideoSource("99")
+    assert source.mode == "camera-or-file"
+    assert source.latest is None
+    source.start()
+    for _ in range(250):
+        if source.error:
+            break
+        time.sleep(0.02)
+    assert source.error, "an unopenable camera index must surface an error"
+    with pytest.raises(ApiError) as failure:
+        source.frame()
+    assert failure.value.status == 503
+    assert source.latest is None
+    source.close()
+
+
+def test_empty_source_is_the_explicit_fixture():
+    # Empty CAMERA_SOURCE is the declared fixture mode, not an implicit /dev/video0.
+    source = VideoSource("")
+    assert source.mode == "fixture-image"
+    source.start()
+    assert source.thread is None
+    data, mime = source.frame()
+    assert data.startswith(b"\xff\xd8") and mime == "image/jpeg"
+    source.close()
