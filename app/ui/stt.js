@@ -120,13 +120,18 @@ function summarise(source) {
   $('sttExact').textContent = results.length ? `${Math.round(exact / results.length * 100)}%` : '—';
   const mean = results.reduce((total, r) => total + r.wer, 0) / (results.length || 1);
   $('sttWer').textContent = results.length ? `${Math.round(mean * 100)}%` : '—';
+  // Median, because one slow take should not define what the demo will feel like.
+  const timings = results.map(r => r.stt_ms).filter(Boolean).sort((a, b) => a - b);
+  $('sttLatency').textContent = timings.length
+    ? `${(timings[Math.floor(timings.length / 2)] / 1000).toFixed(1)}s` : '—';
   if (source) $('sttSource').textContent = source;
 
   const rows = $('sttRows');
   rows.replaceChildren();
   results.forEach((r, i) => {
     const row = document.createElement('tr');
-    for (const value of [i + 1, r.expected, r.heard, `${Math.round(r.wer * 100)}%`]) {
+    const latency = r.stt_ms ? `${(r.stt_ms / 1000).toFixed(1)}s` : '—';
+    for (const value of [i + 1, r.expected, r.heard, `${Math.round(r.wer * 100)}%`, latency]) {
       const cell = document.createElement('td');
       cell.textContent = value;
       row.append(cell);
@@ -168,6 +173,7 @@ $('sttRecord').onclick = async () => {
     await saveTake({
       expected, heard: body.text, wer: Number(score.toFixed(4)),
       seconds: body.seconds, source: body.source, at: new Date().toISOString(),
+      record_ms: body.record_ms || 0, stt_ms: body.stt_ms || 0,
     });
     $('sttHeard').textContent = `“${body.text}”`;
     const verdict = document.createElement('span');
@@ -219,8 +225,9 @@ $('sttClear').onclick = () => {
 };
 
 $('sttCopy').onclick = async () => {
-  const csv = ['expected,heard,wer']
-    .concat(results.map(r => `"${r.expected}","${r.heard.replace(/"/g, '""')}",${r.wer.toFixed(3)}`))
+  const csv = ['expected,heard,wer,take_seconds,record_ms,stt_ms']
+    .concat(results.map(r => `"${r.expected}","${r.heard.replace(/"/g, '""')}",` +
+      `${r.wer.toFixed(3)},${r.seconds || ''},${r.record_ms || ''},${r.stt_ms || ''}`))
     .join('\n');
   try {
     await navigator.clipboard.writeText(csv);

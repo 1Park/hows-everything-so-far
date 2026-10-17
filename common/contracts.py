@@ -208,3 +208,7 @@ class SttTake(BaseModel):
     seconds: int = Field(ge=1, le=15)
     source: str = Field(default="", max_length=40)
     at: str = Field(default="", max_length=40)
+    # Measured on the board. Transcription dominates and barely varies with the
+    # take length, so the two are kept apart rather than summed.
+    record_ms: int = Field(default=0, ge=0)
+    stt_ms: int = Field(default=0, ge=0)

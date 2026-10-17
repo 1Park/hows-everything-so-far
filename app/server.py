@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 from pathlib import Path
 from contextlib import asynccontextmanager
 
@@ -216,7 +217,9 @@ def create_app(settings=None, clients=None, hardware=None):
         This records and transcribes and changes nothing else.
         """
         length = seconds or settings.audio_seconds
+        started = time.perf_counter()
         audio = await controller.microphone.capture(length)
+        recorded = time.perf_counter()
         try:
             async with asyncio.timeout(settings.inference_timeout):
                 result = await clients.stt(audio, "audio/wav")
@@ -224,11 +227,16 @@ def create_app(settings=None, clients=None, hardware=None):
             raise ApiError(
                 "stt_timeout", "Audio transcription timed out. Please retry", 504, True
             ) from None
+        done = time.perf_counter()
+        # Transcription is a near-fixed cost here, so it is reported apart from the
+        # take length: shortening the recording does not shorten the wait.
         return {
             "text": result.text,
             "source": result.source,
             "seconds": length,
             "bytes": len(audio),
+            "record_ms": round((recorded - started) * 1000),
+            "stt_ms": round((done - recorded) * 1000),
         }
 
     @app.get("/api/frame")
