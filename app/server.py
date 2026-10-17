@@ -98,6 +98,11 @@ def create_app(settings=None, clients=None, hardware=None):
                 "ready": ok,
                 "dependencies": dependencies,
                 "video": {"mode": video.mode, "error": video.error},
+                # UI가 리필 대상 박스를 Controller와 같은 기준으로 표시하도록
+                "policy": {
+                    "min_confidence": settings.min_confidence,
+                    "low_fill_threshold": settings.low_fill_threshold,
+                },
                 "hardware": settings.hardware_backend,
                 "hardware_ready": hardware_ready,
                 "location": settings.app_env,
