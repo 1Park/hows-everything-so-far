@@ -7,3 +7,10 @@
 입력 shape·dtype·layout·전처리·출력 계약을 확인하고, 필요한 calibration·양자화·QNN lowering·export를 수행한다. `.pte` 생성 성공과 실제 보드 실행·NPU delegation 검증은 별도 단계다.
 
 결과는 `models/`의 버전별 bundle에 저장한다. 모델 파일 외에도 필요 시 tokenizer·labels·샘플 입력·reference 출력·metadata를 함께 준비한다. 보드 runtime 서버는 이 bundle을 설정 경로로 읽는다. export 도구를 프로덕션 서버에 포함하지 않는다.
+
+## 파일
+
+- `export_qnn.py` — YOLO/DINOv2 → QNN HTP `.pte` (x86 Docker, `--quant 16a8w|fp16|8a8w`, Mac은 `--dry-run`)
+- `export_xnnpack.py` — DINOv2 CLS → XNNPACK CPU `.pte` + parity·속도
+- `export_onnx.py` — DINOv2 CLS → ONNX (AI Hub 등 참고용)
+- `make_bundle.py` — Vision 서비스용 bundle(`bundle.json`+파일) 생성
