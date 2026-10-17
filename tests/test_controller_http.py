@@ -24,7 +24,7 @@ def test_real_routes_ws_and_confirm_identity():
             c.post("/api/utterance", json=body).raise_for_status()
             assert ws.receive_json()["state"]["phase"] == "interpreting"
             card = ws.receive_json()["state"]["card"]
-            identity = {k: v for k, v in card.items() if k not in ("item", "portion")}
+            identity = {k: v for k, v in card.items() if k not in ("item",)}
             assert (
                 c.post("/api/confirm", json={**identity, "object_id": "different-cup"}).status_code
                 == 409

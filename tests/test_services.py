@@ -67,7 +67,7 @@ def test_qwen_validation_and_request_ids():
         r = c.get("/ready", headers={"x-request-id": "demo-123"})
         assert r.status_code == 200 and r.headers["x-request-id"] == "demo-123"
         payload = generation(
-            settings.qwen_model, CurrentRequest(item="water", portion="regular"), "yes"
+            settings.qwen_model, CurrentRequest(item="water"), "yes"
         ).model_dump()
         assert c.post("/v1/chat/completions", json=payload).json()["source"] == "fixture"
         payload["temperature"] = 9
@@ -116,7 +116,7 @@ async def test_mlx_errors_do_not_fallback(kind):
     backend.client = httpx.AsyncClient(transport=httpx.MockTransport(handle))
     with pytest.raises(ApiError) as exc:
         await backend.generate(
-            generation("test", CurrentRequest(item="water", portion="regular"), "yes")
+            generation("test", CurrentRequest(item="water"), "yes")
         )
     assert exc.value.status == (504 if kind == "timeout" else 502)
     await backend.close()

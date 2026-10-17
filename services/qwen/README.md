@@ -1,9 +1,57 @@
-# Qwen 생성 서버
+# Qwen generation service
 
-`server.py:create_app`, 기본127.0.0.1:8000. POST /v1/chat/completions, GET /v1/models, /health, /ready. model/messages/생성 옵션 검증, admitted4/동시1 queue, queue+실행 timeout20초, 요청 ID/log 제공.
+## Resident board Gemma4
 
-QWEN_MODEL_BACKEND=mlx는 QWEN_UPSTREAM_URL(기본 Mac)로 HTTP 생성, fixture는 결정적 개발용, executorch는 실제 board adapter 미연결을 명시적으로503 반환. 자동 fixture fallback 없음. .env.board의 executorch readiness503은 보드 전 상태를 정확히 나타낸다.
+`QWEN_MODEL_BACKEND=board`, `QWEN_MODEL=gemma4` uses `BoardLLMBackend` and
+`scripts/board_llm.sh`. FastAPI startup loads Gemma4 and waits for the native
+worker's ready event before accepting requests. No generation request is sent.
+Missing assets, worker failure, or a 120-second startup timeout fail server startup
+and reap the child process. `/ready` requires a live loaded worker. Normal requests
+reuse the same model process; shutdown closes it. After a runtime failure, readiness
+is false until a subsequent request reloads the worker. Gemma3 support remains for
+explicit use, but startup always selects Gemma4. The native worker and compatible
+Gemma4 bundle must already be installed on the board; this code does not upload models.
 
-Controller의 QWEN_BACKEND=fixture/http는 서버 내부 backend 설정과 별개다. direct 모드는 실제 Mac 직접 호출, proxy/integration은 우리 서버→Mac. 제품 프롬프트/JSON 검증/메뉴/승인은 app/language.py와 Controller. [계약](../../docs/CONTRACTS.md).
+`server.py:create_app`, default 127.0.0.1:8000. POST /v1/chat/completions,
+GET /v1/models, /health, /ready. Validated messages/options, queue4/concurrency1,
+request IDs and timeout. Product prompts/JSON validation remain in app/language.py.
+Backends: mlx calls Mac HTTP; fixture is explicit; executorch calls the track native
+qnn_llama_runner. No automatic fallback.
 
-파일 기반 runtime을 연결하기 전에 [모델 파일·설정 가이드](../../models/README.md)를 읽는다. QWEN_MODEL은 API model ID이며 QWEN_MODEL_PATH와 다른 개념이다. 현재 mlx backend는 HTTP client이고, models/local 또는 models/board의 가중치를 직접 읽지 않는다. 실제 runtime 연결 시 필요한 경로 설정만 추가한다.
+## Board ExecuTorch
+
+Obtain the compatible QCS8275 runner, Qwen3-0.6B .pte, matching tokenizer.bin
+and QNN/HTP libraries from the track team. See the
+[QC guide](../../qc-executorch-guide/IoT/README.md#part-4-run-qwen-06b).
+Set actual paths as process environment variables or in a personal env file:
+
+```bash
+export QNN_LLAMA_RUNNER=/actual/bundle/qnn_llama_runner
+export QWEN_MODEL_PATH=/actual/bundle/qwen_0p6B_monza.pte
+export QWEN_TOKENIZER_PATH=/actual/bundle/tokenizer.bin
+export QWEN_SEQ_LEN=512  # example ONLY: use the bundle-supported total token budget
+python scripts/dev.py --mode board --env-file .env.board
+```
+
+Configure ADSP_LIBRARY_PATH/LD_LIBRARY_PATH according to the supplied image only.
+Relative asset paths resolve against the repository; QWEN_MODEL is the API ID.
+Missing assets/sequence limit -> readiness503. Readiness checks files/config,
+**not successful runtime loading**. Run real generations before claiming readiness.
+
+The adapter passes preformatted Qwen ChatML with all messages and a non-thinking
+assistant prefix via --prompt, plus --decoder_model_version qwen3, --temperature,
+--seq_len and --output_path. Check supplied runner --help/source for flag and
+raw-prompt compatibility: the QC guide board build supports qwen3; stock upstream
+versions may differ. Do not substitute a decoder or double-wrap the template.
+Output comes from the output file, never scraped logs. Exact prompt echo is removed.
+Empty/failed output returns an error; app JSON validation remains strict.
+
+Limits: one native process per request, not persistent model loading. Native seq_len
+bounds TOTAL prompt+output tokens. It does not enforce max_completion_tokens;
+responses explicitly report runner_limits.completion_token_limit_enforced=false.
+Exact completion budgets need a matching native tokenizer/runner extension.
+Timeout/cancellation kills and reaps the child. stdout/stderr are discarded to
+avoid exposing customer prompts; use scripts/runner_smoke.py for standalone diagnostics.
+
+Tests use a real child-process double. Actual .pte inference, tokenizer/template
+correctness, board latency/memory and NPU delegation remain **unverified**.

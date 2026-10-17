@@ -36,7 +36,7 @@ When implementing a file-loading backend, use these names as needed:
 
 Resolve relative paths against the repository root; allow explicit absolute paths through personal configuration. Add only the settings needed by the concrete backend to `common/config.py` when connecting it. A path may identify a file or directory according to the actual runtime; validate the required files in that backend.
 
-**Current implementation:** these model-path settings are not wired into the shared Settings or service factories. The diagnostic script only inspects some process-environment paths; it does not load models. The existing `mlx` Qwen backend is an HTTP client to a running server, not an MLX weights loader. Remote HTTP and fixture backends do not require local model files. These guidelines define the next integration work, not a claim that file loading already works.
+**Current implementation:** QWEN_MODEL_PATH, QWEN_TOKENIZER_PATH and VISION_MODEL_PATH are wired into Settings. QNN_LLAMA_RUNNER and QWEN_SEQ_LEN configure native Qwen execution; QNN_RUNNER and VISION_MODEL_PATH configure common.executorch.DinoRunner. STT_MODEL_PATH remains a convention for its owner. MLX still calls HTTP. Native runtime/bundles are supplied separately; board inference is unverified. See [Qwen setup](../services/qwen/README.md) and [Vision integration](../services/vision/README.md).
 
 ## Implementation boundaries
 

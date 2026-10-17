@@ -32,9 +32,15 @@ class Settings(BaseModel):
     qwen_base_url: HttpUrl = "http://won-macmini:8000"
     qwen_host: str = "127.0.0.1"
     qwen_port: int = Field(8000, ge=1, le=65535)
-    qwen_model_backend: Literal["mlx", "fixture", "executorch"] = "mlx"
+    qwen_model_backend: Literal["mlx", "fixture", "executorch", "board"] = "mlx"
     qwen_upstream_url: HttpUrl = "http://won-macmini:8000"
     qwen_model: str = "mlx-community/Qwen3-0.6B-4bit"
+    qnn_llama_runner: str = ""
+    qnn_runner: str = ""
+    qwen_model_path: str = ""
+    qwen_tokenizer_path: str = ""
+    qwen_seq_len: int | None = Field(None, ge=16, le=32768)
+    vision_model_path: str = ""
     inference_timeout: float = Field(20, gt=0, le=180)
     queue_limit: int = Field(4, ge=1, le=32)
     max_image_bytes: int = Field(5_000_000, ge=1024, le=20_000_000)

@@ -6,7 +6,6 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Drink = Literal["water", "coke", "coffee"]
-Portion = Literal["small", "regular"]
 Source = Literal["fixture", "external", "mlx", "executorch"]
 
 
@@ -62,20 +61,18 @@ class STTResult(Contract):
 
 class CurrentRequest(Contract):
     item: Drink
-    portion: Portion
 
 
 class Interpretation(Contract):
-    intent: Literal["refill", "decline", "cancel", "clarify"]
+    intent: Literal["refill", "decline", "cancel", "not_understood"]
     item: Drink | None
-    portion: Portion | None
 
     @model_validator(mode="after")
     def coherent(self):
-        if self.intent == "refill" and (self.item is None or self.portion is None):
-            raise ValueError("Refill requires item and portion")
-        if self.intent != "refill" and (self.item is not None or self.portion is not None):
-            raise ValueError("Non-refill fields must be null")
+        if self.intent == "refill" and self.item is None:
+            raise ValueError("Refill requires an item")
+        if self.intent != "refill" and self.item is not None:
+            raise ValueError("Non-refill item must be null")
         return self
 
 
@@ -141,7 +138,7 @@ Phase = Literal[
     "listening",
     "transcribing",
     "interpreting",
-    "clarify",
+    "not_understood",
     "card",
     "loading",
     "returning",

@@ -4,9 +4,9 @@
 
 ## 제품·범위
 
-4명이 Arduino VENTUNO Q 한 대를 사용한다. 여러 컵·접시 검출→객체별 crop→DINOv2 종류·잔량 판단은 **Vision 팀원 소유**. 우리 구현은 원본 이미지 입력·객체 결과 계약·검증·fixture·adapter·timeout/readiness이며 검출/crop/모델 전후처리를 구현하지 않는다. STT 모델·오디오 전처리도 담당자 소유다. 주요 음료 water/coke/coffee, 요청 분량 small/regular. 모델 내부 라벨/출력 해석은 담당자가 adapter에서 변환한다.
+4명이 Arduino VENTUNO Q 한 대를 사용한다. 여러 컵·접시 검출→객체별 crop→DINOv2 종류·잔량 판단은 **Vision 팀원 소유**. 우리 구현은 원본 이미지 입력·객체 결과 계약·검증·fixture·adapter·timeout/readiness이며 검출/crop/모델 전후처리를 구현하지 않는다. STT 모델·오디오 전처리도 담당자 소유다. 주요 음료 water/coke/coffee. 요청 분량은 구분하지 않는다. 모델 내부 라벨/출력 해석은 담당자가 adapter에서 변환한다.
 
-요청 해석 Qwen3-0.6B 유지. 앱은 현재 요청+새 영어 발화를 전달하고 strict JSON·허용 메뉴·분량을 검사한다. 관측 음료와 고객 요청은 별개. 충분한 잔량·불확실 판단은 skip. 고객 입력→수정 카드→**명시 Confirm** 전에는 시퀀스를 시작하지 않는다. 실제 주행/집기 없음.
+요청 해석 Qwen3-0.6B 유지. 앱은 현재 요청+새 영어 발화를 전달하고 strict JSON·허용 메뉴를 검사한다. 이해하지 못한 요청은 not_understood로 재입력을 요청한다. 관측 음료와 고객 요청은 별개. 충분한 잔량·불확실 판단은 skip. 고객 입력→수정 카드→**명시 Confirm** 전에는 시퀀스를 시작하지 않는다. 실제 주행/집기 없음.
 
 ## 구성·소유
 
@@ -39,7 +39,7 @@ flowchart TD
 | 구성 | 개인 개발 | 보드 |
 | --- | --- | --- |
 | Controller/UI | 개발자 노트북, UI는 태블릿 또는 로컬 브라우저 | Ubuntu, 태블릿 HTTP 또는 HTTPS 접속 |
-| Qwen | 실제 Mac mini HTTP; 선택 우리 proxy 또는 명시 fixture | localhost API + 미연결 ExecuTorch adapter |
+| Qwen | 실제 Mac mini HTTP; 선택 우리 proxy 또는 명시 fixture | localhost API + native ExecuTorch runner adapter (실기 미검증) |
 | Vision/STT | fixture 또는 담당자 async backend/HTTP 서버 | localhost API + 담당자 실제 모델 |
 | HardwareIO | 상태 mock | 명시 Bridge 선택 후 MCU mock sequence |
 | Mic/speaker | fixture 또는 선택 브라우저 녹음 / 브라우저 재생 | 보드 마이크 / 태블릿 스피커 |
@@ -52,7 +52,7 @@ FastAPI+Uvicorn, 서버별 worker1, ROS/앱 Docker 없음. 학습·export Docker
 - services/qwen: model/messages/생성 옵션 검증, admitted queue4/동시1, 전체20초 timeout, MLX/fixture/ExecuTorch 경계. 실패 시 fixture 전환 없음.
 - Mac 실제 `/v1/models`로 ID 확인, `/v1/chat/completions`로 생성. `mlx-community/Qwen3-0.6B-4bit`, temperature0, thinking false 요청. 서버 설정·모델 변경 없음.
 - Vision/STT API는 담당자 async factory 또는 HTTP 연결. 신뢰도/bbox/전사 fixture는 항상 fixture로 표시한다. 내부 tensor, preprocessing, label 정의는 추측하지 않는다.
-- ExecuTorch는 HTTP 서버가 아니다. 제공 qnn_llama_runner/qnn_executor_runner CLI의 상주 실행·수명·Python 지원은 실제 보드 확인 후 연결한다. HTTP 상주가 모델 상주를 보장하지 않는다.
+- ExecuTorch는 HTTP 서버가 아니다. 제공 qnn_llama_runner/qnn_executor_runner를 호출하는 adapter를 구현했다. 현재 요청별 프로세스 실행이며, 실제 bundle과의 정합은 실기 검증이 필요하다. HTTP 상주가 모델 상주를 보장하지 않는다.
 
 ## 로컬·보드 모델 연결 가이드
 
@@ -62,7 +62,7 @@ FastAPI+Uvicorn, 서버별 worker1, ROS/앱 Docker 없음. 학습·export Docker
 
 ## 상태·동시성
 
-관찰→정책→offered→고객 입력→interpreting→card→Confirm→loading→returning→done. 충분/불확실 skipped, 거절 declined, 취소 cancelled, 모호 clarify, 대기60초 expired, 오류 error→입력 재시도/새 관찰. 대상은 낮은 fill_ratio의 신뢰할 수 있는 객체, 정책값은 설정 가능하고 보드 실측 기준은 아니다.
+관찰→정책→offered→고객 입력→interpreting→card→Confirm→loading→returning→done. 충분/불확실 skipped, 거절 declined, 취소 cancelled, 모호 not_understood, 대기60초 expired, 오류 error→입력 재시도/새 관찰. 대상은 낮은 fill_ratio의 신뢰할 수 있는 객체, 정책값은 설정 가능하고 보드 실측 기준은 아니다.
 
 scene_id/object_id/request_id/revision을 검증한다. 제안 자체는 confirm 불가. 수정된 카드에는 새 revision이 필요하고 중복/오래된 확인409. 모든 background 작업에 generation token을 부여해 Cancel/새 장면 후 늦은 응답을 무효화한다. 추론은 비동기 task로 실행해 상태·취소가 응답한다. native 팀원 backend도 event loop를 막지 않아야 한다.
 
@@ -79,3 +79,19 @@ fixture 모드는 Vision/STT fixture와 Hardware mock을 강제하고 Qwen은 �
 ## 보드에서 남은 검증
 
 [보드 runbook](BOARD_RUNBOOK.md), [대회 IoT guide](../qc-executorch-guide/IoT/README.md), [artifact inventory](../qc-executorch-guide/IoT/artifacts/README.md)를 따른다. QCS8275 Linux+STM32H5F5, 제공 ExecuTorch/QNN checkout·SDK/bundle 경로를 설정한다. 모델 상주 실행·메모리·지연·NPU delegation과 CPU 비교를 추측하지 않는다. DINO 제공 예제가 ImageNet classification logits일 수 있으므로 embedding으로 가정하지 않는다. GPIO pin/polarity·센서 확보 여부도 현장 확인한다. MCU는 provide_safe/짧은 handler/nested RPC 금지/nonblocking 취소/watchdog를 적용한 **미검증 초안**이다.
+
+
+<!-- Native runner implementation status -->
+### Native ExecuTorch runner status
+
+Qwen's former placeholder now invokes the QC native runner via
+`common/backends.py:ExecuTorchBackend`; configure actual runner/model/tokenizer
+paths and `QWEN_SEQ_LEN` per [Qwen setup](../services/qwen/README.md).
+DINOv2 prepared-tensor execution is available as `common.executorch.DinoRunner`
+and `scripts/dino_smoke.py`; the Vision owner still supplies all image
+preprocessing/detection and output conversion. See [Vision setup](../services/vision/README.md).
+Earlier references to an unconnected adapter describe missing runtime assets or
+remaining board validation, not a missing subprocess implementation.
+This is per-request model loading, not a persistent runtime. Tests use a process
+double; actual board model loading, template compatibility and NPU execution remain
+unverified. Qwen's native limit is total sequence length, not exact completion tokens.

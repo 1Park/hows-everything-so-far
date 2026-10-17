@@ -38,7 +38,7 @@ async def say(c, text):
 
 
 def confirmation(c):
-    return ConfirmInput(**c.card.model_dump(exclude={"item", "portion"}))
+    return ConfirmInput(**c.card.model_dump(exclude={"item"}))
 
 
 async def test_full_refill_and_edit(controller):
@@ -47,9 +47,9 @@ async def test_full_refill_and_edit(controller):
     assert c.phase == "offered" and not c.hardware.commands
     await say(c, "A little water, please")
     old = confirmation(c)
-    assert c.card.portion == "small" and not c.hardware.commands
+    assert c.card.item == "water" and not c.hardware.commands
     await say(c, "Coffee instead, regular please")
-    assert c.card.item == "coffee" and c.card.portion == "regular"
+    assert c.card.item == "coffee"
     with pytest.raises(ApiError, match="changed"):
         await c.confirm(old)
     confirm = confirmation(c)
@@ -69,12 +69,29 @@ async def test_skip(controller, scenario):
 
 @pytest.mark.parametrize(
     ("text", "phase"),
-    [("No thanks", "declined"), ("Cancel that", "cancelled"), ("Maybe tea", "clarify")],
+    [("No thanks", "declined"), ("Cancel that", "cancelled"), ("Maybe tea", "not_understood")],
 )
 async def test_non_refill(controller, text, phase):
     await observe(controller)
     await say(controller, text)
     assert controller.phase == phase and not controller.hardware.commands
+
+
+async def test_not_understood_blocks_confirmation_and_allows_retry(controller):
+    c = controller
+    await observe(c)
+    await say(c, "A little water, please")
+    assert "portion" not in c.card.model_dump()
+    old = confirmation(c)
+    await say(c, "Maybe, I'm not sure")
+    assert c.phase == "not_understood" and "understand" in c.message
+    with pytest.raises(ApiError):
+        await c.confirm(old)
+    assert not c.hardware.commands
+    await say(c, "Coffee instead")
+    assert c.phase == "card" and c.card.item == "coffee"
+    with pytest.raises(ApiError):
+        await c.confirm(old)
 
 
 async def test_stale_scene_and_cancel(controller):
