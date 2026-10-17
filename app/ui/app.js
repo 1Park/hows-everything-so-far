@@ -85,8 +85,14 @@ async function checkConnection() {
     $('videoMode').textContent = state?.snapshot_url ? 'Analyzed frame · frozen' : info.video.mode === 'fixture-image' ? 'Sample image' : 'Live source';
     $('imageCredit').textContent = info.video.mode === 'fixture-image' ? 'AI-generated sample · illustrative fixture' : 'Captured by the server · single video owner';
     $('liveStatus').textContent = info.video.error || 'Server capture · camera is opened once · 5 fps preview';
-    $('liveRibbon').hidden = info.video.mode === 'fixture-image';
-    if (info.video.mode !== 'fixture-image') attachStream($('liveFeed'));
+    liveSource = info.video.mode !== 'fixture-image';
+    $('liveRibbon').hidden = !liveSource || !state?.snapshot_url;
+    if (liveSource) {
+      // The small panel only earns its space once the main one is frozen.
+      if (state?.snapshot_url) attachStream($('liveFeed'));
+      else detachStream($('liveFeed'));
+      if (!state?.snapshot_url) attachStream($('sceneImage'));
+    }
   } catch { $('sources').textContent = 'Cannot reach the Controller. Reconnecting…'; }
 }
 function render(next, authoritative = false) {
@@ -140,8 +146,16 @@ function render(next, authoritative = false) {
   $('start').innerHTML = (state.phase === 'idle' ? 'Start demo' : 'Inspect again') + ' <span>↗</span>';
   if (state.snapshot_url && displayedSession !== state.session_id) {
     $('boxes').hidden = true;
+    detachStream($('sceneImage'));
     $('sceneImage').src = state.snapshot_url; displayedSession = state.session_id;
     $('videoMode').textContent = 'Analyzed frame · frozen';
+  } else if (!state.snapshot_url && liveSource) {
+    // Before a capture the panel shows what the camera sees, so pressing Start
+    // visibly freezes the frame the board actually analyzed.
+    displayedSession = null;
+    $('boxes').hidden = true;
+    attachStream($('sceneImage'));
+    $('videoMode').textContent = 'Live source';
   }
   const boxes = $('boxes'); boxes.replaceChildren(); const objects = $('objects'); objects.replaceChildren();
   for (const obj of state.scene?.objects || []) {
@@ -182,10 +196,11 @@ function render(next, authoritative = false) {
 $('sceneImage').onload = () => {
   if ($('sceneImage').getAttribute('src') === state?.snapshot_url) $('boxes').hidden = false;
 };
-$('sceneImage').onerror = () => {
+function sceneImageError() {
   $('boxes').hidden = true;
   showError('The scene image could not load. Inspect the scene again to retry.');
-};
+}
+$('sceneImage').onerror = sceneImageError;
 function connect() {
   clearTimeout(retryTimer);
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);

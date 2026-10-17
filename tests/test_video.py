@@ -127,3 +127,17 @@ def test_capture_is_retried_after_the_camera_goes_away(tmp_path):
     source.close()
     assert len(attempts) >= 2, "the capture loop gave up after the first failure"
     assert source.error, "a source that is still down must keep reporting the error"
+
+
+def test_ui_assets_are_never_served_from_cache():
+    # A tablet kept running an older app.js after a deploy, so a UI fix looked
+    # like it had not shipped at all.
+    from fastapi.testclient import TestClient
+
+    from app.server import create_app
+
+    with TestClient(create_app()) as client:
+        for path in ("/", "/ui/app.js", "/ui/style.css"):
+            response = client.get(path)
+            assert response.status_code == 200, path
+            assert response.headers.get("cache-control") == "no-store", path

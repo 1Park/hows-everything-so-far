@@ -58,11 +58,22 @@ def create_app(settings=None, clients=None, hardware=None):
     app = create_api("Controller", lifespan)
     app.state.controller, app.state.video = controller, video
 
+    # The tablet kept running an older app.js after a deploy because the browser
+    # revalidated into a 304. The UI is tiny and served over a direct link, so
+    # always send the current bytes rather than debug a stale page mid-demo.
+    no_store = {"Cache-Control": "no-store"}
+
     @app.get("/")
     async def index():
-        return FileResponse(ROOT / "app/ui/index.html")
+        return FileResponse(ROOT / "app/ui/index.html", headers=no_store)
 
-    app.mount("/ui", StaticFiles(directory=ROOT / "app/ui"), name="ui")
+    class FreshStaticFiles(StaticFiles):
+        def file_response(self, *args, **kwargs):
+            response = super().file_response(*args, **kwargs)
+            response.headers.update(no_store)
+            return response
+
+    app.mount("/ui", FreshStaticFiles(directory=ROOT / "app/ui"), name="ui")
 
     @app.get("/ready")
     async def ready():
