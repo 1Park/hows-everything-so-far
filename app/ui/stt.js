@@ -18,6 +18,38 @@ let phrases = load();
 let index = 0;
 let results = [];
 
+// Takes live on the board, not in this tab: a reload, a second device or a
+// restarted browser must not lose a measurement that took real speaking to get.
+async function loadResults() {
+  try {
+    const response = await fetch('/api/stt/results');
+    const body = await response.json();
+    results = body.takes || [];
+    summarise(results.at(-1)?.source);
+  } catch {
+    showError('Saved takes could not be loaded.');
+  }
+}
+
+async function saveTake(take) {
+  const response = await fetch('/api/stt/results', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(take),
+  });
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error?.message || 'Could not save this take');
+  results = body.takes;
+}
+
+async function dropTake(index) {
+  const query = index === null ? '' : `?index=${index}`;
+  const response = await fetch(`/api/stt/results${query}`, {method: 'DELETE'});
+  const body = await response.json();
+  results = body.takes || [];
+  summarise();
+}
+
 function load() {
   try {
     const saved = JSON.parse(localStorage.getItem('sttPhrases') || 'null');
@@ -106,7 +138,7 @@ function summarise(source) {
     drop.className = 'secondary';
     drop.textContent = '✕';
     drop.title = 'Discard this take';
-    drop.onclick = () => { results.splice(i, 1); summarise(); };
+    drop.onclick = () => dropTake(i).catch(() => showError('Could not discard that take.'));
     cell.append(drop);
     row.append(cell);
     rows.prepend(row);
@@ -133,7 +165,10 @@ $('sttRecord').onclick = async () => {
     const body = await response.json();
     if (!response.ok) throw new Error(body.error?.message || 'Transcription failed');
     const score = wer(expected, body.text);
-    results.push({expected, heard: body.text, wer: score});
+    await saveTake({
+      expected, heard: body.text, wer: Number(score.toFixed(4)),
+      seconds: body.seconds, source: body.source, at: new Date().toISOString(),
+    });
     $('sttHeard').textContent = `“${body.text}”`;
     const verdict = document.createElement('span');
     verdict.className = `verdict ${score === 0 ? 'hit' : 'miss'}`;
@@ -180,8 +215,7 @@ $('sttReset').onclick = () => {
 
 $('sttClear').onclick = () => {
   if (results.length && !confirm(`Discard all ${results.length} takes?`)) return;
-  results = [];
-  summarise();
+  dropTake(null).catch(() => showError('Could not clear the saved takes.'));
 };
 
 $('sttCopy').onclick = async () => {
@@ -203,3 +237,4 @@ $('sttPhrases').value = phrases.join('\n');
 renderSuggestions();
 showPhrase();
 summarise();
+loadResults();

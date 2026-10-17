@@ -192,3 +192,16 @@ class StateEvent(Contract):
 class Heartbeat(Contract):
     type: Literal["heartbeat"] = "heartbeat"
     sequence: int = Field(ge=0)
+
+
+class SttTake(BaseModel):
+    """One accuracy-check attempt, stored so the numbers survive a page reload."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    expected: str = Field(min_length=1, max_length=1000)
+    heard: str = Field(default="", max_length=1000)
+    wer: float = Field(ge=0, le=10)
+    seconds: int = Field(ge=1, le=15)
+    source: str = Field(default="", max_length=40)
+    at: str = Field(default="", max_length=40)

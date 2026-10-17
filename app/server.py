@@ -1,4 +1,6 @@
 import asyncio
+import json
+from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import File, Form, Query, UploadFile, WebSocket, WebSocketDisconnect
@@ -18,6 +20,7 @@ from common.contracts import (
     StateEvent,
     Heartbeat,
     ListenInput,
+    SttTake,
 )
 from common.media import read_upload, validate_audio, validate_image
 
@@ -166,6 +169,43 @@ def create_app(settings=None, clients=None, hardware=None):
             raise ApiError(
                 "stt_timeout", "Audio transcription timed out. Please retry", 504, True
             ) from None
+
+    # One file so a take survives a refresh, a new tab, or someone else's browser.
+    # Kept under docs/ because these numbers are the evidence for the write-up.
+    takes_file = Path(settings.stt_takes_file)
+    if not takes_file.is_absolute():
+        takes_file = ROOT / takes_file
+
+    def read_takes():
+        try:
+            return json.loads(takes_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return []
+
+    def write_takes(takes):
+        takes_file.parent.mkdir(parents=True, exist_ok=True)
+        takes_file.write_text(json.dumps(takes, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    @app.get("/api/stt/results")
+    async def stt_results():
+        return {"takes": read_takes()}
+
+    @app.post("/api/stt/results")
+    async def stt_add_result(take: SttTake):
+        takes = read_takes()
+        takes.append(take.model_dump(mode="json"))
+        write_takes(takes)
+        return {"takes": takes}
+
+    @app.delete("/api/stt/results")
+    async def stt_delete_results(index: int = Query(default=-1, ge=-1)):
+        takes = read_takes()
+        if index < 0:
+            takes = []
+        elif index < len(takes):
+            takes.pop(index)
+        write_takes(takes)
+        return {"takes": takes}
 
     @app.post("/api/stt/check")
     async def stt_check(seconds: int = Query(default=0, ge=0, le=15)):

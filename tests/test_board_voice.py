@@ -200,3 +200,32 @@ async def test_existing_whisper_http_contract_and_empty_result(monkeypatch):
     with pytest.raises(ApiError) as error:
         await backend.infer(b"original-audio", "audio/wav")
     assert error.value.code == "no_speech"
+
+
+def test_stt_takes_survive_a_reload(tmp_path, monkeypatch):
+    # Measurements cost real speaking, so a refresh must not discard them.
+    from fastapi.testclient import TestClient
+
+    import app.server as server
+
+    monkeypatch.setenv("STT_TAKES_FILE", str(tmp_path / "takes.json"))
+    with TestClient(server.create_app()) as client:
+        assert client.get("/api/stt/results").json() == {"takes": []}
+        take = {
+            "expected": "a little water",
+            "heard": "a little water",
+            "wer": 0.0,
+            "seconds": 4,
+            "source": "external",
+            "at": "2026-10-18T01:00:00Z",
+        }
+        assert client.post("/api/stt/results", json=take).status_code == 200
+        assert client.post("/api/stt/results", json={**take, "heard": "a little otter",
+                                                     "wer": 0.25}).status_code == 200
+
+    # A new app instance stands in for a reloaded page or a second device.
+    with TestClient(server.create_app()) as client:
+        assert len(client.get("/api/stt/results").json()["takes"]) == 2
+        assert len(client.request("DELETE", "/api/stt/results?index=0").json()["takes"]) == 1
+        assert client.request("DELETE", "/api/stt/results").json() == {"takes": []}
+    assert (tmp_path / "takes.json").exists()  # the repo copy was never touched
