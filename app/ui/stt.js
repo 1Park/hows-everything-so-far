@@ -64,10 +64,22 @@ function renderDiff(expected, heard) {
   node.hidden = false;
 }
 
-// Only moves the prompt on. The last result stays on screen until the next take,
-// so you can read the comparison before speaking again.
+// Suggestions only fill the box; whatever is typed there is what gets scored, so
+// an unplanned sentence can be checked without editing the list first.
 function showPhrase() {
-  $('sttTarget').textContent = phrases[index % phrases.length];
+  $('sttTarget').value = phrases[index % phrases.length] || '';
+}
+
+function renderSuggestions() {
+  const box = $('sttSuggest');
+  box.replaceChildren();
+  for (const phrase of phrases) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = phrase;
+    button.onclick = () => { $('sttTarget').value = phrase; $('sttTarget').focus(); };
+    box.append(button);
+  }
 }
 
 function summarise(source) {
@@ -98,7 +110,8 @@ function showError(message) {
 }
 
 $('sttRecord').onclick = async () => {
-  const expected = phrases[index % phrases.length];
+  const expected = $('sttTarget').value.trim();
+  if (!expected) return showError('Type the sentence you are about to say.');
   $('sttRecord').disabled = true;
   $('sttSkip').disabled = true;
   $('sttDiff').hidden = true;
@@ -141,6 +154,7 @@ $('sttSave').onclick = () => {
   phrases = list;
   localStorage.setItem('sttPhrases', JSON.stringify(list));
   index = 0;
+  renderSuggestions();
   showPhrase();
 };
 
@@ -149,6 +163,7 @@ $('sttReset').onclick = () => {
   phrases = DEFAULT_PHRASES.slice();
   $('sttPhrases').value = phrases.join('\n');
   index = 0;
+  renderSuggestions();
   showPhrase();
 };
 
@@ -166,5 +181,6 @@ $('sttCopy').onclick = async () => {
 };
 
 $('sttPhrases').value = phrases.join('\n');
+renderSuggestions();
 showPhrase();
 summarise();
