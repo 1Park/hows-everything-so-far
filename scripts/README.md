@@ -4,7 +4,7 @@
 
 | 도구 | 역할 |
 | --- | --- |
-| dev.py | direct/fixture/proxy/integration/board 모드, 포트·lock 검사, startup 실패 시 자식 정리, 로그 |
+| dev.py | direct/fixture/offline/proxy/integration/board 모드, 포트·lock 검사, startup 실패 시 자식 정리, 로그 |
 | dev.py --stop | matching mode/port supervisor에 종료 요청; --mode board에는 동일 옵션 사용 |
 | start-board.sh / stop-board.sh | Linux native background supervisor, PID·중복 검사·실패/종료 대기 |
 | diagnose.py | OS/arch/Python, 명시 runner/model/library, camera/Bridge/router read-only 진단 |
@@ -14,3 +14,5 @@
 | browser_check.cjs | 실제 Chromium 녹음/fixtureSTT/고정 오디오/카드/확인/취소/반응형/재연결 |
 
 logs/서비스명.log, tmp/lock은 Git 제외. Ctrl+C 또는 --stop. 외부 Mac 서버·호스트 arduino-router·MCU firmware·Tailscale Serve는 이 supervisor가 시작/종료하지 않는다. board --stop은 shell stop 도구와 같은 managed supervisor만 대상으로 한다.
+
+fixture는 Vision/STT/Hardware만 고정하고 Qwen은 QWEN_BASE_URL의 실제 HTTP API(기본 Mac)를 사용한다. offline은 Qwen도 fixture로 고정하며 외부 모델 연결 없이 실행한다. 이 두 모드는 Controller/UI만 시작한다. 실제 API 장애를 fixture로 자동 전환하지 않는다.

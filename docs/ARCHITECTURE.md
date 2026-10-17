@@ -65,6 +65,8 @@ HTTP는 입력/확인, WS는 전체 상태 snapshot+sequence/heartbeat, 영상 M
 
 개발자는 각자 venv와 로컬 앱, 기본 Vision/STT fixture+Mac API로 개발한다. direct 모드는 Controller만 시작, proxy 모드는 우리 Qwen API 포함, integration은4서버. [실행 도구](../scripts/README.md). Ctrl+C 또는 --stop으로 관리 프로세스 정리. 보드 통합 checkout 한 개·배포 담당 한 명, camera/MCU 중복 점유 금지.
 
+fixture 모드는 Vision/STT fixture와 Hardware mock을 강제하고 Qwen은 설정한 실제 HTTP API를 사용한다. 완전 오프라인 재현/자동 테스트는 별도 offline 모드로 Qwen까지 fixture로 고정한다. 두 모드 모두 로컬 Qwen 서버를 추가로 시작하지 않는다.
+
 .env(개인)/.env.board(공유) 선택, process env 우선, 설정 범위 검증. model/data/log/generated 결과 Git 제외. 기존 Qwen 평가 아카이브 보존, 새 음료 평가 timestamp 파일. 실제 Mac/fixture 테스트와 보드 NPU/장치 실측은 구분한다.
 
 ## 보드에서 남은 검증

@@ -30,7 +30,8 @@ python scripts/dev.py
 | 모드 | 명령 | 이 기기에서 시작하는 프로세스 |
 | --- | --- | --- |
 | 기본 direct | `python scripts/dev.py` | Controller/UI만. Mac API 직접 호출, Vision/STT fixture |
-| 완전 offline fixture | `python scripts/dev.py --mode fixture` | Controller/UI만. 모든 모델 fixture, Hardware mock |
+| 개발 fixture | `python scripts/dev.py --mode fixture` | Controller/UI만. Vision/STT fixture·Hardware mock, Qwen은 설정한 실제 HTTP API |
+| 완전 offline | `python scripts/dev.py --mode offline` | Controller/UI만. Qwen 포함 모든 모델 fixture, Hardware mock |
 | 우리 Qwen proxy | `python scripts/dev.py --mode proxy` | Controller + Qwen API; Qwen API→실제 Mac |
 | 서버 간 통합 | `python scripts/dev.py --mode integration` | Controller + Qwen + Vision + STT; Vision/STT 기본 fixture backend |
 | 보드 준비 | `bash scripts/start-board.sh` | .env.board 기반4개 서버. ExecuTorch 미연결이면 /ready 503이 정상 |

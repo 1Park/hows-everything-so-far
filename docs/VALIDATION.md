@@ -1,5 +1,11 @@
 # 보드 전 구현·검증 결과
 
+## 2026-10-17 실행 모드 변경
+
+사용자 요청에 따라 fixture 모드는 Vision/STT fixture·Hardware mock을 유지하고 Qwen은 설정한 실제 HTTP API(기본 Mac)로 호출한다. 모든 모델이 fixture인 완전 오프라인 모드는 별도 `--mode offline`으로 이동했다. 두 모드 모두 Controller/UI만 시작한다.
+
+변경 후 supervisor 테스트3개 통과: offline 전체 데모/중복 실행/종료·재시작, startup 실패 정리, fixture 모드에서 실제 Qwen HTTP 장애를 오류로 처리하고 fixture 정답으로 대체하지 않는 동작. 실제 `--mode fixture` 서버에서도 Mac Qwen(source=mlx)으로 리필→음료/분량 수정→Confirm→mock 완료와 STT fixture·skip 경로를 smoke 검증했다. 검증용 서버는 종료했다. 아래 내용은 최초 구현의 검증 기록이다.
+
 검증일: 2026-10-16 (Pacific), 결과 파일명은 UTC2026-10-17. Windows11 AMD64/Python3.13, Chrome 실제 브라우저, Tailscale→Mac MLX. 보드 없음.
 
 ## 구현·실행 결과

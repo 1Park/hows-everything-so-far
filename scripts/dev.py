@@ -36,9 +36,9 @@ def supervise(args):
     if args.env_file:
         env["REFILL_ENV_FILE"] = str(Path(args.env_file).resolve())
     env["PYTHONUNBUFFERED"] = "1"
-    if args.mode == "fixture":
+    if args.mode in ("fixture", "offline"):
         env.update(
-            QWEN_BACKEND="fixture",
+            QWEN_BACKEND="fixture" if args.mode == "offline" else "http",
             VISION_BACKEND="fixture",
             STT_BACKEND="fixture",
             HARDWARE_BACKEND="mock",
@@ -170,7 +170,10 @@ def supervise(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--mode", choices=["direct", "fixture", "proxy", "integration", "board"], default="direct"
+        "--mode",
+        choices=["direct", "fixture", "offline", "proxy", "integration", "board"],
+        default="direct",
+        help="fixture mocks Vision/STT/hardware and uses real Qwen HTTP; offline mocks everything",
     )
     parser.add_argument("--env-file")
     parser.add_argument(
