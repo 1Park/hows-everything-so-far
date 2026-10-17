@@ -1,6 +1,6 @@
 """Vision external backend — `VISION_MODEL_BACKEND=external`, `VISION_ADAPTER=services.vision.backend:create_backend`.
 
-설정 (프로세스 환경변수, models/README.md 규칙):
+설정 (common.config.Settings — 선택한 env 파일 + 프로세스 환경변수 우선, models/README.md 규칙):
   VISION_MODEL_PATH  bundle 디렉터리 (bundle.json 포함). 상대 경로는 레포 루트 기준.
                      예) models/local/vision/<name> (Mac, XNNPACK .pte) / models/board/vision/<name> (보드, QNN .pte)
   VISION_RUNNER_BIN  bundle이 cli runner를 쓸 때만: qnn_executor_runner 등 실행 파일 경로
@@ -12,14 +12,13 @@ bundle이 없거나 로드에 실패하면 ready=False + 명시적 오류. fixtu
 import asyncio
 import io
 import logging
-import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from PIL import Image
 
 from common.api import ApiError
-from common.config import ROOT
+from common.config import ROOT, load_settings
 
 log = logging.getLogger("vision.backend")
 
@@ -27,10 +26,13 @@ log = logging.getLogger("vision.backend")
 class DinoVisionBackend:
     source = "external"
 
-    def __init__(self, bundle_path=None, runner_bin=None, runners=None):
-        raw = bundle_path or os.environ.get("VISION_MODEL_PATH", "")
+    def __init__(self, bundle_path=None, runner_bin=None, runners=None, settings=None):
+        # .env.board 값은 REFILL_ENV_FILE → Settings 로만 전달되고 os.environ 엔 없으므로 Settings 에서 읽는다
+        if bundle_path is None or runner_bin is None:
+            settings = settings or load_settings()
+        raw = str(bundle_path or settings.vision_model_path)
         self.path = (Path(raw) if Path(raw).is_absolute() else ROOT / raw) if raw else None
-        self.runner_bin = runner_bin or os.environ.get("VISION_RUNNER_BIN") or None
+        self.runner_bin = runner_bin or (settings.vision_runner_bin if settings else "") or None
         self._runners = runners
         self.pipeline = None
         self.error = None

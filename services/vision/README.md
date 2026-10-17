@@ -15,6 +15,8 @@ VISION_MODEL_PATH=models/local/vision/<bundle> \
 python -m uvicorn services.vision.server:create_app --factory --host 127.0.0.1 --port 8001
 ```
 
+설정은 `common.config.Settings`에서 읽는다 — 선택한 env 파일(`.env`, 보드는 `.env.board`)에 적거나 프로세스 환경변수로 덮어쓴다.
+
 | 설정 | 의미 |
 |---|---|
 | `VISION_MODEL_PATH` | bundle 디렉터리 (`bundle.json`, `.pte`, `head.json`). 상대 경로는 레포 루트 기준. `ml/export/make_bundle.py`가 생성 |
