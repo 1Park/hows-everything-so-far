@@ -2,6 +2,13 @@
 #include <Arduino_RouterBridge.h>
 
 enum Phase { IDLE=0, LOADING=1, RETURNING=2, DONE=3, CANCELLED=4 };
+
+// Mock sequence timings. The host polls refill_phase every mock_step_seconds
+// (0.8s by default), so HOST_TIMEOUT_MS tolerates two missed polls and must stay
+// below SEQUENCE_DONE_MS or the sequence would always finish before it can fire.
+const unsigned long SEQUENCE_RETURNING_MS = 1500;
+const unsigned long SEQUENCE_DONE_MS = 3000;
+const unsigned long HOST_TIMEOUT_MS = 2000;
 Phase phase = IDLE;
 String lastCommand;
 unsigned long startedAt = 0;
@@ -53,9 +60,11 @@ void setup() {
 void loop() {
   unsigned long now = millis();
   if (phase == LOADING || phase == RETURNING) {
-    if (now - lastPoll > 5000) phase = CANCELLED;  // lost host watchdog
-    else if (now - startedAt >= 3000) phase = DONE;
-    else if (now - startedAt >= 1500) phase = RETURNING;
+    // Checked first: a host that stopped polling must stop the sequence even if
+    // its remaining steps would otherwise complete.
+    if (now - lastPoll > HOST_TIMEOUT_MS) phase = CANCELLED;
+    else if (now - startedAt >= SEQUENCE_DONE_MS) phase = DONE;
+    else if (now - startedAt >= SEQUENCE_RETURNING_MS) phase = RETURNING;
   }
   // A running sequence owns the LED so it stays correct if the host goes away.
   // Otherwise the last set_led_state value persists, which is also the Bridge smoke test.
