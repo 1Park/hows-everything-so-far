@@ -37,7 +37,7 @@ Vision/STT 담당자는 [API·async 계약](CONTRACTS.md)을 구현한다. facto
 
 Vision(DINOv2): `VISION_MODEL_BACKEND=external`, `VISION_ADAPTER=services.vision.backend:create_backend`, `VISION_MODEL_PATH=models/board/vision/<bundle>`(bundle 디렉터리, `.pte` 파일 아님). bundle은 `ml/export/make_bundle.py`로 만들고, head는 **보드에서 돌릴 `.pte`의 특징으로** `ml/training/make_head.py`로 학습한다(fp32 head를 양자화 모델에 쓰면 크게 떨어짐). bundle 없음/로드 실패는 ready503. 세부는 [services/vision](../services/vision/README.md)·[ml](../ml/README.md)·[평가 기록](vision_evaluation/README.md).
 
-Qwen ExecuTorch는 common/backends.py의 ExecuTorchBackend 경계에 실제 runtime을 연결한다. 토크나이저·chat template·생성 옵션·취소/timeout·상주 실행·원본 output을 확인한다. 일회성 CLI를 감싼 HTTP 상주만으로 모델 상주를 주장하지 않는다. .env.board는 QWEN_MODEL_BACKEND=executorch라서 연결 전 ready503을 반환하며 Mac/fixture로 자동 전환하지 않는다. 실제 보드 bundle의 공개 model ID는 확인 후 설정한다.
+보드 LLM은 Qwen이 아니라 주최 측 **Gemma**다. `.env.board`의 `QWEN_MODEL_BACKEND=executorch`면 Qwen 서비스(127.0.0.1:8000)가 `services/qwen/board_llm.py`로 `scripts/board_llm.sh ask`(qnn_llama_runner, NPU)를 요청마다 1회 실행한다. **일회성 CLI라 모델은 상주하지 않는다**(요청당 load 4~7초 포함 약 9초, gemma4). Mac/fixture로 자동 전환하지 않는다. 실행·모델 선택은 [services/qwen](../services/qwen/README.md).
 
 ## 3. 카메라와 태블릿
 
@@ -89,6 +89,6 @@ bash scripts/stop-board.sh
 | Gemma3 1B (주최 측 `.pte`, ctx 5000) | `qnn_llama_runner --decoder_model_version gemma3 --eval_mode 1` | prefill 317~393 tok/s, decode 26~30 tok/s, 로딩 3~5초, 최대 RSS 1.4 GB. 단답 산수 오답 있음 |
 | Gemma4 E2B (주최 측 `.pte`, ctx 2000) | `--decoder_model_version gemma4 --eval_mode 1` | prefill 205~233 tok/s, decode 16 tok/s, 로딩 3.3~4.9초, 최대 RSS 2.2 GB |
 
-- **Qwen3 0.6B `.pte`는 주최 측 번들에 없다.** 보드 export는 hybrid 모드가 메모리 ~100GB를 요구하고 kv 모드도 torchtune↔torchao 의존성 충돌이 있어 중단했다. LLM은 주최 측 Gemma를 `scripts/board_llm.sh`로 쓴다(`use gemma3|gemma4|auto`, `auto`는 MemAvailable ≥ 3.7GB면 gemma4). 앱의 `ExecuTorchBackend`(Qwen 경계)는 아직 연결 전.
+- **Qwen3 0.6B `.pte`는 주최 측 번들에 없다.** 보드 export는 hybrid 모드가 메모리 ~100GB를 요구하고 kv 모드도 torchtune↔torchao 의존성 충돌이 있어 중단했다. LLM은 주최 측 Gemma를 `scripts/board_llm.sh`로 쓴다(`use gemma3|gemma4|auto`, `auto`는 MemAvailable ≥ 3.7GB면 gemma4). 앱 연결: Qwen 서비스 `executorch` backend = `services/qwen/board_llm.py`. Controller 프롬프트 1건 실측 gemma4 정답 8.8초 / gemma3 오답 5.4초 → 데모는 `use gemma4`.
 - LLM을 연달아 실행하면 직전 프로세스의 NPU 메모리 반환이 늦어 `Failed to find available PD`가 날 수 있다 → 스크립트가 5초 후 재시도.
 - 보드 Vision bundle 만들기: 위 QNN `.pte`로 `python -m ml.training.make_head --runner cli --runner-bin <qnn_executor_runner>` → `python -m ml.export.make_bundle --out models/board/vision/<name> --dino-runner cli --yolo-runner cli ...`.
