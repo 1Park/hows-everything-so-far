@@ -37,7 +37,7 @@ Vision/STT 담당자는 [API·async 계약](CONTRACTS.md)을 구현한다. facto
 
 Vision(DINOv2): `VISION_MODEL_BACKEND=external`, `VISION_ADAPTER=services.vision.backend:create_backend`, `VISION_MODEL_PATH=models/board/vision/<bundle>`(bundle 디렉터리, `.pte` 파일 아님). bundle은 `ml/export/make_bundle.py`로 만들고, head는 **보드에서 돌릴 `.pte`의 특징으로** `ml/training/make_head.py`로 학습한다(fp32 head를 양자화 모델에 쓰면 크게 떨어짐). bundle 없음/로드 실패는 ready503. 세부는 [services/vision](../services/vision/README.md)·[ml](../ml/README.md)·[평가 기록](vision_evaluation/README.md).
 
-보드 LLM은 Qwen이 아니라 주최 측 **Gemma**다. `.env.board`의 `QWEN_MODEL_BACKEND=executorch`면 Qwen 서비스(127.0.0.1:8000)가 `services/qwen/board_llm.py`로 `scripts/board_llm.sh ask`(qnn_llama_runner, NPU)를 요청마다 1회 실행한다. **일회성 CLI라 모델은 상주하지 않는다**(요청당 load 4~7초 포함 약 9초, gemma4). Mac/fixture로 자동 전환하지 않는다. 실행·모델 선택은 [services/qwen](../services/qwen/README.md).
+보드 LLM은 Qwen이 아니라 주최 측 **Gemma**다. `.env.board`의 `QWEN_MODEL_BACKEND=executorch`면 Qwen 서비스(127.0.0.1:8000)가 `services/qwen/board_llm.py`로 상주 `qnn_llm_runner_host`(NPU)를 사용한다. 첫 요청에서 로드한 뒤 같은 모델은 재사용하고 다른 모델 요청일 때만 교체한다. 요청 간 KV는 초기화하고 취소/timeout/오류 때 worker를 회수한다. Mac/fixture로 자동 전환하지 않는다. [상주 실행·전환·실측](RESIDENT_LLM.md), [서비스 안내](../services/qwen/README.md).
 
 ## 3. 카메라와 태블릿
 
@@ -65,7 +65,7 @@ bash scripts/stop-board.sh
 | 포트 | 서비스 | 실제 backend | 누가 띄우나 | 로그 |
 |---|---|---|---|---|
 | 0.0.0.0:8080 | Controller/UI | Vision·STT·Qwen HTTP 호출, Hardware mock | `scripts/dev.py --mode direct` | `logs/controller.log` |
-| 127.0.0.1:8000 | Qwen 서비스 | **Gemma** (`board_llm.sh` → qnn_llama_runner, NPU, 요청마다 load) | 단독 uvicorn (아래) | `~/model_output/logs/qwen-8000.log` |
+| 127.0.0.1:8000 | Qwen 서비스 | **Gemma** (qnn_llm_runner_host, NPU, 첫 요청 load 후 상주) | 단독 uvicorn (아래) | `~/model_output/logs/qwen-8000.log` |
 | 127.0.0.1:8001 | Vision 서비스 | DINOv2 fp16 + YOLO11n 16a8w QNN (cli runner, NPU) | 단독 uvicorn (아래) | `~/model_output/logs/vision-8001.log` |
 | 127.0.0.1:8002 | STT 서비스 | whisper.cpp HTTP adapter (`services.stt.whisper_http`) | `dev.py --with-stt` | `logs/stt.log` |
 | 0.0.0.0:8178 | whisper-server | whisper.cpp `ggml-base.en` (레포 밖 `~/whisper.cpp`) | 팀원 수동 실행, 건드리지 않음 | — |

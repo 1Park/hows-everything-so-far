@@ -1,6 +1,10 @@
+"""Real JSONL child processes test persistence, switches, isolation and cleanup.
+
+The fake child is NOT a model or evidence of board inference accuracy.
+"""
 import asyncio
 import json
-import os
+import sys
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,100 +13,159 @@ from app.language import generation, parse_interpretation
 from common.api import ApiError
 from common.config import Settings
 from common.contracts import CurrentRequest
-from services.qwen.board_llm import BoardLLMBackend
+from services.qwen.board_llm import BoardLLMBackend, render_prompt
 from services.qwen.server import create_app
-
-# board_llm.sh 와 같은 출력 규칙: 답은 stdout, 속도는 stderr, 메모리 부족은 exit 4
-FAKE = """#!/usr/bin/env bash
-case "$1" in
-  status) echo "selected : auto  → would run: gemma4"
-          echo "  gemma3  ctx 5000  peak ~1400 MB  ok (1.1G)"
-          echo "  gemma4  ctx 2000  peak ~2200 MB  {gemma4}";;
-  ask) shift; sys=""; while [ "$1" != "--" ]; do [ "$1" = -s ] && sys="$2"; shift; done; shift
-       [ -n "{hang}" ] && {{ sleep 30 & echo $! > "{pidfile}"; wait; }}
-       [ -n "{oom}" ] && exit 4
-       echo "$1" > "{seen}"; printf '%s' "$sys" > "{seen}.sys"
-       echo '{answer}'
-       echo "[gemma4] load 6.7s | prompt 565 tok @ 846 tok/s | gen 14 tok @ 17.3 tok/s" >&2;;
-esac
-"""
-
-
-def fake(
-    tmp_path,
-    gemma4="ok (2.8G)",
-    hang="",
-    oom="",
-    answer='{"intent":"refill","item":"coffee","portion":"small"}',
-):
-    script = tmp_path / "board_llm.sh"
-    script.write_text(
-        FAKE.format(
-            gemma4=gemma4,
-            hang=hang,
-            oom=oom,
-            answer=answer,
-            seen=tmp_path / "seen",
-            pidfile=tmp_path / "pid",
-        )
-    )
-    return script
 
 
 def body(utterance="Just a little coffee please"):
-    return generation("board-gemma", CurrentRequest(item="coke", portion="regular"), utterance)
+    return generation("board-gemma", CurrentRequest(item="water", portion="regular"), utterance)
 
 
-async def test_generate_passes_system_and_user_and_parses(tmp_path):
-    backend = BoardLLMBackend(fake(tmp_path))
-    assert await backend.ready()
-    result = await backend.generate(body())
-    assert parse_interpretation(result["choices"][0]["message"]["content"]).item == "coffee"
-    assert result["runner"] == {
-        "llm": "gemma4",
-        "stats": "load 6.7s | prompt 565 tok @ 846 tok/s | gen 14 tok @ 17.3 tok/s",
-    }
-    assert json.loads((tmp_path / "seen").read_text())["utterance"] == "Just a little coffee please"
-    assert (
-        (tmp_path / "seen.sys")
-        .read_text()
-        .startswith("You interpret English drink refill requests")
-    )
+@pytest.fixture
+def worker(tmp_path, monkeypatch):
+    worker = tmp_path / "worker.py"
+    worker.write_text('''import json,sys,time,os
+from pathlib import Path
+root=Path(__file__).parent
+with (root/"starts").open("a") as f: f.write(str(os.getpid())+"\\n")
+print(json.dumps({"ready": True}),flush=True)
+for line in sys.stdin:
+    req=json.loads(line)
+    with (root/"requests").open("a") as f: f.write(json.dumps(req)+"\\n")
+    if "HANG" in req["prompt"]: time.sleep(30)
+    if "CRASH" in req["prompt"]: sys.exit(1)
+    if "BAD_PROTOCOL" in req["prompt"]:
+        print("not json",flush=True); continue
+    result={"intent":"refill","item":"coffee","portion":"small"}
+    print(json.dumps({"token":json.dumps(result)}),flush=True)
+    print(json.dumps({"done":True,"finish_reason":"stop","session_reset_reason":"new"}),flush=True)
+''', encoding="utf-8")
+    script = tmp_path / "config.py"
+    script.write_text('''import json,sys,os
+from pathlib import Path
+root=Path(__file__).parent
+sel=os.environ.get("LLM_SELECTION") or (root/"selection").read_text()
+name=sys.argv[2] if len(sys.argv)>2 else ("gemma4" if sel=="auto" else sel)
+print(json.dumps(dict(selection=sel,name=name,worker=str(root/"worker.py"),
+ model_path=str(root/(name+".pte")),tokenizer_path=str(root/"tokenizer.json"),
+ ld_library_path="",adsp_library_path="")))
+''', encoding="utf-8")
+    for name in ("gemma3.pte", "gemma4.pte", "tokenizer.json"):
+        (tmp_path / name).touch()
+    (tmp_path / "selection").write_text("gemma4")
+    real_exec = asyncio.create_subprocess_exec
+
+    async def launch(*args, **kwargs):
+        if args[0] == "bash":
+            args = (sys.executable, *args[1:])
+        elif args[0] == str(worker):
+            args = (sys.executable, *args)
+        return await real_exec(*args, **kwargs)
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", launch)
+    return script
 
 
-async def test_not_ready_when_selected_model_missing(tmp_path):
-    assert not await BoardLLMBackend(fake(tmp_path, gemma4="MISSING")).ready()
-    assert await BoardLLMBackend(fake(tmp_path, gemma4="MISSING"), model="gemma3").ready()
-    assert not await BoardLLMBackend(tmp_path / "nope.sh").ready()
+async def test_reuse_same_pid_isolated_requests_and_switch(worker):
+    backend = BoardLLMBackend(worker)
+    try:
+        assert await backend.ready()
+        assert not backend.status["resident"]
+        first = await backend.generate(body())
+        second = await backend.generate(body("Coffee instead"))
+        assert first["runner"]["cold_start"] and not second["runner"]["cold_start"]
+        assert first["runner"]["pid"] == second["runner"]["pid"]
+        assert parse_interpretation(second["choices"][0]["message"]["content"]).item == "coffee"
+        requests = [json.loads(s) for s in (worker.parent / "requests").read_text().splitlines()]
+        assert all("session_id" not in req for req in requests)
+        assert all(req["temperature"] == 0 and req["max_new_tokens"] == 192 for req in requests)
+        assert "Coffee instead" in requests[1]["prompt"]
+        assert "Just a little coffee" not in requests[1]["prompt"]
+        (worker.parent / "selection").write_text("auto")
+        third = await backend.generate(body())
+        assert third["runner"]["pid"] == first["runner"]["pid"]
+        (worker.parent / "selection").write_text("gemma3")
+        fourth = await backend.generate(body())
+        assert fourth["runner"]["pid"] != first["runner"]["pid"]
+        assert fourth["runner"]["cold_start"] and fourth["runner"]["llm"] == "gemma3"
+        assert len((worker.parent / "starts").read_text().splitlines()) == 2
+    finally:
+        await backend.close()
+    assert not backend.status["resident"]
 
 
-async def test_memory_shortage_is_retryable_503(tmp_path):
-    with pytest.raises(ApiError) as exc:
-        await BoardLLMBackend(fake(tmp_path, oom="1")).generate(body())
-    assert exc.value.status == 503 and exc.value.code == "model_memory"
+@pytest.mark.parametrize("utterance", ["CRASH", "BAD_PROTOCOL"])
+async def test_worker_failure_reloads_without_fixture(worker, utterance):
+    backend = BoardLLMBackend(worker)
+    try:
+        with pytest.raises(ApiError) as error:
+            await backend.generate(body(utterance))
+        assert error.value.code == "model_unavailable"
+        assert not backend.status["resident"]
+        assert (await backend.generate(body()))["runner"]["cold_start"]
+    finally:
+        await backend.close()
 
 
-async def test_timeout_kills_runner_child(tmp_path):
-    backend = BoardLLMBackend(fake(tmp_path, hang="1"))
-    task = asyncio.create_task(backend.generate(body()))
-    pidfile = tmp_path / "pid"
-    for _ in range(100):
-        if pidfile.exists() and pidfile.read_text().strip():
-            break
-        await asyncio.sleep(0.02)
-    task.cancel()
-    with pytest.raises(asyncio.CancelledError):
-        await task
-    pid = int(pidfile.read_text())
-    await asyncio.sleep(0.1)
-    with pytest.raises(ProcessLookupError):
-        os.kill(pid, 0)
+async def test_timeout_kills_worker_and_restarts(worker):
+    backend = BoardLLMBackend(worker)
+    task = asyncio.create_task(backend.generate(body("HANG")))
+    try:
+        for _ in range(200):
+            if (worker.parent / "requests").exists():
+                break
+            await asyncio.sleep(0.02)
+        process = backend.process
+        assert process is not None
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert process.returncode is not None
+        assert not backend.status["resident"]
+        result = await backend.generate(body())
+        assert result["runner"]["cold_start"] and result["runner"]["pid"] != process.pid
+    finally:
+        task.cancel()
+        await backend.close()
 
 
-def test_qwen_service_uses_board_backend(tmp_path):
-    settings = Settings(qwen_model_backend="executorch", qwen_model="board-gemma")
-    with TestClient(create_app(settings, backend=BoardLLMBackend(fake(tmp_path)))) as c:
-        ready = c.get("/ready").json()
-        assert ready["ready"] is True and ready["source"] == "executorch"
-        r = c.post("/v1/chat/completions", json=body().model_dump())
-        assert r.status_code == 200 and r.json()["source"] == "executorch"
+async def test_missing_model_not_ready(worker):
+    (worker.parent / "gemma4.pte").unlink()
+    assert not await BoardLLMBackend(worker).ready()
+    assert await BoardLLMBackend(worker, model="gemma3").ready()
+
+
+async def test_concurrent_calls_serialized(worker):
+    backend = BoardLLMBackend(worker)
+    try:
+        results = await asyncio.gather(*(backend.generate(body()) for _ in range(3)))
+        assert len({r["runner"]["pid"] for r in results}) == 1
+        assert sum(r["runner"]["cold_start"] for r in results) == 1
+    finally:
+        await backend.close()
+
+
+def test_templates():
+    assert render_prompt(body(), "gemma4").startswith("<bos><|turn>system\n")
+    assert render_prompt(body(), "gemma3").startswith("<start_of_turn>user\nYou interpret")
+
+
+def test_api_shutdown_reaps_resident_worker(worker):
+    backend = BoardLLMBackend(worker)
+    with TestClient(create_app(Settings(qwen_model_backend="executorch", qwen_model="board-gemma"),
+                               backend=backend)) as client:
+        assert client.get("/ready").json()["ready"]
+        result = client.post("/v1/chat/completions", json=body().model_dump())
+        assert result.status_code == 200 and result.json()["source"] == "executorch"
+        assert client.get("/ready").json()["runner"]["resident"]
+        request = body().model_dump()
+        request["model"] = "gemma3"
+        switched = client.post("/v1/chat/completions", json=request)
+        assert switched.status_code == 200 and switched.json()["runner"]["llm"] == "gemma3"
+        assert switched.json()["runner"]["cold_start"]
+        reused = client.post("/v1/chat/completions", json=request)
+        assert reused.json()["runner"]["pid"] == switched.json()["runner"]["pid"]
+        assert not reused.json()["runner"]["cold_start"]
+        assert "gemma4" in [m["id"] for m in client.get("/v1/models").json()["data"]]
+        proc = backend.process
+    assert proc.returncode is not None
