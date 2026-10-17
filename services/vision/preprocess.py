@@ -47,6 +47,25 @@ def center_box(size_wh, frac=0.7):
     return (w - s) // 2, (h - s) // 2, s
 
 
+def pad_crop(img: Image.Image, xyxy, margin=1.15, fill=(114, 114, 114)) -> Image.Image:
+    """박스를 margin배만 넓혀 자르고, 정사각형의 남는 부분은 회색으로 채운다 (YOLO 모드 기본).
+
+    정사각형으로 넓혀 자르면 세로로 긴 캔·병이나 화면 가장자리 물체에서 옆 컵이 crop에 같이 들어가
+    분류가 옆 물체를 따라간다 (실측: 캔 옆 커피잔 → 캔을 coffee로). 패딩은 옆 물체 대신 회색을 넣고,
+    박스 중심을 정사각형 중심에 고정해 가장자리에서도 밀리지 않는다.
+    """
+    x0, y0, x1, y1 = xyxy
+    W, H = img.size
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    w2, h2 = (x1 - x0) * margin, (y1 - y0) * margin
+    left, top = max(0, int(cx - w2 / 2)), max(0, int(cy - h2 / 2))
+    right, bottom = min(W, int(cx + w2 / 2)), min(H, int(cy + h2 / 2))
+    side = max(1, int(max(w2, h2)))
+    canvas = Image.new("RGB", (side, side), fill)
+    canvas.paste(img.crop((left, top, right, bottom)), (int(side / 2 - (cx - left)), int(side / 2 - (cy - top))))
+    return canvas
+
+
 def square_crop_box(xyxy, size_wh, scale):
     """박스 → 중심이 같은 정사각형으로 scale배 확장 (x, y, side). 학습 crop처럼 컵 주변 여백을 남긴다.
 

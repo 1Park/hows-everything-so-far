@@ -3,6 +3,7 @@
 화면 가운데 정사각형 박스 = ROI (스펙의 primary ROI). 잔을 박스 안에 두고 찍는다.
 
 1) 수집:  python -m ml.tools.camera collect --drinks water coke coffee
+          python -m ml.tools.camera collect --classes other   (컵이 아닌 물체: 캔·병)
    키: 1~9,0 클래스 선택 (10번째 = 0) | space 저장 | q 종료   → data/real/<class>/NNNN.jpg
 2) 정확도: python -m ml.evaluation.eval_fewshot --data data/real --shots 1 3 5
 3) 실시간: python -m ml.tools.camera live --train data/real            (가운데 ROI 1개)
@@ -166,7 +167,7 @@ def next_index(d):
 
 
 def collect(args):
-    classes = [f"{d}__{lv}" for d in args.drinks for lv in LEVELS] + ["empty"]
+    classes = args.classes or [f"{d}__{lv}" for d in args.drinks for lv in LEVELS] + ["empty"]
     if len(classes) > len(KEYS):
         raise SystemExit("drink는 최대 3종")
     out = Path(args.out)
@@ -342,6 +343,8 @@ def main():
     sub = ap.add_subparsers(dest="mode", required=True)
     c = sub.add_parser("collect")
     c.add_argument("--drinks", nargs="+", default=["water", "coke", "coffee"])
+    c.add_argument("--classes", nargs="+",
+                   help="직접 클래스 지정 (예: other — 캔·병처럼 YOLO가 cup으로 잘못 잡는 물체). --drinks 무시")
     c.add_argument("--out", default="data/real")
     c.add_argument("--cam", type=int, default=0)
     lv = sub.add_parser("live")

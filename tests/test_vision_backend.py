@@ -104,3 +104,32 @@ def test_label_conversion():
     obs = to_observation([0.6, 0.3, 0.1], ["coke__low", "coffee__low", "empty"])
     assert obs["item"] == "coke" and obs["item_confidence"] == pytest.approx(0.6 / 0.9, abs=1e-3)
     assert to_observation([0.1, 0.9], ["coke__low", "empty"])["item_confidence"] is None
+
+
+class FakeDinoByPosition:
+    """왼쪽 crop은 컵 특징 [1,0,0], 오른쪽은 캔 특징 [0,0,1] (crop 평균 밝기와 무관하게 호출 순서로 구분)."""
+
+    def run(self, xs):
+        return [np.array([[1.0, 0.0, 0.0]] if i == 0 else [[0.0, 0.0, 1.0]], np.float32) for i in range(len(xs))]
+
+
+def test_other_class_is_dropped(tmp_path):
+    head = dict(classes=["coke__low", "water__full", "other"], mean=[0.0] * 3, scale=[1.0] * 3,
+                W=[[4.0, 0.0, 0.0], [0.0, 4.0, 0.0], [0.0, 0.0, 4.0]], b=[0.0] * 3)
+    (tmp_path / "head.json").write_text(json.dumps(head))
+    cfg = {"version": 1, "boxes": {"mode": "rois", "rois": [[0.1, 0.2, 0.2, 0.5], [0.6, 0.2, 0.2, 0.5]]},
+           "dino": {"pte": "dino.pte", "runner": "py", "out_shape": [1, 3]}, "head": "head.json"}
+    (tmp_path / "bundle.json").write_text(json.dumps(cfg))
+    _, r = analyze(DinoVisionBackend(tmp_path, runners={"dino": FakeDinoByPosition()}))
+    objs = VisionResult.model_validate(r.json()).objects
+    assert [o.object_id for o in objs] == ["cup-0"] and objs[0].item == "coke"
+    assert objs[0].confidence > 0.9  # other 확률을 빼고 정규화
+
+
+def test_split_other():
+    from services.vision.labels import split_other
+
+    drop, p, cls = split_other([0.2, 0.2, 0.6], ["coke__low", "empty", "other"])
+    assert drop and cls == ["coke__low", "empty"] and p == pytest.approx([0.5, 0.5])
+    drop, p, cls = split_other([0.7, 0.3], ["coke__low", "empty"])
+    assert not drop and cls == ["coke__low", "empty"]
