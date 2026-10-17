@@ -57,3 +57,19 @@ main{padding:18px 28px 28px}
   .audio-panel{position:static}
   .capture-panel .scene>img{max-height:42vh}
 }
+
+/* Tighter chrome: the frame and the request deserve the height, not the headers. */
+header{padding:10px 24px 8px}
+header h1{font-size:clamp(20px,2.2vw,28px);letter-spacing:-1px}
+main{padding:12px 24px 22px}
+.workspace{gap:14px}
+.panel-heading{padding:10px 18px}
+.panel-heading h2{font-size:11px;letter-spacing:1.2px}
+.capture-panel .scene>img{max-height:70vh}
+.scene-footer{padding:14px 18px}
+.objects{margin:0 18px 14px}
+.audio-panel .message{font-size:17px;margin:2px 20px 12px}
+.stage{margin:2px 20px 12px}
+.dev-tools{margin-top:14px;padding:10px 16px}
+.dev-tools .sources{justify-content:flex-start;margin:10px 0}
+.footer{margin-top:14px}
