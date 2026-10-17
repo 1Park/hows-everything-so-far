@@ -24,8 +24,22 @@ class VideoSource:
 
     def start(self):
         if self.source:
-            self.thread = threading.Thread(target=self.capture, daemon=True)
+            self.thread = threading.Thread(target=self.supervise, daemon=True)
             self.thread.start()
+
+    def supervise(self):
+        """A USB camera can drop out briefly. Keep trying instead of failing for good.
+
+        The error stays visible while the source is down, so a camera that is really
+        gone still surfaces as 503 rather than quietly serving a stale frame.
+        """
+        delay = 0.5
+        while not self.closed.is_set():
+            self.capture()
+            if self.closed.is_set():
+                break
+            self.closed.wait(delay)
+            delay = min(delay * 2, 5)
 
     def capture(self):
         try:
@@ -54,6 +68,7 @@ class VideoSource:
                     if ok:
                         with self.lock:
                             self.latest, self.content_type = image.tobytes(), "image/jpeg"
+                            self.error = None  # a frame arrived; the source is back
                     if not live:
                         # Files have no queue to drain, so pace them to the target rate.
                         self.closed.wait(self.capture_interval)
@@ -71,8 +86,17 @@ class VideoSource:
             return self.latest, self.content_type
 
     async def frames(self):
+        """Once streaming has begun, a gap is a gap, not the end of the stream.
+
+        Raising here would close the response and the browser never retries an
+        <img> stream on its own, so a momentary hiccup used to need a reload.
+        """
         while not self.closed.is_set():
-            data, mime = self.frame()
+            try:
+                data, mime = self.frame()
+            except ApiError:
+                await asyncio.sleep(self.stream_interval)
+                continue
             yield (
                 b"--frame\r\nContent-Type: "
                 + mime.encode()

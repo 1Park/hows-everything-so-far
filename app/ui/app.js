@@ -86,7 +86,7 @@ async function checkConnection() {
     $('imageCredit').textContent = info.video.mode === 'fixture-image' ? 'AI-generated sample · illustrative fixture' : 'Captured by the server · single video owner';
     $('liveStatus').textContent = info.video.error || 'Server capture · camera is opened once · 5 fps preview';
     $('liveRibbon').hidden = info.video.mode === 'fixture-image';
-    if (info.video.mode !== 'fixture-image' && !$('liveFeed').getAttribute('src')) $('liveFeed').src='/api/video';
+    if (info.video.mode !== 'fixture-image') attachStream($('liveFeed'));
   } catch { $('sources').textContent = 'Cannot reach the Controller. Reconnecting…'; }
 }
 function render(next, authoritative = false) {
@@ -238,7 +238,10 @@ $('audioToggle').onclick = () => {
     audioContext.resume().then(()=>state?.phase === 'offered' ? announceOffer() : playPrompt('welcome')).catch(()=>showError('Tap Enable sound to activate audio.'));
   } else {playingSource?.stop(); playingSource=null;}
 };
-$('livePreview').parentElement.addEventListener('toggle', event => {if(event.target.open) $('livePreview').src='/api/video'; else $('livePreview').removeAttribute('src');});
+$('livePreview').parentElement.addEventListener('toggle', event => {
+  if (event.target.open) attachStream($('livePreview'));
+  else {$('livePreview').removeAttribute('src'); delete $('livePreview').dataset.streaming;}
+});
 async function transcribe(blob) {
   if (!canEdit() || pendingAction) return;
   const session = state.session_id, sequence = state.sequence, draft = draftVersion;
@@ -259,24 +262,36 @@ let listeningSince = null;
 
 function renderVoiceBanner(state) {
   const banner = $('voiceBanner');
-  if (state.phase !== 'listening' && state.phase !== 'transcribing') {
+  const wave = $('waveform');
+  const stage = {idle: $('stageIdle'), listening: $('stageListening'),
+                 transcribing: $('stageTranscribing'), result: $('stageResult')};
+  const current = state.phase === 'listening' ? 'listening'
+    : state.phase === 'transcribing' ? 'transcribing'
+    : state.transcript ? 'result' : 'idle';
+  for (const [name, node] of Object.entries(stage)) {
+    node.classList.toggle('active', name === current);
+    node.classList.toggle('live', name === current && name === 'listening');
+  }
+
+  if (current !== 'listening' && current !== 'transcribing') {
     listeningSince = null;
     clearInterval(renderVoiceBanner.timer);
     banner.hidden = true;
+    wave.hidden = true;
     return;
   }
   banner.hidden = false;
-  if (state.phase === 'transcribing') {
+  if (current === 'transcribing') {
     listeningSince = null;
     clearInterval(renderVoiceBanner.timer);
-    banner.classList.add('working');
+    wave.hidden = true;
     $('voiceTitle').textContent = 'Transcribing…';
     $('voiceDetail').textContent = 'The board is turning your words into text.';
     $('voiceCount').textContent = '';
     return;
   }
-  banner.classList.remove('working');
-  $('voiceTitle').textContent = 'Recording — please speak now';
+  wave.hidden = false;
+  $('voiceTitle').textContent = 'Listening — please speak now';
   $('voiceDetail').textContent = 'The board microphone is open. It stops on its own.';
   const total = state.audio_seconds || 6;
   listeningSince ||= Date.now();

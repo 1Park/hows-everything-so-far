@@ -76,3 +76,54 @@ def test_empty_source_is_the_explicit_fixture():
     data, mime = source.frame()
     assert data.startswith(b"\xff\xd8") and mime == "image/jpeg"
     source.close()
+
+
+def test_stream_survives_a_gap_instead_of_ending(tmp_path):
+    # A browser never retries a dead <img> stream, so a momentary gap must not
+    # close the response.
+    import asyncio
+
+    source = VideoSource(str(tmp_path / "unused.avi"))
+    source.latest, source.content_type = b"\xff\xd8frame", "image/jpeg"
+    source.stream_interval = 0.01
+
+    async def collect():
+        chunks = []
+        stream = source.frames()
+        chunks.append(await anext(stream))
+        source.error = "temporarily unavailable"  # the gap
+        gapped = asyncio.ensure_future(anext(stream))
+        await asyncio.sleep(0.05)
+        assert not gapped.done(), "the stream ended instead of waiting out the gap"
+        source.error = None
+        chunks.append(await gapped)
+        await stream.aclose()
+        return chunks
+
+    try:
+        chunks = asyncio.run(collect())
+    finally:
+        source.close()
+    assert all(b"\xff\xd8frame" in chunk for chunk in chunks)
+
+
+def test_capture_is_retried_after_the_camera_goes_away(tmp_path):
+    # A USB drop used to be permanent: the capture thread exited and every later
+    # frame request failed until the app restarted.
+    source = VideoSource(str(tmp_path / "missing.avi"))
+    attempts = []
+    original = source.capture
+
+    def counted():
+        attempts.append(1)
+        original()
+
+    source.capture = counted
+    source.start()
+    for _ in range(200):
+        if len(attempts) >= 2:
+            break
+        time.sleep(0.02)
+    source.close()
+    assert len(attempts) >= 2, "the capture loop gave up after the first failure"
+    assert source.error, "a source that is still down must keep reporting the error"
