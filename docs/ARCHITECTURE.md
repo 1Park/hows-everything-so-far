@@ -141,7 +141,15 @@ Controller → HTTP → FastAPI 모델 서버
 - 카메라와 MCU를 중복 실행 프로세스가 점유하지 않도록 한다.
 - 보드 DINO·Qwen·Bridge 검증은 시작부터 진행한다. fixture → Mac Qwen → 확인 UI → 실제 LED로 전체 흐름을 먼저 연결한 뒤 실제 Vision·보드 Qwen으로 교체한다.
 
-## 환경 설정
+## 코드 위치와 모델 개발 환경
+
+전체 폴더 구조와 파일 배치 기준은 [루트 README](../README.md#레포-구조와-코드-위치)에 기록한다. Controller·시연 UI·HardwareIO는 `app/`, 독립 모델 API 서버는 `services/`, 공통 schema·설정은 `common/`, MCU sketch는 `firmware/`에 둔다.
+
+모델 학습·오프라인 평가·양자화·QNN용 `.pte` export는 `ml/`에서 관리한다. 주최 측이 요구하는 모델 개발용 Dockerfile과 ML 의존성도 `ml/`에 분리하며, 실제 이미지·SDK·호스트 아키텍처 확인 후 작성한다. 학습·export 환경과 보드 추론 환경의 지원 조건은 별도로 확인한다.
+
+**앱 배포는 Docker 없이 보드 Ubuntu에서 직접 실행한다.** 모델 개발용 Docker를 사용해도 앱 배포를 컨테이너로 변경하지 않는다. 서비스는 학습 코드 대신 `models/`의 배포 bundle을 읽는다. 데이터는 `data/`, 작은 공유 fixture는 `fixtures/`에 둔다. `models/`와 `data/`는 안내 README를 제외하고 Git에서 제외한다.
+
+## 환경 설정 파일
 
 루트 [`.env.board`](../.env.board)는 비밀이 없는 공용 보드 설정으로 커밋한다. [`.env.example`](../.env.example)을 `.env`로 복사해 개인 개발 설정을 만든다. `.env`와 개인 override는 커밋하지 않는다.
 

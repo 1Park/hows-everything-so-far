@@ -27,7 +27,10 @@ logs/
 *.log
 tmp/
 recordings/
-models/
+/models/*
+!/models/README.md
+/data/*
+!/data/README.md
 *.pte
 *.safetensors
 *.onnx
