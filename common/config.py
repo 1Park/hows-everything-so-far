@@ -37,17 +37,6 @@ class Settings(BaseModel):
     qwen_model_backend: Literal["mlx", "fixture", "executorch"] = "mlx"
     qwen_upstream_url: HttpUrl = "http://won-macmini:8000"
     qwen_model: str = "mlx-community/Qwen3-0.6B-4bit"
-    # Board LLM via qnn_llama_runner (QWEN_MODEL_BACKEND=executorch). Relative paths resolve
-    # against the repository root. Empty values keep the backend explicitly not ready.
-    qwen_runner_bin: str = ""
-    qwen_model_path: str = ""
-    qwen_tokenizer_path: str = ""
-    qwen_decoder_version: str = "gemma4"  # runner --decoder_model_version (gemma3, qwen3, ...)
-    qwen_seq_len: int = Field(1024, ge=64, le=8192)  # prompt + output token budget
-    qwen_eval_mode: str = ""  # runner --eval_mode; empty uses the runner default
-    # Prepended to the runner's LD_LIBRARY_PATH (libqnn_executorch_backend.so, libQnnHtp.so).
-    qwen_runner_library_path: str = ""
-    qwen_adsp_library_path: str = ""  # runner ADSP_LIBRARY_PATH (libQnnHtpV*Skel.so)
     inference_timeout: float = Field(20, gt=0, le=180)
     queue_limit: int = Field(4, ge=1, le=32)
     max_image_bytes: int = Field(5_000_000, ge=1024, le=20_000_000)

@@ -41,7 +41,7 @@ Resolve relative paths against the repository root; allow explicit absolute path
 ## Implementation boundaries
 
 1. Read the owning `services/vision`, `services/stt`, or `services/qwen` README and [public contracts](../docs/CONTRACTS.md) first. Preserve the current HTTP API and Vision/STT no-argument `package:create_backend` factory contract.
-2. Put model loading and runtime-specific work behind that service's backend; connect board Qwen at the existing `ExecuTorchBackend` boundary. The Controller uses API URLs and must not load model files.
+2. Put model loading and runtime-specific work behind that service's backend; the board LLM lives in `services/qwen/board_llm.py:BoardLLMBackend`. The Controller uses API URLs and must not load model files.
 3. Vision developers own detection, crop, DINOv2, preprocessing, and output conversion. STT developers own decoding, audio preprocessing, and recognition. Other agents must not guess or replace those implementations. Keep DINOv2 and Qwen3-0.6B.
 4. Load/reuse the model where the runtime supports it, keep blocking inference off the event loop, and retain the existing timeout/readiness/error contract. Missing files, unsupported runtimes, or failed initialization must produce an explicit error/not-ready state, never an automatic fixture or remote fallback. Fixtures remain explicit; source labels must stay truthful.
 5. Keep camera ownership in Controller VideoSource and microphone/speaker ownership in the tablet browser. Model backends receive the transported image/audio; do not open those devices again.

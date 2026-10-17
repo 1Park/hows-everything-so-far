@@ -54,7 +54,7 @@ CAMERA_SOURCE에 샘플 AVI 파일을 지정한 실제 서버에서도 전체 fi
 | --- | --- |
 | Vision 모델 | DINOv2 external backend 병합(PR #2, `services.vision.backend:create_backend`): YOLO11n/고정 ROI → crop → DINOv2 → head. Mac XNNPACK bundle로 실제 HTTP 검증. 보드 QNN bundle·실사 데이터(coffee·잔량 단계)·정확도/지연은 현장 확인 — [vision_evaluation](vision_evaluation/README.md) |
 | STT 모델 | 팀원 소유. 원본 오디오 전달은 확인. WebM/Opus·Safari MP4/AAC 지원/실제 영어 인식 확인 필요 |
-| ExecuTorch/QNN | 보드/runner/bundle/SDK 경로 미제공. ExecuTorchBackend는 명시 not-ready503. 경로·상주 실행·토크나이저·취소/성능/NPU delegation은 현장 검증 |
+| ExecuTorch/QNN | 보드/runner/bundle/SDK 경로 미제공. (2026-10-17 갱신) 보드 LLM은 Gemma로 `services/qwen/board_llm.py` 연결, 상주 실행은 아님 — [BOARD_RUNBOOK](BOARD_RUNBOOK.md). 경로·상주 실행·토크나이저·취소/성능/NPU delegation은 현장 검증 |
 | Bridge/MCU | 공식 RPC API 기반 adapter·nonblocking/cancel/watchdog 초안. 실제 board core compile, LED polarity·package 버전·router·timeout/단절/센서 연결 미검증 |
 | 물리 카메라 | 영상 파일 capture·loop·MJPEG 검증. 실제 USB 권한·index·연결 끊김 현장 확인 |
 | 물리 태블릿 | Chromium 실제 UI·녹음 transport·WebAudio·태블릿 너비 검증. iPad/Android 권한·실제 mic/speaker·HTTPS tailnet 설정은 현장 장치 필요 |
