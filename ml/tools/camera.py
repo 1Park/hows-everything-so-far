@@ -159,6 +159,12 @@ def setup_rois(args):
     print(f"saved {args.out} ({len(rois)} ROIs), preview → models/experiments/vision/rois_preview.jpg")
 
 
+def next_index(d):
+    """다음 저장 번호 = 숫자 이름 중 최댓값 + 1. 개수로 정하면 사진을 다른 폴더로 옮긴 뒤 기존 파일을 덮어쓴다."""
+    nums = [int(p.stem) for p in d.glob("*.jpg") if p.stem.isdigit()]
+    return max(nums) + 1 if nums else 0
+
+
 def collect(args):
     classes = [f"{d}__{lv}" for d in args.drinks for lv in LEVELS] + ["empty"]
     if len(classes) > len(KEYS):
@@ -190,7 +196,7 @@ def collect(args):
         if k == ord(" ") and time.time() - last_save > 0.4:  # 스페이스 누르고 있을 때 키 반복으로 연속 저장 방지
             last_save = time.time()
             d = out / classes[cur]
-            n = len(list(d.glob("*.jpg")))
+            n = next_index(d)
             cv2.imwrite(str(d / f"{n:04d}.jpg"), crop_roi(frame))
             print(f"saved {classes[cur]}/{n:04d}.jpg")
     cap.release()
