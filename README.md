@@ -1,87 +1,84 @@
-# How's Everything So Far — Refill Assist
+# How’s Everything So Far — Refill Assist
 
-On-device drink monitoring and refill assistance, with customer confirmation.
+여러 컵·접시의 종류/잔량을 관찰하고, 고객 요청을 해석한 뒤 **명시적 확인을 받아 mock 적재·주방 복귀**를 시연하는 4인 해커톤 프로젝트다. 목표 보드는 Arduino VENTUNO Q 한 대, 비전 DINOv2, 요청 해석 Qwen3-0.6B, 주요 음료 water/coke/coffee다. UI·마이크·스피커는 태블릿 브라우저가 담당한다.
 
-여러 컵·접시를 검출하고 객체별 종류·잔량을 판단한 뒤, 리필 요청을 해석하고 고객 확인을 받아 LED·mock 주방 복귀로 연결하는 4인 해커톤 프로젝트다. 메인 데모는 water / coke / coffee이며, DINOv2와 Qwen3-0.6B를 Arduino VENTUNO Q에서 ExecuTorch로 실행하는 것이 목표다.
+현재 보드 없이 실행 가능하다. 기본은 **Vision/STT fixture + 실제 Mac Qwen HTTP + mock HardwareIO**. Vision/STT 모델 자체는 다른 팀원 소유이며 이 레포 구현은 서비스 계층이다. 보드 ExecuTorch/카메라/Bridge 실기 검증은 별도다. fixture 결과를 실제 인식으로 표시하지 않는다.
 
-## 문서
+## 바로 실행
 
-- [그림으로 보는 아키텍처](docs/architecture.html) — HTML을 브라우저에서 열어 컵 이미지·모델 호출·고객 확인 흐름을 단계별로 탐색
-- [아키텍처 및 개발 방식](docs/ARCHITECTURE.md) — 현재 합의한 구조·통신·실행 위치·분업
-- [기존 Design Doc](<docs/Design Doc.md>) — 과거 기획 초안; 최신 결정은 아키텍처 문서 우선
-- [Qwen 평가 자료](docs/qwen_evaluation/README.md)
-- [보드 / ExecuTorch 가이드](qc-executorch-guide/IoT/README.md)
+Python **3.11–3.13** (로컬 검증 3.13), Tailscale로 Mac mini에 연결한다. 레포 루트에서:
+
+```powershell
+python -m venv .venv
+.venv/Scripts/python.exe -m pip install -c requirements.lock -e '.[dev]'
+Copy-Item .env.example .env
+.venv/Scripts/python.exe scripts/dev.py
+```
+
+macOS/Linux:
+
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -c requirements.lock -e '.[dev]'
+cp .env.example .env
+python scripts/dev.py
+```
+
+`http://127.0.0.1:8080` → Start demo → Record request(또는 텍스트) → 전사 검토·Send → 카드 → Confirm refill. 종료 Ctrl+C. 다른 터미널에서 `python scripts/dev.py --stop`도 가능하다. 프로세스 환경변수 > 선택 dotenv(`--env-file`/REFILL_ENV_FILE, 기본 .env) > 기본값. 비밀은 개인 환경에만 저장한다.
+
+| 모드 | 명령 | 이 기기에서 시작하는 프로세스 |
+| --- | --- | --- |
+| 기본 direct | `python scripts/dev.py` | Controller/UI만. Mac API 직접 호출, Vision/STT fixture |
+| 완전 offline fixture | `python scripts/dev.py --mode fixture` | Controller/UI만. 모든 모델 fixture, Hardware mock |
+| 우리 Qwen proxy | `python scripts/dev.py --mode proxy` | Controller + Qwen API; Qwen API→실제 Mac |
+| 서버 간 통합 | `python scripts/dev.py --mode integration` | Controller + Qwen + Vision + STT; Vision/STT 기본 fixture backend |
+| 보드 준비 | `bash scripts/start-board.sh` | .env.board 기반4개 서버. ExecuTorch 미연결이면 /ready 503이 정상 |
+
+Mac endpoint `http://won-macmini:8000/v1/chat/completions`, 모델 `mlx-community/Qwen3-0.6B-4bit`. 서버 설정/모델을 변경하지 않는다. proxy와 원격 Mac은 서로 다른 기기의8000포트다. 모델 장애 시 fixture로 자동 대체하지 않는다. 평가는 temperature=0.
+
+태블릿에서는 HTTPS가 필요하다. [태블릿 접속·마이크·스피커 안내](docs/TABLET_DEMO.md)에 따라 Tailscale Serve로 연결한다. **음성 입출력 장치는 태블릿 브라우저 소유**이고 서버는 마이크/스피커를 열지 않는다. 고정 안내 WAV를 재생하며 live TTS는 없다.
+
+## 실행·검증
+
+```sh
+python -m pytest -q
+python -m ruff check app common services scripts tests
+python scripts/dev.py --mode integration
+# 별도 터미널
+python scripts/smoke.py
+python scripts/evaluate_qwen.py --proxy
+```
+
+실제 Chromium 검증(선택 Node.js): `npm ci`, `npx playwright install chromium`, 실행 중 앱에 `npm run test:browser`. 시스템 Chrome을 쓰면 CHROME_PATH를 지정한다. 테스트 가상 마이크는 오디오 전달 검증이며 실제 STT 정확도 증거가 아니다. 결과·스크린샷은 tmp/browser-qa, 서비스별 로그는 logs. 평가 결과는 docs/qwen_evaluation/drinks-타임스탬프.json에 새 파일로 저장한다.
+
+선택 영상 재생·USB 카메라: `python -m pip install -e '.[camera]'`, CAMERA_SOURCE에 파일 절대경로 또는 USB index 지정. 기본은 AI-generated sample 이미지다. Controller가 입력을 한 번만 열고 MJPEG와 Vision 분석으로 분기한다. 업로드 이미지는 원본 그대로 전달하며 모델 전처리를 구현하지 않는다.
 
 ## 레포 구조와 코드 위치
 
-하나의 레포에서 앱·모델 서버·모델 개발 도구를 관리한다. **프로덕션 앱은 보드 Ubuntu에서 직접 실행하고, 모델 학습·QNN용 export 환경은 `ml/`로 분리**한다. 카메라·NPU·Bridge 접근을 위해 앱을 컨테이너에 넣지는 않는다. 모델 개발용 Docker가 앱 배포 방식에 영향을 주지는 않는다.
-
-아래 폴더는 README로 역할을 정의한 초기 구조다. `Dockerfile`, 의존성 파일, Python 모듈, 실행 스크립트는 실제 환경을 확인하며 구현할 예정이고 아직 없다.
-
-```text
-app/                   Controller 서버·상태 머신·정책·클라이언트
-  ui/                  실제 시연 웹 UI·브라우저 오디오
-  hardware/            Controller 내부 Mock / Bridge HardwareIO
-services/              보드에서 독립 실행하는 FastAPI 모델 서버
-  vision/              카메라·영상·검출·crop·DINO 추론·후처리
-  qwen/                Qwen 추론 서버·ExecuTorch 실행 adapter
-common/                공통 schema·설정 로더·가벼운 공유 코드
-firmware/              MCU용 Arduino sketch·LED·버튼·센서
-ml/                    학습·평가·양자화·.pte export 도구
-  configs/             모델·학습·전처리·export 설정
-  training/            학습·fine-tuning 코드
-  evaluation/          이미지 모델의 오프라인 평가 코드
-  export/              보드용 변환·검증·배포 bundle 생성
-models/                로컬 가중치·.pte·tokenizer·배포 bundle (Git 제외)
-data/                  로컬 원본·라벨·학습/검증 데이터 (Git 제외)
-fixtures/              팀이 공유하는 작은 샘플·모델 응답 JSON
-scripts/               로컬 실행·보드 시작/종료·진단 도구
-docs/                  아키텍처·설명 HTML·평가 기록
-qc-executorch-guide/   참조용 대회 가이드·예제
-```
-
-| 무엇을 만들 때 | 넣을 위치 |
+| 위치 | 책임 |
 | --- | --- |
-| 리필 정책·요청 검증·확인/취소·상태 머신 | `app/` |
-| Vision/Qwen HTTP 호출·영어 프롬프트·요청 파싱 | `app/`의 client / language 모듈 |
-| 카메라 영상·bbox·요청 카드·확인 버튼·소리 | 브라우저는 `app/ui/`, 영상 획득·송출은 `services/vision/` |
-| 실제 DINO/Qwen 모델 로딩·runner 호출·추론 | 해당 `services/vision/` 또는 `services/qwen/` |
-| Python에서 LED·센서 mock / Bridge 호출 | `app/hardware/` |
-| MCU에서 실행하는 GPIO·시퀀스 | `firmware/` |
-| API 양쪽이 공유하는 입력·출력 타입 | `common/` |
-| 학습용 Dockerfile·별도 ML 의존성 | `ml/` — 주최 측 지원 환경 확인 후 작성 |
-| 학습·이미지 평가·양자화·export 코드 | `ml/`의 해당 하위 폴더 |
-| 원본 사진·학습 데이터·가중치·변환 산출물 | `data/`, `models/` — Git 제외, 경로·획득 방법만 문서화 |
-| 개발용 작은 재현 샘플 | `fixtures/` — fixture임을 명시 |
-| 앱·보드 실행/종료·설치 점검 | `scripts/` |
-| 과거 Qwen 발화 평가 원본·재현 안내 | `docs/qwen_evaluation/` — 기존 아카이브 보존 |
+| app/ | Controller 상태·정책·클라이언트·영어 프롬프트·검증·미디어 transport |
+| app/ui/ | 실제 태블릿/데스크톱 UI·브라우저 녹음/재생·고정 안내 음성 |
+| app/hardware/ | 상태 mock/simulator와 미검증 Bridge adapter |
+| services/qwen/ | 독립 FastAPI 생성 서버·MLX/fixture/ExecuTorch 경계 |
+| services/vision/, services/stt/ | API·backend interface·fixture·외부 담당자 연결, 모델 코드는 제외 |
+| common/ | 공통 schema·설정·로그·오류·제한 queue·transport 검증 |
+| firmware/ | MCU mock 시퀀스 초안, 별도 빌드/업로드·미검증 |
+| ml/configs/, training/, evaluation/, export/ | 학습·평가·양자화·.pte export와 별도 ML Docker 관심사 |
+| models/, data/ | 로컬 모델/대량 데이터, README 외 Git 제외 |
+| fixtures/ | 명시적 fixture JSON·음료 텍스트 평가셋 |
+| scripts/ | 로컬 supervisor·보드 시작/종료·진단·runner smoke·평가·검증 |
+| tests/ | 정책/경쟁/계약/API 테스트 |
+| docs/ | 아키텍처·API 계약·태블릿/보드 안내·검증 기록 |
+| qc-executorch-guide/ | 대회 제공 참조 가이드·artifact inventory |
 
-학습·평가·export는 `ml/`에서 수행하고, 생성한 bundle을 `models/`에 둔다. 보드 서비스는 bundle만 로드하며 학습 코드·학습용 Docker·전체 데이터셋에 의존하지 않는다. 실제 Vision/Qwen 서버와 Controller의 자세한 경계는 각 폴더 README와 [아키텍처](docs/ARCHITECTURE.md)를 따른다.
+앱은 **ROS·배포 Docker 없이 Ubuntu + venv + FastAPI/Uvicorn**. 학습/export Docker는 ml/에 분리한다. 모델 bundle/라이브러리는 별도 설치하고 새 표준 버전으로 임의 교체하지 않는다.
 
-## 초기 개발 설정
+## 문서
 
-개인 개발은 `.env.example`을 `.env`로 복사한다.
-
-```powershell
-Copy-Item .env.example .env
-```
-
-macOS / Linux:
-
-```sh
-cp .env.example .env
-```
-
-기본 개발 구성은 로컬 Controller·UI, Vision fixture, 공용 Mac mini Qwen (`http://won-macmini:8000`), mock 하드웨어다. 공용 서버 접속에는 Tailscale 연결과 이름 해석이 필요하다.
-
-UI·Controller 담당자는 fixture로 개발하고, Vision 담당자는 실제 검출·crop·DINO 파이프라인을 개발한다. Vision API가 준비되면 담당자 기기 또는 Mac mini의 공용 API로 연결할 수 있다. 서버 코드 작성은 로컬에서 진행하고, 실제 ExecuTorch·QNN·카메라·Bridge 연결은 보드에서 초반부터 검증한다.
-
-보드는 커밋된 [`.env.board`](.env.board)를 사용한다. Controller/UI는 8080, Qwen은 8000, Vision은 8001을 기본 포트로 예약한다. 모델 API는 보드 내부 localhost로 연결한다. 개인 `.env`와 비밀 정보는 커밋하지 않는다.
-
-## 서버·배포 방향
-
-서버는 **FastAPI + Uvicorn**, 모델 실행은 **ExecuTorch**로 분리한다. 보드는 **Docker 없이 Ubuntu에서 직접 실행**하며 Python 가상환경을 사용한다. 기존 Mac mini MLX 서버는 그대로 호출한다.
-
-로컬은 `python scripts/dev.py` 하나로 필요한 서버만 시작하고 함께 종료하는 도구를 만들 예정이다. 기본 로컬 실행은 Controller/UI만 필요하며 Mac Qwen 서버는 다시 띄우지 않는다. 보드는 `scripts/start-board.sh`·`scripts/stop-board.sh`로 Controller·Vision·Qwen을 관리할 계획이다. **이 실행 도구들은 아직 구현되지 않았다.** 세부 실행·모델 adapter 계획은 [아키텍처 문서](docs/ARCHITECTURE.md)를 참고한다.
-
-현재 레포는 문서·평가 자료·환경 설정을 준비한 상태다. 앱, 환경 파일 로더, 서버 시작 명령, 의존성 manifest는 아직 구현되지 않았으며 `.env` 파일만으로 서버가 실행되지는 않는다. 구현 시 프로세스 환경변수를 선택한 환경 파일보다 우선하도록 한다.
+- [아키텍처](docs/ARCHITECTURE.md), [그림으로 보는 설명](docs/architecture.html) (실제 UI는 앱의 `/`)
+- [API·담당자 연결 계약](docs/CONTRACTS.md), [태블릿 데모](docs/TABLET_DEMO.md)
+- [보드 통합 준비](docs/BOARD_RUNBOOK.md), [검증 결과·남은 작업](docs/VALIDATION.md)
+- [요구사항 체크리스트](docs/IMPLEMENTATION_CHECKLIST.md), [Qwen 평가](docs/qwen_evaluation/README.md)
+- [과거 Design Doc](<docs/Design Doc.md>) (최신 결정은 아키텍처 우선)

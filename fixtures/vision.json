@@ -1,0 +1,9 @@
+{
+  "scene_id": "fixture-scene",
+  "source": "fixture",
+  "objects": [
+    {"object_id":"cup-water","bbox":{"x1":0.09,"y1":0.23,"x2":0.297,"y2":0.705},"item":"water","fill_ratio":0.15,"confidence":0.95},
+    {"object_id":"cup-coke","bbox":{"x1":0.41,"y1":0.23,"x2":0.608,"y2":0.705},"item":"coke","fill_ratio":0.75,"confidence":0.94},
+    {"object_id":"cup-coffee","bbox":{"x1":0.716,"y1":0.23,"x2":0.924,"y2":0.705},"item":"coffee","fill_ratio":0.5,"confidence":0.93}
+  ]
+}

@@ -1,12 +1,7 @@
-# Qwen service
+# Qwen 생성 서버
 
-기본 bind: `127.0.0.1:8000`. 보드의 Qwen3-0.6B `.pte`·tokenizer와 ExecuTorch runtime을 연결하는 API 서버를 둔다. 아직 구현 전이다.
+`server.py:create_app`, 기본127.0.0.1:8000. POST /v1/chat/completions, GET /v1/models, /health, /ready. model/messages/생성 옵션 검증, admitted4/동시1 queue, queue+실행 timeout20초, 요청 ID/log 제공.
 
-- 입력 메시지 검증, tokenizer·chat template 적용, 생성 옵션 처리
-- 모델 로딩·추론 backend와 제공 runner adapter
-- 생성 결과·오류 반환, health·소요 시간 기록
-- 로컬 API 개발용 mock model backend
+QWEN_MODEL_BACKEND=mlx는 QWEN_UPSTREAM_URL(기본 Mac)로 HTTP 생성, fixture는 결정적 개발용, executorch는 실제 board adapter 미연결을 명시적으로503 반환. 자동 fixture fallback 없음. .env.board의 executorch readiness503은 보드 전 상태를 정확히 나타낸다.
 
-리필 정책·영어 제품 프롬프트·메뉴 검증·고객 확인은 Controller의 `app/`에 둔다. 이 서버는 물리 동작을 승인하지 않는다. API 계약은 Mac의 `/v1/chat/completions` 호출과 호환되도록 맞추거나 Controller client adapter에서 차이를 흡수한다. 최종 구현은 보드 runner를 확인한 뒤 결정한다.
-
-공용 Mac mini의 기존 MLX 서버는 개발 중 그대로 호출한다. 이 폴더의 서버를 Mac 서버 대신 반드시 띄울 필요는 없다. HTTP 서버가 상주해도 일회성 runner를 요청마다 실행하면 모델 재로딩이 생길 수 있으므로 실제 상주 실행 여부를 확인한다.
+Controller의 QWEN_BACKEND=fixture/http는 서버 내부 backend 설정과 별개다. direct 모드는 실제 Mac 직접 호출, proxy/integration은 우리 서버→Mac. 제품 프롬프트/JSON 검증/메뉴/승인은 app/language.py와 Controller. [계약](../../docs/CONTRACTS.md).

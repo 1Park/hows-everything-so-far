@@ -1,5 +1,15 @@
 # 평가 자료 인덱스
 
+## 현재 음료 앱 평가
+
+실행: 로컬 integration 모드에서 `python scripts/evaluate_qwen.py --proxy`. temperature=0, 원본/raw·제품 프롬프트·모델 ID·dataset hash를 timestamp **신규 JSON**으로 저장한다. 기존 Markdown 아카이브는 그대로 보존한다.
+
+- [최종 음료 평가17/20](drinks-20261017T061614204547Z.json): Controller와 같은 프롬프트, 우리 proxy→실제 Mac MLX, HTTP 중앙값0.679초. 개발 평가셋이며 일반화/보드 성능 주장이 아니다.
+- [첫 실제 평가15/20](drinks-20261017T060722867674Z.json), [초기 transport 계약 실패](drinks-20261017T060535441028Z.json)도 보존.
+- 상세 실패·범위는 [검증 보고서](../VALIDATION.md).
+
+아래 내용은 과거 자료를 Markdown으로 이전했을 당시의 아카이브 설명이다.
+
 이번 이전은 사용자 요청에 따라 **새로 추가하는 자료를 전부 Markdown**으로 저장했다. 기존 대회 가이드는 건드리지 않았다. `.py.md`와 `.json.md`는 원본을 단일 4-backtick 코드 블록에 보존한 아카이브이며, 확장자만 바꾼 실행 파일이 아니다.
 
 ## 읽는 순서

@@ -1,0 +1,6 @@
+{
+  "name": "refill-assist-browser-checks",
+  "private": true,
+  "scripts": { "test:browser": "node scripts/browser_check.cjs", "test:docs": "node scripts/docs_check.cjs" },
+  "devDependencies": { "playwright": "1.64.1" }
+}

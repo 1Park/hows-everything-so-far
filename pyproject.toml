@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "refill-assist"
+version = "0.1.0"
+description = "Customer-confirmed refill demo and model service contracts"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "fastapi==0.143.3", "uvicorn==0.54.0", "httpx==0.28.1",
+  "pydantic==2.14.1", "python-dotenv==1.1.0", "python-multipart==0.0.32",
+  "starlette==1.8.0",
+  "Pillow==13.0.0", "websockets==15.0.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==8.3.5", "pytest-asyncio==0.26.0", "ruff==0.11.9"]
+camera = ["opencv-python-headless==4.11.0.86"]
+
+[tool.setuptools.packages.find]
+include = ["app*", "common*", "services*"]
+
+[tool.setuptools.package-data]
+app = ["ui/*", "ui/audio/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 100

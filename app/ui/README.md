@@ -1,12 +1,5 @@
-# Demo UI
+# 실제 Demo UI
 
-실제 Controller에 연결되는 시연 웹 화면의 HTML·CSS·JavaScript와 고정 안내 음성 파일을 둔다. UI framework는 아직 정하지 않았다. Controller가 UI를 제공하는 구성을 기본으로 한다.
+Controller가 `/`에서 제공하는 프레임워크 없는 HTML/CSS/JS. 설명용 docs/architecture.html과 별개다. 태블릿 우선 **브라우저 마이크/스피커**: MediaRecorder→STT 전송→전사 검토→Send, Web Audio 고정 WAV. 서버 오디오 장치/live TTS 없음.
 
-- 라이브 영상 위 bbox·컵 ID·종류·잔량 표시
-- 분석 당시 이미지가 고정된 요청 카드
-- 영어 안내·고객 텍스트 입력·Confirm / Cancel
-- WebSocket 상태 수신, 연결 상태, 브라우저 오디오 재생
-
-영상은 Vision 서비스의 단일 카메라 소유 모듈이 제공한다. UI는 카메라를 별도로 열지 않는다. STT 위치·연결 방식은 미정이다.
-
-`docs/architecture.html`은 오프라인 설명 문서이며 이 실제 시연 UI와 별개다. 예시 이미지·JSON을 실제 측정 결과로 표시하지 않는다.
+분석 이미지·bbox·컵ID/잔량·frozen target card·Confirm/Cancel·WS 재연결·fixture/source 표시. 카메라는 Controller만 열고 UI는 영상만 받는다. [HTTPS 접속](../../docs/TABLET_DEMO.md). audio/*.wav는 개발 시 Windows SAPI로 생성한 고정 영어 안내이며 입력 기반 TTS 생성은 하지 않는다. 텍스트/파일 입력도 제공한다.

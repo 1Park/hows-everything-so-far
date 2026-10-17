@@ -1,11 +1,7 @@
-# MCU firmware
+# MCU 준비 — 실기 미검증
 
-VENTUNO Q의 STM32H5F5에서 실행할 Arduino sketch를 둔다. Python 앱·모델 서버와 별도로 빌드·업로드한다. sketch와 빌드 설정은 보드 환경을 확인하며 추가한다.
+`refill_mock/refill_mock.ino`: Arduino_RouterBridge 기반 LED mock 시퀀스 초안. 별도 Arduino toolchain/core로 빌드·업로드한다. 실제 모터/그리퍼 없음. 제공 board core 설치 전 컴파일/실기 성공을 주장하지 않는다.
 
-- Arduino Bridge 메서드 등록과 GPIO handler
-- LED 상태·버튼·확보한 센서 입력
-- nonblocking·취소 가능한 mock 적재/복귀 시퀀스
+provide_safe, 짧은 handler, nested RPC/logging 금지, millis 기반 nonblocking 상태, command_id 중복 거부, 취소, polling 단절5초 watchdog. [Python RPC 계약](../app/hardware/README.md). LED_BUILTIN active-low는 가이드 예시를 따른 초안이며 보드 pin/polarity 확인 필요. 버튼/occupied는 확보 센서 미정이므로 false인 simulator 값이다. 실제 pin을 임의 지정하지 않았다.
 
-GPIO handler는 `provide_safe`를 사용하고 짧게 처리한다. handler 내부 nested RPC·RPC logging을 피한다. Python 호출부는 `app/hardware/`와 메서드 계약을 맞춘다. 카메라·DINO·Qwen은 MCU에서 실행하지 않는다.
-
-설치·예제는 [IoT 가이드](../qc-executorch-guide/IoT/README.md)를 참고한다. 호스트 `arduino-router`와 MCU 펌웨어는 앱 시작·종료 도구와 별도로 관리한다.
+호스트 arduino-router는 별도 서비스다. 설치/제약은 [대회 IoT 가이드](../qc-executorch-guide/IoT/README.md).
