@@ -1,0 +1,20 @@
+[Unit]
+Description=Refill Assist Controller UI and STT API
+Wants=refill-vision.service
+After=refill-vision.service
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+WorkingDirectory=%h/project/hows-everything-so-far
+Environment=PYTHONUNBUFFERED=1
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/project/hows-everything-so-far/.venv/bin/python scripts/dev.py --mode direct --with-stt --env-file .env.board
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=35
+KillMode=control-group
+
+[Install]
+WantedBy=default.target

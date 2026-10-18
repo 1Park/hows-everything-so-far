@@ -1,0 +1,19 @@
+[Unit]
+Description=Refill Assist resident Vision API
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+WorkingDirectory=%h/project/hows-everything-so-far
+Environment=REFILL_ENV_FILE=%h/project/hows-everything-so-far/.env.board
+# Required machine-local model/SDK paths, kept outside Git.
+EnvironmentFile=%h/.config/refill-assist/vision.env
+ExecStart=%h/project/hows-everything-so-far/.venv/bin/python -m uvicorn services.vision.server:create_app --factory --host 127.0.0.1 --port 8001
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=25
+KillMode=control-group
+
+[Install]
+WantedBy=default.target
