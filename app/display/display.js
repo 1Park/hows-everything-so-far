@@ -48,8 +48,13 @@ function paintRuntime(ready) {
         ready.dependencies?.vision?.source === 'external' ? 'npu' : '');
     add('Speech', ready.dependencies?.stt?.source === 'external' ? 'whisper · CPU' : 'fixture',
         ready.dependencies?.stt?.source === 'external' ? 'cpu' : '');
-    add('Language', ready.dependencies?.qwen?.model || '—',
-        ready.dependencies?.qwen?.ready ? 'npu' : '');
+    // Named by where it actually runs: 'executorch' is the board's NPU, anything
+    // else is a host elsewhere and must not be shown as NPU.
+    const llm = ready.llm || {};
+    const onBoard = llm.source === 'executorch';
+    add('Language', `${llm.model || ready.dependencies?.qwen?.model || '—'}`
+        + (onBoard ? ' · NPU' : llm.source ? ` · ${llm.source}` : ''),
+        onBoard ? 'npu' : '');
     if (ready.tts?.ready) add('Voice', `Piper · ${(ready.tts.decoder || '').toUpperCase()}`, 'npu');
     add('Board', ready.hardware === 'bridge' ? 'MCU over Bridge' : 'mock', '');
   }
