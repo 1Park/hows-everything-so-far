@@ -230,3 +230,30 @@ def test_stt_takes_survive_a_reload(tmp_path, monkeypatch):
         assert len(client.request("DELETE", "/api/stt/results?index=0").json()["takes"]) == 1
         assert client.request("DELETE", "/api/stt/results").json() == {"takes": []}
     assert (tmp_path / "takes.json").exists()  # the repo copy was never touched
+
+
+async def test_voice_retries_stop_after_two_attempts():
+    # The tablet records again the moment the phase reaches not_understood, so a
+    # microphone that hears nothing would loop until the request expired.
+    from app.clients import ModelClients
+    from app.controller import Controller
+    from common.config import load_settings
+
+    settings = load_settings(None)
+    controller = Controller(settings, ModelClients(settings))
+    controller.token = 7
+
+    for attempt in (1, 2):
+        await controller.retry_voice(7, "say again")
+        assert controller.phase == "not_understood", f"attempt {attempt} should ask again"
+
+    await controller.retry_voice(7, "say again")
+    assert controller.phase == "error", "a third failure should stop asking"
+    assert "type it" in controller.message
+
+    # A fresh observation starts over rather than inheriting the spent budget.
+    from common.contracts import VisionResult
+
+    controller.voice_retries = 9
+    controller.apply_observation(VisionResult(scene_id="s1", objects=[], source="fixture"))
+    assert controller.voice_retries == 0

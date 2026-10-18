@@ -72,6 +72,7 @@ class Controller:
         self.microphone = BoardMicrophone(settings)
         self.voice_task = None
         self.transcript = self.stt_source = None
+        self.voice_retries = 0
         self.capture_status = None
         self.untrained_categories = False  # Session-only demo opt-in; never a production default.
 
@@ -235,6 +236,9 @@ class Controller:
     def apply_observation(self, result):
         """Caller holds lock. Keep selected frame and its exact analysis together."""
         self.scene = result
+        # A new observation is a new request: it should not inherit the retry
+        # budget spent on the previous one.
+        self.voice_retries = 0
         eligible = [o for o in result.objects if o.item != "unknown"
                     and o.fill_ratio is not None
                     and o.confidence >= self.settings.min_confidence
@@ -334,12 +338,24 @@ class Controller:
             task.add_done_callback(self.tasks.discard)
             return self.state()
 
+    # Asking again is better than failing, but only twice: the tablet records again
+    # as soon as it reaches not_understood, so a microphone that hears nothing would
+    # otherwise loop until the request expires.
+    MAX_VOICE_RETRIES = 2
+
     async def retry_voice(self, token, message):
         async with self.lock:
             if token != self.token:
                 return
+            self.voice_retries += 1
             self.last_error = None
             self.arm_deadline()
+            if self.voice_retries > self.MAX_VOICE_RETRIES:
+                self.emit(
+                    "error",
+                    "I still couldn't hear your request. Please type it instead.",
+                )
+                return
             self.emit("not_understood", message)
 
     async def hear(self, token):
@@ -359,6 +375,7 @@ class Controller:
                 if token != self.token:
                     return
                 self.transcript, self.stt_source = result.text, result.source
+                self.voice_retries = 0
                 self.begin_interpret(result.text)
         except TimeoutError:
             await self.retry_voice(token, "Speech recognition took too long. Please speak again after the prompt.")
