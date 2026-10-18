@@ -89,11 +89,12 @@ bash scripts/stop-board.sh
 cd ~/project/hows-everything-so-far
 ET=$HOME/git/executorch
 
-# Vision 8001 (bundle: models/board/vision/dinov2-qnn-v4c, 되돌리기는 -v3 / -v1)
+# Vision 8001 (상주 worker 빌드·배포 후 실행; bundle: dinov2-qnn-v4c)
 LD_LIBRARY_PATH=$ET/build-x86/backends/qualcomm:/usr/lib ADSP_LIBRARY_PATH=/usr/lib \
 VISION_MODEL_BACKEND=external VISION_ADAPTER=services.vision.backend:create_backend \
 VISION_MODEL_PATH=models/board/vision/dinov2-qnn-v4c \
 VISION_RUNNER_BIN=$ET/build-x86/examples/qualcomm/executor_runner/qnn_executor_runner \
+VISION_WORKER_BIN=$PWD/models/board/bin/qnn_vision_worker \
 setsid nohup .venv/bin/python -m uvicorn services.vision.server:create_app --factory \
   --host 127.0.0.1 --port 8001 > ~/model_output/logs/vision-8001.log 2>&1 < /dev/null &
 
