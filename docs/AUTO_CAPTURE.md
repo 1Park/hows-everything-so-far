@@ -32,7 +32,7 @@ UI의 **Demo tools & diagnostics → Capture mode → Automatic**을 선택한�
 ## 설정·계약
 
 ```dotenv
-CAPTURE_MODE=manual
+CAPTURE_MODE=auto
 AUTO_CAPTURE_INTERVAL_SECONDS=0.5
 AUTO_CAPTURE_STABLE_SECONDS=3
 AUTO_CAPTURE_RESTART_ENABLED=true
@@ -40,7 +40,7 @@ AUTO_CAPTURE_RESTART_SECONDS=10
 OBSERVE_INTERVAL_SECONDS=0
 ```
 
-기본은 기존 수동 모드이며 UI에서 자동 모드로 바꾼다. 처음부터 자동이면 CAPTURE_MODE=auto. 기존 OBSERVE_INTERVAL_SECONDS>0 설정은 자동 모드 활성화/샘플 간격으로 호환하되 **3초 안정성 판정도 적용**한다. 새 설정에는 AUTO_CAPTURE_*를 권장한다.
+보드 `.env.board`는 기본 Automatic(`CAPTURE_MODE=auto`)이며 서버 재시작 시 자동 스캔을 시작한다. 개발용 `.env.example`은 Manual이다. UI에서 모드를 바꿀 수 있고, 서버 재시작 시 선택 env의 기본값을 다시 적용한다. 기존 OBSERVE_INTERVAL_SECONDS>0 설정은 자동 모드 활성화/샘플 간격으로 호환하되 **3초 안정성 판정도 적용**한다. 새 설정에는 AUTO_CAPTURE_*를 권장한다.
 
 - `GET /api/capture` → CaptureStatus
 - `POST /api/capture`, JSON `{"mode":"auto"}` 또는 `{"mode":"manual"}` → CaptureStatus. auto→auto는 명시적 재시작.
