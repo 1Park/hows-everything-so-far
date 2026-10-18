@@ -4,32 +4,24 @@ Observes cup type and remaining level on an Arduino VENTUNO Q and interprets the
 
 The code is the source of truth for behavior and settings. The docs explain how to run things and where the code lives; evaluation records are the results at the time they were run.
 
-## Running locally
+## Deploy and run on Arduino VENTUNO Q
 
-Python 3.11–3.13. From the repo root:
+**For the real-board demonstration, start with the [board deployment and operation runbook](docs/BOARD_RUNBOOK.md).** It covers SDK/model installation, real Vision configuration, Gemma4, Whisper STT, TTS, systemd startup, and recovery.
 
-```powershell
-python -m venv .venv
-.venv/Scripts/python.exe -m pip install -c requirements.lock -e '.[dev]'
-Copy-Item .env.example .env
-.venv/Scripts/python.exe scripts/dev.py --mode offline
-```
+1. Prepare the board dependencies, model bundles, camera, microphone, and Arduino Bridge using the runbook.
+2. Configure the real Vision service with `VISION_MODEL_BACKEND=external`, its adapter, bundle, and worker paths. In the recommended systemd setup, these are recorded in `~/.config/refill-assist/vision.env`. **Selecting `.env.board` alone does not enable real Vision.**
+3. Install and start the systemd services described in the runbook. For an already provisioned board:
 
-On macOS/Linux, use `.venv/bin/python` and `cp .env.example .env`.
-`http://127.0.0.1:8080` → Start demo → text request → Send → Confirm refill.
-Stop with Ctrl+C, or with `python scripts/dev.py --stop` using the same settings.
+   ```sh
+   systemctl --user start refill-llm refill-vision refill-tts refill-whisper-tiny refill-whisper-base refill-controller
+   curl -fsS http://127.0.0.1:8080/ready
+   ```
 
-| Mode | Services started | Model connection |
-| --- | --- | --- |
-| `direct` (default) | Controller/UI | Configured API/fixture. Default is Vision/STT fixture + Mac Qwen HTTP |
-| `fixture` | Controller/UI | Vision/STT fixture, Hardware mock, LLM over real HTTP |
-| `offline` | Controller/UI | Everything including the LLM is a fixture, Hardware mock |
-| `proxy` | Controller + Qwen API | The Qwen server calls the configured backend |
-| `integration`, `board` | Controller + Qwen + Vision + STT | Uses the backends from the selected env |
+4. Open `http://<board-address>:8080/` on the tablet.
 
-`--mode direct --with-stt` also manages the STT API. If model servers are already running separately on the board, follow the [board runbook](docs/BOARD_RUNBOOK.md). Model failures are not automatically replaced with fixtures.
+The current board layout runs model servers separately; Controller/STT uses `dev.py --mode direct --with-stt --env-file .env.board` through systemd. Do not additionally run `--mode board` or `start-board.sh` alongside these services: they would compete for the same ports.
 
-Settings precedence is explicit overrides in code > process environment variables > selected dotenv (`--env-file`/`REFILL_ENV_FILE`, default `.env`) > [`Settings`](common/config.py) defaults. `.env.board` alone does not select real Vision; bundle settings are also required.
+Before presenting, inspect the contents of `/ready`, not just its HTTP status: Vision and STT must report `source: external`, video must not be `fixture-image`, and hardware must be `bridge` and ready. Check the LLM service at `http://127.0.0.1:8000/ready` for the real Gemma4 resident runner, and verify that changing the cups and spoken request changes the results. Fixtures can also report ready. Model failures are not automatically replaced with fixtures.
 
 ## Layout
 
@@ -63,3 +55,7 @@ Details: https://github.com/1Park/hows-everything-so-far/blob/main/docs/ARCHITEC
 - [Board deployment and operation](docs/BOARD_RUNBOOK.md), [Tablet and voice flow](docs/TABLET_DEMO.md), [whisper.cpp server](docs/WHISPER_SERVER.md), [Model files](models/README.md)
 - [Validation commands and scope](docs/VALIDATION.md)
 - Past measurements: [Gemma](docs/gemma_evaluation/README.md), [Qwen](docs/qwen_evaluation/README.md), [Vision](docs/vision_evaluation/README.md), [STT](docs/stt_evaluation/README.md)
+
+## Developer reference
+
+- [Local development without a board and supervisor modes](docs/LOCAL_DEVELOPMENT.md) — simulated inputs for UI/flow testing.
