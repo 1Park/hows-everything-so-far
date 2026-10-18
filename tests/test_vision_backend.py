@@ -167,3 +167,6 @@ def test_split_other():
     assert drop and cls == ["coke__low", "empty"] and p == pytest.approx([0.5, 0.5])
     drop, p, cls = split_other([0.7, 0.3], ["coke__low", "empty"])
     assert not drop and cls == ["coke__low", "empty"]
+    # other 가 가장 높으면 0.5 미만이어도 뺀다 (보드: 오렌지주스 잔에 겹친 과자봉지 0.47 vs 0.38)
+    assert split_other([0.38, 0.15, 0.47], ["orange_juice__low", "coke__low", "other"])[0]
+    assert not split_other([0.45, 0.15, 0.40], ["orange_juice__low", "coke__low", "other"])[0]
