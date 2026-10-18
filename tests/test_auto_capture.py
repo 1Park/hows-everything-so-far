@@ -1,5 +1,6 @@
 import asyncio
 import random
+import time
 
 import pytest
 from fastapi.testclient import TestClient
@@ -208,3 +209,40 @@ def test_capture_mode_http_validation_and_no_button_autostart():
         client.post("/api/capture", json={"mode": "manual"}).raise_for_status()
         assert client.get("/api/state").json()["session_id"] == session
         assert client.get(state["snapshot_url"]).content == IMAGE
+
+
+async def test_rearming_auto_capture_clears_the_finished_run():
+    # Re-arming the scanner is the start of the next run: the card, transcript and
+    # phase of the one that just ended should not still be on screen while the
+    # board scans for the next customer.
+    from fastapi.testclient import TestClient
+
+    from app.server import create_app
+    from common.config import ROOT, Settings
+
+    settings = Settings(qwen_backend="fixture", mock_step_seconds=0.01, response_timeout=5)
+    with TestClient(create_app(settings)) as client:
+        image = (ROOT / "docs/assets/cups-example.jpg").read_bytes()
+        client.post("/api/observe", files={"file": ("scene.jpg", image, "image/jpeg")})
+        for _ in range(300):
+            state = client.get("/api/state").json()
+            if state["phase"] == "offered":
+                break
+            time.sleep(0.01)
+        client.post("/api/utterance", json={
+            "scene_id": state["scene"]["scene_id"],
+            "object_id": state["target"]["object_id"],
+            "utterance": "a little water please",
+        })
+        for _ in range(500):
+            state = client.get("/api/state").json()
+            if state["phase"] in ("done", "card"):
+                break
+            time.sleep(0.01)
+        assert state["card"] is not None
+
+        client.post("/api/capture", json={"mode": "auto"})
+        state = client.get("/api/state").json()
+        assert state["phase"] == "idle", state["phase"]
+        assert state["card"] is None and state["scene"] is None
+        assert state["transcript"] is None

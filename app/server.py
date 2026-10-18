@@ -152,7 +152,12 @@ def create_app(settings=None, clients=None, hardware=None):
 
     @app.post("/api/capture", response_model=CaptureStatus)
     async def capture_mode(body: CaptureModeInput):
-        return capture.set_mode(body.mode)
+        status = capture.set_mode(body.mode)
+        if body.mode == "auto":
+            # Arming the scanner is the start of the next run, so the previous
+            # one should not still be on screen.
+            await controller.restart_session()
+        return status
 
     @app.post("/api/observe", status_code=202, response_model=StateSnapshot)
     async def observe(

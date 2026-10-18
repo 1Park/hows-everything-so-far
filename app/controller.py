@@ -517,6 +517,25 @@ class Controller:
                 else ApiError("hardware_timeout", "The sequence timed out", 504, True),
             )
 
+    async def restart_session(self):
+        """Return a finished demo to its first step.
+
+        Re-arming automatic capture only resets the scanner, so the card,
+        transcript and progress of the run that just ended stayed on screen while
+        the board was already scanning for the next one.
+        """
+        async with self.lock:
+            if self.phase not in TERMINAL:
+                return self.state()
+            self.token += 1
+            self.session_id = uid()
+            self.scene = self.target = self.card = self.snapshot = None
+            self.transcript = self.stt_source = self.qwen_source = None
+            self.deadline = self.last_error = None
+            self.voice_retries = 0
+            self.emit("idle", "Start a demo to inspect the scene.")
+            return self.state()
+
     async def cancel(self, session_id):
         async with self.lock:
             if session_id != self.session_id:
