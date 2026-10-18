@@ -19,19 +19,18 @@ def refill_offer(item):
 
 
 def speech_for(phase, target, card, item_confirm_threshold, allowed_items=None):
-    item = card.item if card else (target.item if target else None)
     if phase == "offered" and target is not None:
         return refill_offer(target.item)
     if phase == "card" and card is not None:
         return f"One more {say(card.item)}, got it. Please press Confirm."
+    if phase == "loading" and card is not None:
+        return f"Got it, I'll be right back with {say(card.item)}."
     if phase == "not_understood":
         return "Sorry, I didn't catch that. Could you say that again?"
     if phase == "declined":
         return "No problem. Just call me if you need anything."
     if phase == "cancelled":
         return "Okay, cancelled. Call me anytime."
-    if phase == "done" and item:
-        return f"Your {say(item)} refill is on its way."
     if phase == "expired":
         return "I'll check back on you later."
     if phase == "error":

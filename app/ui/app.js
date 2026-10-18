@@ -315,7 +315,7 @@ function render(next, authoritative = false) {
     if (['offered','not_understood'].includes(lastPhase)) {audioVersion++; playingSource?.stop();}
     if (['offered','not_understood'].includes(state.phase)) announceAndListen();
     if (state.phase === 'card') speakState('review');
-    if (state.phase === 'done') speakState('done');
+    if (state.phase === 'loading') speakState(null);
     if (state.phase === 'cancelled') speakState('cancelled');
     if (['declined','expired','error'].includes(state.phase)) speakState(null);
     lastPhase = state.phase;
