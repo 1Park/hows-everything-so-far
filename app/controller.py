@@ -358,7 +358,15 @@ class Controller:
                 ApiError("stt_timeout", "Speech recognition timed out. Please retry", 504, True),
             )
         except ApiError as error:
-            await self.fail(token, error)
+            if error.code == "no_speech":
+                async with self.lock:
+                    if token != self.token:
+                        return
+                    self.last_error = None
+                    self.arm_deadline()
+                    self.emit("not_understood", "I didn't hear your request. Please speak again after the prompt.")
+            else:
+                await self.fail(token, error)
         except Exception:
             log.exception("Board voice input failed")
             await self.fail(

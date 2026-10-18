@@ -112,9 +112,9 @@ async function speakState(fallback) {
   }
   return fallback ? playPrompt(fallback) : false;
 }
-async function announceOffer() {
+async function announceAndListen() {
   const prompt = state;
-  if (!prompt || prompt.phase !== 'offered' || !connected) return;
+  if (!prompt || !['offered','not_understood'].includes(prompt.phase) || !connected) return;
   const finished = await speakState('offer');
   if (!finished || state?.session_id !== prompt.session_id || state.sequence !== prompt.sequence || !connected) return;
   if (state.audio_input === 'disabled') return;
@@ -286,12 +286,12 @@ function render(next, authoritative = false) {
   const step = ['observing','skipped'].includes(state.phase) ? 0 : ['offered','listening','transcribing','interpreting','not_understood','error'].includes(state.phase) ? 1 : state.phase === 'card' ? 2 : ['loading','returning','done'].includes(state.phase) ? 3 : -1;
   document.querySelectorAll('[data-step]').forEach(e => e.classList.toggle('active', Number(e.dataset.step) <= step));
   if (lastPhase !== state.phase) {
-    if (lastPhase === 'offered') {audioVersion++; playingSource?.stop();}
-    if (state.phase === 'offered') announceOffer();
+    if (['offered','not_understood'].includes(lastPhase)) {audioVersion++; playingSource?.stop();}
+    if (['offered','not_understood'].includes(state.phase)) announceAndListen();
     if (state.phase === 'card') speakState('review');
     if (state.phase === 'done') speakState('done');
     if (state.phase === 'cancelled') speakState('cancelled');
-    if (['declined','not_understood','expired','error'].includes(state.phase)) speakState(null);
+    if (['declined','expired','error'].includes(state.phase)) speakState(null);
     lastPhase = state.phase;
   }
 }
@@ -371,7 +371,7 @@ $('audioToggle').onclick = () => {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) {setSound(false); showError('This browser does not support audio playback.'); return;}
     audioContext ||= new AudioContextClass();
-    audioContext.resume().then(()=>state?.phase === 'offered' ? announceOffer() : playPrompt('welcome')).catch(()=>showError('Tap Enable sound to activate audio.'));
+    audioContext.resume().then(()=>['offered','not_understood'].includes(state?.phase) ? announceAndListen() : playPrompt('welcome')).catch(()=>showError('Tap Enable sound to activate audio.'));
   } else {playingSource?.stop(); playingSource=null;}
 };
 $('livePreview').parentElement.addEventListener('toggle', event => {

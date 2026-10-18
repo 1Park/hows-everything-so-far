@@ -48,6 +48,11 @@ class ModelClients:
                 data=form,
                 headers={"x-request-id": request_id.get()},
             )
+            if kind == "stt" and response.status_code == 422:
+                payload = response.json()
+                error = payload.get("error") if isinstance(payload, dict) else None
+                if isinstance(error, dict) and error.get("code") == "no_speech":
+                    raise ApiError("no_speech", "No speech was recognized. Please speak again", 422, True)
             response.raise_for_status()
             result = (VisionResult if kind == "vision" else STTResult).model_validate(
                 response.json()
