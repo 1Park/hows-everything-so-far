@@ -1,50 +1,18 @@
-# Model assets and integration guidelines
+# 모델 파일
 
-For developers and coding agents connecting real models. Keep integration small: use the existing service backend boundary, a few explicit environment settings, and the public API contracts. Do not introduce a model registry, automatic runtime detection, or another configuration framework.
+모델·tokenizer·native binary는 Git에 넣지 않는다. `models/local/`, `models/board/`, `models/experiments/`를 용도별로 사용하거나 명시적 외부 경로를 지정한다. 경로만 설정해도 backend가 자동 선택되지는 않는다.
 
-## Asset layout
+| 사용처 | 실제 설정·파일 |
+| --- | --- |
+| Vision | `VISION_MODEL_BACKEND=external`, `VISION_ADAPTER=services.vision.backend:create_backend`, `VISION_MODEL_PATH`는 bundle 디렉터리 (`bundle.json`, `.pte`, head) |
+| 보드 Vision native worker | `VISION_WORKER_BIN`, 서비스 시작 시 YOLO/DINO preload. 빌드·배포는 [Vision 안내](../services/vision/README.md) |
+| 보드 Gemma4 | `QWEN_MODEL_BACKEND=executorch`, `QWEN_MODEL=gemma4`. 파일 경로는 `scripts/board_llm.sh config`로 확인 |
+| 개발 Mac LLM | HTTP 연결. 로컬 모델 파일을 읽지 않음 |
+| 선택적 Qwen CLI | `QWEN_MODEL_BACKEND=qwen_cli`, runner/model/tokenizer/seq_len 설정. 보드 기본 Gemma 경로와 별개 |
+| STT | `STT_MODEL_BACKEND=external`, Whisper HTTP adapter와 `STT_WHISPER_URL`. 모델은 외부 whisper.cpp 서버 소유 |
 
-```text
-models/
-  local/                 # Native development runtime assets
-    vision/              # Detector / DINOv2 bundle owned by the Vision developer
-    stt/                 # STT assets owned by the STT developer
-    qwen/                # Only if running Qwen weights on this machine
-  board/                 # VENTUNO Q runtime assets
-    vision/              # Board-compatible Vision bundle
-    stt/                 # Only if STT runs on the board
-    qwen/                # Qwen .pte, tokenizer, and required companion files
-  experiments/           # Local training/export outputs
-```
+`STT_MODEL_PATH` 설정은 현재 코드에 없다. 실제 파일 요구사항·경로 해석은 각 backend가 정의한다. Vision bundle 상대 경로는 레포 루트 기준이다.
 
-This is a placement convention, not an installed bundle. Create directories when adding assets; Git does not preserve empty directories. Keep vendor bundle filenames and companion files together. No particular tensor layout, internal labels, or bundle format is assumed. Existing assets elsewhere may be referenced by an explicit path without copying them.
+모델 로딩·전후처리는 해당 서비스 backend에 둔다. Controller는 API를 호출하고 카메라·마이크를 단독 소유한다. 파일 누락·로드 실패는 명시적 오류로 처리하고 fixture로 자동 대체하지 않는다.
 
-Only this README is tracked under `models/`. Weights, tokenizers, exports, and other large assets remain ignored. Record acquisition instructions, model version/checksum, and required runtime in the owning service README or `ml/configs/`; do not commit personal absolute paths or credentials.
-
-## Configuration convention
-
-Use personal `.env` for development and `.env.board` plus process-environment overrides for the board. Choose the backend explicitly as well as its path: a local development model and a board `.pte` may require different runtimes. `APP_ENV` alone must not silently select a runtime or scan folders for a model.
-
-When implementing a file-loading backend, use these names as needed:
-
-| Setting | Purpose | Example relative paths: local / board |
-| --- | --- | --- |
-| `VISION_MODEL_PATH` | Vision bundle file or directory | `models/local/vision/...` / `models/board/vision/...` |
-| `STT_MODEL_PATH` | STT bundle file or directory | `models/local/stt/...` / `models/board/stt/...` |
-| `QWEN_MODEL_PATH` | Qwen weights or runtime bundle | `models/local/qwen/...` / `models/board/qwen/...` |
-| `QWEN_TOKENIZER_PATH` | Separate tokenizer, if the runtime needs one | Within the matching Qwen bundle |
-
-Resolve relative paths against the repository root; allow explicit absolute paths through personal configuration. Add only the settings needed by the concrete backend to `common/config.py` when connecting it. A path may identify a file or directory according to the actual runtime; validate the required files in that backend.
-
-**Current implementation:** QWEN_MODEL_PATH, QWEN_TOKENIZER_PATH and VISION_MODEL_PATH are wired into Settings. QNN_LLAMA_RUNNER and QWEN_SEQ_LEN configure native Qwen execution; QNN_RUNNER and VISION_MODEL_PATH configure common.executorch.DinoRunner. STT_MODEL_PATH remains a convention for its owner. MLX still calls HTTP. Native runtime/bundles are supplied separately; board inference is unverified. See [Qwen setup](../services/qwen/README.md) and [Vision integration](../services/vision/README.md).
-
-## Implementation boundaries
-
-1. Read the owning `services/vision`, `services/stt`, or `services/qwen` README and [public contracts](../docs/CONTRACTS.md) first. Preserve the current HTTP API and Vision/STT no-argument `package:create_backend` factory contract.
-2. Put model loading and runtime-specific work behind that service's backend; the board LLM lives in `services/qwen/board_llm.py:BoardLLMBackend`. The Controller uses API URLs and must not load model files.
-3. Vision developers own detection, crop, DINOv2, preprocessing, and output conversion. STT developers own decoding, audio preprocessing, and recognition. Other agents must not guess or replace those implementations. Keep DINOv2 and Qwen3-0.6B.
-4. Load/reuse the model where the runtime supports it, keep blocking inference off the event loop, and retain the existing timeout/readiness/error contract. Missing files, unsupported runtimes, or failed initialization must produce an explicit error/not-ready state, never an automatic fixture or remote fallback. Fixtures remain explicit; source labels must stay truthful.
-5. Keep camera ownership in Controller VideoSource and microphone/speaker ownership in the tablet browser. Model backends receive the transported image/audio; do not open those devices again.
-6. Document the actual backend setting, asset acquisition, runtime dependencies, and one startup command. Verify readiness, a real input, and missing-file behavior. Report local runtime verification separately from board verification.
-
-Training/export dependencies and any required Docker environment belong in `ml/`. App deployment remains native Ubuntu + venv; do not add training dependencies or guessed board SDK versions to the app just to prepare this structure.
+[보드 실행](../docs/BOARD_RUNBOOK.md), [LLM](../services/qwen/README.md), [Vision](../services/vision/README.md), [STT](../services/stt/README.md), [학습·export](../ml/README.md).

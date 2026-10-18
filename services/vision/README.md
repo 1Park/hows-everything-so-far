@@ -1,35 +1,8 @@
-# Vision 서비스 레이어
+# Vision
 
-`server.py:create_app`, 기본127.0.0.1:8001, POST /v1/analyze. JPEG/PNG 원본→객체별 결과. fixture JSON은 fixtures/vision.json이며 임의 bbox/점수임을 표시한다.
-
-검출/crop/DINOv2·모델 전후처리는 다른 팀원 소유다. `VISION_MODEL_BACKEND=external`, `VISION_ADAPTER=package:create_backend` 또는 별도 HTTP 서버를 연결한다. [정확한 async/HTTP 계약](../../docs/CONTRACTS.md). Controller의 VideoSource가 카메라를 열므로 이 backend는 카메라를 다시 열지 않는다.
-
-실제 모델 연결 전에 [모델 파일·설정 가이드](../../models/README.md)를 읽는다. 로컬/보드 파일 배치와 VISION_MODEL_PATH는 담당 backend를 구현할 때 연결하며, 현재 파일 로더가 준비됐다고 가정하지 않는다.
-
-
-## Native DINOv2 runner integration
-
-`common.executorch.DinoRunner(QNN_RUNNER, VISION_MODEL_PATH, timeout)` invokes
-qnn_executor_runner with one sample's input list and isolated output directory.
-`await runner.infer([tensor_bytes, ...])` returns `{relative_raw_path: bytes}`.
-The Vision owner supplies exact prepared tensors and interprets raw outputs inside
-the existing external adapter. No detection/crop/normalization/dtype/layout/labels
-are invented. This helper is not itself a complete Vision backend.
-
-Set QNN_RUNNER and VISION_MODEL_PATH to actual bundle files. Relative paths resolve
-against repository root. QNN/HTP library setup follows the supplied image.
-Each call reloads the model; calls on an instance serialize. Timeout/cancellation
-kills and reaps the child, without fixture fallback.
-
-```bash
-python scripts/dino_smoke.py --env-file .env.board --output logs/dino-first /actual/bundle/sample.raw
-```
-
-Output directory must be new. Multiple tensor arguments are inputs to ONE sample.
-Compare raw tensors with bundle reference outputs before claiming correctness.
-[QC DINO guide](../../qc-executorch-guide/IoT/README.md#part-3-run-and-evaluate-dinov2).
-Locally tested with a child-process double only. Actual board inference, model
-preprocessing/labels and NPU delegation remain unverified.
+`server.py:create_app`, 기본 localhost:8001, `POST /v1/analyze`.
+원본 JPEG/PNG를 받아 객체별 종류·잔량·bbox를 반환한다. 카메라는 Controller만 연다.
+fixture 또는 아래 external backend를 명시적으로 선택한다. 자동 fallback은 없다.
 
 ## DINOv2 backend (`backend.py`)
 
@@ -45,7 +18,7 @@ python -m uvicorn services.vision.server:create_app --factory --host 127.0.0.1 -
 | 설정 | 의미 |
 |---|---|
 | `VISION_MODEL_PATH` | bundle 디렉터리 (`bundle.json`, `.pte`, `head.json`). 상대 경로는 레포 루트 기준. `ml/export/make_bundle.py`가 생성 |
-| `VISION_RUNNER_BIN` | bundle이 `cli` runner일 때만 — 보드 `qnn_executor_runner` 경로 |
+| `VISION_RUNNER_BIN` | 독립 CLI pipeline·학습·진단에서 사용할 `qnn_executor_runner` 경로. 상주 서비스는 `VISION_WORKER_BIN` 사용 |
 | `VISION_WORKER_BIN` | 서비스에서 DINO·YOLO를 상주시키는 native worker 경로. CLI bundle을 사용할 때 필수 |
 
 - 흐름: 이미지 bytes → 컵 박스 (`boxes.mode`: `yolo` .pte / 고정 `rois` / `center`) → crop (`yolo`는 기본 `crop_mode: pad` = 박스×1.15 + 회색 패딩) → DINOv2 .pte → head → `item`·`fill_ratio`·`confidence`·`item_confidence` ([labels.py](labels.py)).

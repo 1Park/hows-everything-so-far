@@ -1,10 +1,6 @@
-# 이전 내역
+# 아카이브 출처
 
-원본: `iot-hackathon-brainstorm/evaluation/` → 현재 레포 `docs/qwen_evaluation/`.
-
-원본 삭제·Git commit/push·서버 설정 변경은 하지 않았다. 조사 수상작과 브레인스토밍 문서는 포함하지 않는다. 기존 `qc-executorch-guide/`와 루트 README는 변경하지 않았다.
-
-기존 보고서는 본문을 보존하고 로컬 `.py`/`.json` 링크만 Markdown 아카이브 경로로 바꿨다. Python/JSON은 코드 블록으로 보존했다. 이후 인계 문서는 폐기하고 제품·보드 관련 정보는 [아키텍처](../ARCHITECTURE.md), 평가 환경·결과·실행 지침은 [평가 인덱스](README.md)에 통합했다. 원본 바이트 SHA-256은 검증 기록용이고 줄바꿈 정규화 후의 hash와 구분한다.
+`iot-hackathon-brainstorm/evaluation/`에서 이전한 원본 목록과 이전 전 SHA-256이다. 코드·결과는 Markdown 블록에 보존했으며 현재 제품 실행 지침과 구분한다.
 
 | 원본 | 이전 파일 | 원본 SHA-256 |
 |---|---|---|

@@ -1,87 +1,58 @@
-# 서비스 계약 v1
+# API 경계
 
-실제 타입: [`common/contracts.py`](../common/contracts.py). 실행 중 OpenAPI는 각 서버 `/docs`, `/openapi.json`. 모델 내부 tensor·crop·정규화·head·codec 처리는 이 계약이 정의하지 않는다.
+스키마는 [`common/contracts.py`](../common/contracts.py), 설정은 [`common/config.py`](../common/config.py)가 기준이다. 상세 필드·제한·오류 응답은 실행 중 각 서비스 `/docs`와 `/openapi.json`을 확인한다.
 
-## ID·좌표·정책
+## 식별자·이미지·요청
 
-- scene_id: Controller가 분석 입력마다 UUID 발급, 하나의 고정 원본 이미지에 해당.
-- object_id: Vision이 장면 안에서 유일하게 발급. 배열 index의 장기 ID 사용 금지. 장면 사이 동일성 보장 없음.
-- session_id: 새 관찰마다 발급. Cancel은 현재 session에만 적용.
-- request_id: 첫 유효 요청 카드에서 발급, 수정 시 유지; revision은 수정마다 증가.
-- bbox: **원본 전체 이미지 기준 normalized xyxy [0,1], 좌상단 원점**, x1<x2, y1<y2. EXIF 자동 회전 없음. 담당자 adapter가 원본 표시 좌표와 일치시킨다.
-- 음료 water/coke/coffee/unknown; fill_ratio 0..1 또는 null; confidence 0..1. 이는 외부 표현이며 모델 내부 라벨 변환은 모델 담당자 책임이다.
-- item_confidence 0..1 또는 null(선택): **음료 종류만**의 확신도. confidence는 음료·잔량을 함께 본 값이다. 제공하지 않으면 null.
-- 요청 음료 water/coke/coffee. 분량은 요청·카드·LLM 출력에 포함하지 않는다.
-- 초기 정책: confidence>=0.7, fill_ratio<=0.3 중 최소 잔량 컵; 동률 object_id 정렬. 환경변수로 변경 가능하며 보드 실측 기준은 아니다.
-- 대상이 coke/coffee이고 item_confidence<0.8(`ITEM_CONFIRM_THRESHOLD`)이면 제안 문구에서 음료를 묻는다("Is that coke or coffee?"). 추정 음료로 카드는 만들되 고객이 수정·Confirm한다. 0.8은 Mac 실사 교차검증(콜라·커피 190장) 기준: 17%를 묻고 혼동의 87%를 잡음 — [vision_evaluation](vision_evaluation/README.md).
-- 한 번에 한 대상/요청. 제안 자체는 Confirm 불가. 고객 입력→카드→명시 Confirm 필요.
-- 관측 음료와 요청 음료는 별개다. 물 컵을 대상으로 coffee 주문 가능; 대상은 유지된다.
+- `scene_id`는 분석 이미지 하나, `object_id`는 그 장면 안의 객체다. 장면 사이 추적 ID가 아니다. `session_id`는 고객 응대, 카드 `request_id/revision`은 요청과 수정 버전이다.
+- bbox는 **원본 전체 이미지 기준 normalized xyxy [0,1]**, 좌상단 원점이다. Controller가 원본을 보관하고 Vision이 같은 좌표계로 반환한다.
+- 관찰 item은 water/coke/coffee/unknown, 요청 item은 water/coke/coffee다. `fill_ratio`, `item_confidence`는 null일 수 있다. `confidence`와 `item_confidence`는 각각 종합·음료 종류 확신도다.
+- 요청·카드·LLM 출력에는 분량이 없다. 관찰 음료와 다른 음료로 요청을 수정해도 대상 객체는 유지한다.
+- 한 번에 한 대상·요청만 처리한다. Confirm은 현재 카드의 scene/object/request/revision이 모두 일치해야 한다. 제안·STT·LLM 결과만으로 하드웨어를 승인하지 않는다.
 
-## 공통 HTTP
+## 서비스 API
 
-자동 캡처: `GET /api/capture`, `POST /api/capture` (`{"mode":"manual"}` / `{"mode":"auto"}`)는 CaptureStatus를 반환한다. Controller state의 `capture`와 별도 WS `type=capture` 이벤트로 모드/5초 안정성 진행도를 제공한다. 이 이벤트는 요청 sequence를 변경하지 않는다. [프레임 선택·중복 방지·설정](AUTO_CAPTURE.md).
+| 서비스 | 입력 | 출력 |
+| --- | --- | --- |
+| Vision `POST /v1/analyze` | multipart `file` JPEG/PNG, `scene_id`, `scenario`(fixture용) | `VisionResult`: scene_id/source/objects |
+| STT `POST /v1/transcribe` | multipart audio `file` | text/language/source |
+| LLM `POST /v1/chat/completions` | `Generation`: model/messages/생성 옵션 | choices[0].message.content/source, 보드 runner 통계 |
 
-`GET /health`는 프로세스 생존, `/ready`는 backend 가용성(503 가능). Qwen readiness는 모델 목록에 설정 ID가 있는지 검사하며 생성 성공과 구분한다.
+Vision/STT 모델 서버는 카메라·마이크를 열지 않는다. Controller가 이미지·오디오 bytes를 전달한다. 지원 MIME·크기 검사는 [`common/media.py`](../common/media.py), 실제 전처리는 서비스 backend에 있다.
 
-```json
-{"error":{"code":"stale_confirmation","message":"This request has changed or was already confirmed","request_id":"uuid","retryable":false}}
-```
+LLM 제품 프롬프트·파서는 [`app/language.py`](../app/language.py)에 있다. 출력은 `{"intent":"refill","item":"water"}` 형태이며 intent는 refill/decline/cancel/not_understood다. refill은 유효 item 필수, 나머지는 item=null이다. 단일 JSON Markdown fence는 허용하지만 prose 추출·추가 필드·중복 키·필드 보정은 허용하지 않는다.
 
-X-Request-ID 생성/전파/응답. validation422, 형식415, 크기413, stale/state409, backend502/503, timeout504. raw transport 최대26MB, 이미지 기본5MB/16M pixels, 오디오 기본10MB. signature·크기 검사는 transport 검증으로 모델 전처리가 아니다. 오디오 codec/길이 검사는 STT 담당자 책임이다.
-
-HTTP 오류의 request_id/X-Request-ID는 호출 추적 ID이며, 요청 카드 request_id(업무 ID)와 별개다. 상태/이벤트도 StateSnapshot/StateEvent/Heartbeat 공통 타입으로 검증하며 Controller OpenAPI에 상태 schema를 노출한다.
-
-## Vision·STT 담당자 연결
-
-Vision `POST /v1/analyze` multipart: file JPEG/PNG 원본 bytes, scene_id, scenario=normal|enough|uncertain (fixture용; external은 무시 가능).
-
-```json
-{"scene_id":"s","source":"external","objects":[{"object_id":"cup-a","bbox":{"x1":0.1,"y1":0.2,"x2":0.3,"y2":0.7},"item":"water","fill_ratio":0.15,"confidence":0.9,"item_confidence":0.97}]}
-```
-
-STT `POST /v1/transcribe` multipart file. MIME: audio/wav, audio/x-wav, audio/webm, audio/ogg, audio/mp4; codec parameter 허용. 응답 `{"text":"A little water, please","language":"en","source":"external"}`. 보드 마이크 흐름은 STT→Qwen→카드를 자동 생성하고 전사를 UI에 표시한다. STT만으로 동작을 승인하지 않으며 Confirm이 필요하다. 개발용 브라우저 업로드는 전사 검토 후 Send를 유지한다.
-
-Plugin: `VISION_MODEL_BACKEND=external`, `VISION_ADAPTER=your_package:create_backend` (STT도 동일). factory는 인자 없이 한 번 실행된다. backend:
+외부 Vision/STT plugin은 `*_MODEL_BACKEND=external`, `*_ADAPTER=package:create_backend`로 선택한다. 인자 없는 factory를 한 번 호출하며 backend는 다음 async 메서드를 제공한다. 반환값은 공통 타입 또는 같은 shape dict다.
 
 ```python
 async def ready(self) -> bool: ...
-# Vision: VisionResult 또는 같은 shape dict
-async def infer(self, data: bytes, content_type: str, scene_id: str, scenario: str): ...
-# STT: STTResult 또는 같은 shape dict
-async def infer(self, data: bytes, content_type: str): ...
+async def infer(self, data, content_type, scene_id, scenario): ...  # Vision
+async def infer(self, data, content_type): ...  # STT
 async def close(self): ...  # 선택
 ```
 
-담당자는 blocking 추론을 전용 worker/queue로 분리해 event loop를 막지 않는다. 서비스 기본 admitted4/동시실행1, queue+실행 전체20초 timeout. native 호출 취소/수명은 담당자와 확인한다. 모델 미준비면 ready=False, fixture 자동 전환 금지. 결과 source는 선택한 backend와 일치해야 한다.
+별도 HTTP 서버 연결은 Controller의 `VISION_BACKEND=http`/`VISION_BASE_URL`과 STT 대응 설정을 사용한다. `source=fixture|external`을 실제 backend와 일치시킨다. LLM은 mlx/fixture/executorch source를 사용한다. 자동 fixture 전환은 없다.
 
-별도 팀 서버가 HTTP 계약을 제공하면 Controller `VISION_BACKEND=http`, VISION_BASE_URL 지정(STT 동일). 내부 출력 변환은 담당자 adapter 책임. **검출/crop/DINO 전후처리·오디오 전처리/STT 모델은 이번 구현 범위 밖**이다.
-
-카메라는 **Controller VideoSource 하나**가 소유한다. 원본 capture bytes를 Vision에 전달하고 모델 서버는 같은 카메라를 열지 않는다. 파일 루프/USB는 선택 OpenCV, 모델 resize/정규화 없음. **보드 Controller만 마이크를 열고 태블릿은 스피커를 소유**한다. STT 모델 서버는 마이크를 다시 열지 않는다. 분석 bbox는 고정 snapshot에 겹치고 live preview에는 과거 bbox를 겹치지 않는다.
-
-## Qwen
-
-`POST /v1/chat/completions`: model/messages, temperature0..1(제품·평가0), max_completion_tokens16..512(기본192), stream=false, chat_template_kwargs.enable_thinking=false. 서버는 generic 생성; 프롬프트/strict 파서는 app/language.py.
-
-응답 choices[0].message.content + source mlx/fixture/executorch. 실패 시 fixture 대체 없음. 파서는 intent refill/decline/cancel/not_understood, item 필수키, refill만 허용 음료, 나머지는 item=null. 이해하지 못한 요청은 not_understood로 반환하고 재입력을 요청한다. 단일 Markdown JSON fence만 허용; prose에서 JSON 추출/필드 보정 없음.
+`/health`는 프로세스 생존, `/ready`는 backend 준비 상태(미준비503)다. 준비 상태가 생성 정확도를 보장하지는 않는다. 추론은 bounded queue와 timeout을 적용하며 기본값은 Settings를 따른다. 공통 오류는 `{error: {code,message,request_id,retryable}}`이고 `X-Request-ID`는 카드 ID와 별도의 호출 추적 ID다.
 
 ## Controller
 
-| 경로 | 입력·결과 |
+| 경로 | 용도 |
 | --- | --- |
-| GET /api/state | 전체 상태·scene/target/card/source/sequence |
-| POST /api/observe | multipart scenario, 선택 file; 202 background 분석 |
-| POST /api/utterance | JSON scene_id, object_id, utterance; 202 background Qwen |
-| POST /api/confirm | JSON scene_id, object_id, request_id, revision; 202 |
-| POST /api/cancel | JSON session_id; 현재 작업 무효화/시퀀스 취소 |
-| POST /api/transcribe | multipart audio file; STT 결과만 반환 |
-| POST /api/voice/listen | 안내 재생 후 `{session_id,scene_id,object_id,sequence}`. 현재 offered/not_understood/error에서만 녹음 시작; 중복/오래된 ACK409. listening→transcribing→interpreting→card, 승인 없음 |
-| GET /api/frame, /api/video | 최신 원본·MJPEG5fps |
-| GET /api/snapshot/{session_id} | 고정 원본 이미지 |
-| GET /api/hardware | simulator/Bridge 입력·상태·명령 ID |
-| WS /ws | 초기 전체 상태, 변경 이벤트, 10초 heartbeat |
+| `GET /api/state` | 전체 `StateSnapshot` |
+| `GET/POST /api/capture` | 자동/수동 모드·진행 상태, POST `{mode}` |
+| `POST /api/observe` | multipart 선택 이미지·scenario로 관찰 시작 |
+| `POST /api/utterance` | scene_id/object_id/utterance로 요청 해석 |
+| `POST /api/voice/listen` | 안내 종료 ACK: session_id/scene_id/object_id/sequence |
+| `POST /api/transcribe` | 업로드 오디오 전사만 수행 |
+| `POST /api/confirm` | scene_id/object_id/request_id/revision으로 현재 카드 확인 |
+| `POST /api/cancel` | session_id로 현재 작업 취소 |
+| `GET /api/frame`, `/api/video` | 최신 이미지·설정 FPS의 MJPEG |
+| `GET /api/snapshot/{session_id}` | 분석에 사용한 고정 이미지 |
+| `GET /api/hardware`, `/api/events` | 하드웨어 상태·대시보드 이력 |
+| `/api/stt/*` | `/stt` 정확도 측정·결과 저장 도구; 상세는 OpenAPI |
+| `WS /ws` | 초기 전체 상태·변경 이벤트·heartbeat·capture 이벤트 |
 
-WS `{type:"state",version:1,sequence:42,state:{...}}`, heartbeat는 type/sequence만. 연결별 큐16, 과거 상태를 버려 최신 전체 상태 유지. 재연결 시 전체 snapshot. 세션 영속화 없음.
+state 이벤트는 `{type:"state",version:1,sequence,state}`이며 서버 실행별 `state.instance_id`와 단조 증가 sequence로 오래된 REST/WS 응답을 무시한다. 재연결은 전체 snapshot으로 복구한다. capture 이벤트는 `{type:"capture",instance_id,capture}`와 별도 `capture.revision`을 사용한다. [자동 캡처](AUTO_CAPTURE.md).
 
-state.instance_id는 서버 실행마다 새 UUID, sequence는 같은 서버에서 단조 증가한다. UI는 늦게 도착한 REST/WS 응답의 작은 sequence를 무시한다. 새 서버 instance는 WS의 초기 전체 상태를 통해 수용해 재시작 후에도 복구한다.
-
-phase: idle/observing/offered/interpreting/not_understood/card/loading/returning/done/skipped/declined/cancelled/expired/error. 고객 대기60초. 오류 후 같은 대상 입력 재시도 또는 새 관찰 가능. loading/returning 중 관찰 거부; Cancel 후 다시 시작. generation token+lock으로 오래된 확인·중복 클릭·취소 뒤 늦은 결과·장면 변경 결과를 무효화한다.
+phase 전체 목록은 코드의 `Phase` 타입, 허용 전이는 Controller 메서드를 따른다. 보드 음성 흐름은 offered → listening → transcribing → interpreting → card이며, not_understood는 재입력을 기다린다. [음성 흐름](TABLET_DEMO.md).

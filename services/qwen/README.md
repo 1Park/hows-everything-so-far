@@ -28,9 +28,7 @@ queue, queue+실행 timeout20초, 요청 ID/log 제공. 제품 프롬프트와 `
 - `QWEN_MODEL`은 API 식별자다. 과거 Qwen ID를 사용한 프로세스와 설정을 바꾸려면
   Controller와 Qwen 서비스를 같이 재시작한다. native worker와 호환 번들은 별도 설치한다.
 
-```bash
-setsid nohup .venv/bin/python -m uvicorn services.qwen.server:create_app --factory --host 127.0.0.1 --port 8000 > ~/model_output/logs/qwen-8000.log 2>&1 < /dev/null &
-```
+선택 env를 명시한 시작 명령은 [보드 runbook](../../docs/BOARD_RUNBOOK.md)을 따른다.
 
 ## 개발 HTTP / fixture
 

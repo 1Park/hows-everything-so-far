@@ -1,64 +1,42 @@
-# 보드 전 구현·검증 결과
+# 검증
 
-## 2026-10-17 실행 모드 변경
+현재 테스트·코드가 기준이다. 고정된 통과 개수·실행 중 PID·배포 상태는 이 문서에서 관리하지 않는다. 테스트는 fixture/가짜 backend로 동작을 검증하며 실제 모델 정확도·NPU 지연·물리 장치를 대신하지 않는다.
 
-사용자 요청에 따라 fixture 모드는 Vision/STT fixture·Hardware mock을 유지하고 Qwen은 설정한 실제 HTTP API(기본 Mac)로 호출한다. 모든 모델이 fixture인 완전 오프라인 모드는 별도 `--mode offline`으로 이동했다. 두 모드 모두 Controller/UI만 시작한다.
+## Python
 
-변경 후 supervisor 테스트3개 통과: offline 전체 데모/중복 실행/종료·재시작, startup 실패 정리, fixture 모드에서 실제 Qwen HTTP 장애를 오류로 처리하고 fixture 정답으로 대체하지 않는 동작. 실제 `--mode fixture` 서버에서도 Mac Qwen(source=mlx)으로 리필→음료/분량 수정→Confirm→mock 완료와 STT fixture·skip 경로를 smoke 검증했다. 검증용 서버는 종료했다. 아래 내용은 최초 구현의 검증 기록이다.
+```sh
+python -m pytest -q
+python -m ruff check app common services scripts tests
+```
 
-검증일: 2026-10-16 (Pacific), 결과 파일명은 UTC2026-10-17. Windows11 AMD64/Python3.13, Chrome 실제 브라우저, Tailscale→Mac MLX. 보드 없음.
+정책·스키마·HTTP·취소/확인 경쟁·모델 worker 수명·자동 캡처·supervisor 종료/재시작을 검사한다. Unix-domain socket이 없는 플랫폼에서는 Router wire 테스트를 skip한다. 카메라 파일 테스트는 선택 OpenCV 의존성이 필요하다.
 
-## 구현·실행 결과
+## 브라우저
 
-- Controller 상태/리필 정책/영어 제품 프롬프트/엄격 파서/수정/취소/무응답/재시도/명시 확인, 상태 mock HardwareIO 구현.
-- Qwen 독립 FastAPI: MLX HTTP·명시 fixture·미연결 ExecuTorch 경계, 생성 옵션/입력 검증·bounded queue·timeout·health/readiness.
-- Vision/STT: API·schema·입력 제한·fixture·external async factory/HTTP·오류/readiness. 검출/crop/DINO/STT 모델·전후처리는 구현하지 않았음(이후 Vision은 PR #2에서 추가, 아래 표 참고).
-- 실제 앱 UI: 태블릿 브라우저 녹음·원본 전달·전사 검토·고정 WAV 재생, frozen frame/bbox/대상 카드·Confirm/Cancel·연결 복구·반응형. live camera/video source는 별도 live ribbon으로 계속 표시.
-- direct/fixture/proxy/integration 모드, 프로세스별 logs·포트/lock·시작 실패 rollback·graceful stop/재시작. board shell·진단·runner smoke 준비.
+```sh
+npm ci
+npx playwright install chromium
+python scripts/dev.py --mode offline
+# 별도 터미널
+npm run test:browser
+npm run test:ui-regressions
+REFILL_URL=http://127.0.0.1:8080 node scripts/browser_auto_capture.cjs
+```
 
-## 자동 테스트·통합
+보드 음성 흐름은 별도 설정으로 검사한다:
 
-`python -m pytest -q`: **45개 통과**. 정상/음료·분량 수정/거절/취소/모호/충분/저신뢰·엄격 JSON/중복키/허용값·오래된/중복/대상 불일치 확인·취소 뒤 late inference·확인/취소 경쟁·timeout/재시도·무응답 expiry·raw body/media 제한·상태/WS·외부 adapter 오류/timeout/readiness·실제 MLX HTTP 오류(no fallback)·영상 파일 EOF loop·supervisor start/중복/stop/restart/실패 rollback. Bridge 검증은 가짜 official-module transport 계약만이며 실기가 아님.
+```sh
+AUDIO_INPUT=fixture CAPTURE_MODE=auto CONTROLLER_PORT=8090   python scripts/dev.py --mode offline
+REFILL_URL=http://127.0.0.1:8090 npm run test:board-voice
+```
 
-`python -m ruff check app common services scripts tests`, compileall, pip check 통과. shell start/stop은 Git Bash `bash -n` 구문 검사; 실제 Ubuntu/보드 daemon 실행은 미검증. Starlette TestClient의 httpx deprecation warning이 있지만 테스트 실패가 아니다.
+환경변수 예시는 POSIX shell 기준이며 PowerShell에서는 `$env:이름='값'`으로 설정한다. `REFILL_URL`로 앱 주소, `CHROME_PATH`로 설치된 Chrome을 지정할 수 있다. 결과는 `tmp/browser-qa/`에 쓴다. 기본 브라우저 검사는 가상 마이크를 사용한다.
 
-45개 테스트 검증 환경에는 선택 camera extra가 설치되어 있다. 기본 dev만 설치하면 영상 파일 loop 테스트1개는 명시 skip하고 나머지를 실행한다.
+## 실제 모델·보드
 
-별도 빈 venv(tmp/fresh-install)를 만들고 README의 requirements.lock 제약으로 editable/dev 설치와 pip check를 완료했다. 그 환경에서도 integration 서버·실제 Mac 경유 전체 smoke를 재현했다.
+- `python scripts/smoke.py`: 실행 중 Controller의 요청·수정·Confirm·취소·STT·skip 흐름.
+- `python scripts/evaluate_gemma.py --help`: 원본20/합성 왜곡20을 현재 제품 프롬프트로 평가. 새 결과에 prompt input/output/시간을 저장한다.
+- `python scripts/benchmark_vision_residency.py --help`: 동일 bundle·이미지로 CLI/상주 지연과 출력 동등성 비교.
+- 현장에서는 실제 이미지/음성, 장치 단절, 태블릿 청취, Bridge/MCU watchdog을 별도로 확인한다.
 
-`python scripts/dev.py --mode integration` + `python scripts/smoke.py`로 **Controller→우리 Qwen API→실제 Mac MLX** 경로 확인. 모델 목록 API에 `mlx-community/Qwen3-0.6B-4bit` 존재. 리필(water/small)→coffee/regular 수정→오래된 확인409→Confirm→중복409→mock done, STT fixture 전달, enough/uncertain skip 통과. 종료 후 같은 integration 모드 재시작·동일 smoke 재현. 서버 모델/설정은 변경하지 않았다.
-
-`npm run test:browser`는 실제 Chromium에서 가상 마이크로 녹음→STT fixture 전달→전사 검토→Send→Mac Qwen 카드→수정→Confirm→done, decline/cancel, 연결 offline/reconnect를 확인. MJPEG preview와 이미지 upload도 검사한다. 스크린샷1440/820/768/390px, bbox 정규화 위치/이미지 비율·가로 overflow 없음. 고정 WAV decode 성공·AudioContext running/재생·Sound on 유지 확인. 스크린샷/기계 결과는 Git 제외 tmp/browser-qa에 생성되며 재실행 가능하다. **가상 마이크이므로 실제 STT 정확도/물리 스피커 청취 검증은 아니다.**
-
-빠른 fixture의 WS 이벤트가 이전 REST 응답보다 먼저 도착하는 경쟁을 재현해 instance_id/sequence로 역전 갱신을 차단했다. 브라우저 검증에서 첫 관찰 HTTP 응답을 일부러 지연해 회귀 검사한다. multipart 파일은 이 지연 장치가 원본을 손실하지 않도록 실제 브라우저 경로로 직접 전송한다.
-
-CAMERA_SOURCE에 샘플 AVI 파일을 지정한 실제 서버에서도 전체 fixture 브라우저 검증을 재실행해 반복 영상·항상 보이는 live ribbon·고정 분석 bbox·이미지 업로드와 녹음 흐름을 확인했다. 설명 HTML도 모든7단계·개발/보드 토글·1440/820/390px에서 이미지 로딩·overflow·JavaScript 오류를 검사했다.
-
-## 실제 Qwen 평가
-
-20개 영어 음료 사례, temperature=0, thinking=false 요청, max_completion_tokens192, stream=false. expected intent/item/portion 모두 일치해야 정답. 단일 JSON Markdown fence는 제거하지만 필드를 보정하지 않는다. fixture fallback 없음. 프롬프트 보완에 사용한 개발 평가셋이므로 held-out 일반화 성능으로 해석하지 않는다.
-
-| 신규 결과 | 의미 |
-| --- | --- |
-| [060535](qwen_evaluation/drinks-20261017T060535441028Z.json) | proxy 생성옵션 계약 불일치로 요청422. 실제 생성 실패 기록이며 모델 정확도0%로 해석하지 않음 |
-| [060722](qwen_evaluation/drinks-20261017T060722867674Z.json) | 첫 실제 평가15/20, 프롬프트 보완 전 |
-| [061614](qwen_evaluation/drinks-20261017T061614204547Z.json) | 최종 제품 프롬프트17/20(85%), HTTP 왕복 중앙값0.679초 |
-
-최종 실패3개: `Coke instead, please`에서 regular를 small로 해석; `I'm fine`은 decline 대신 clarify; `Actually a regular coffee`는 refill 대신 clarify. 출력은 허용 schema였으나 의미가 틀렸다. 결과를 정답으로 바꾸지 않고 원본 raw를 보존했다. 메뉴/schema 검증만으로 의미 정확도를 보장할 수 없으므로 사용자가 카드에서 수정/취소하고 최종 Confirm한다. 기존 .py.md/.json.md 평가 아카이브는 변경하지 않았다.
-
-위 시간은 Windows→우리 proxy→Mac HTTP 전체 응답이며 보드 inference/NPU/TTFT/token throughput/실제 STT 성능과 무관하다. 서버 옵션 적용·가중치 checksum을 독립 감사한 결과는 아니다.
-
-## 외부 의존성과 남은 작업
-
-| 항목 | 현재 상태 / 실제 필요한 것 |
-| --- | --- |
-| Vision 모델 | DINOv2 external backend 병합(PR #2, `services.vision.backend:create_backend`): YOLO11n/고정 ROI → crop → DINOv2 → head. Mac XNNPACK bundle로 실제 HTTP 검증. 보드 QNN bundle·실사 데이터(coffee·잔량 단계)·정확도/지연은 현장 확인 — [vision_evaluation](vision_evaluation/README.md) |
-| STT 모델 | 팀원 소유. 원본 오디오 전달은 확인. WebM/Opus·Safari MP4/AAC 지원/실제 영어 인식 확인 필요 |
-| ExecuTorch/QNN | 보드/runner/bundle/SDK 경로 미제공. (2026-10-17 갱신) 보드 LLM은 Gemma로 `services/qwen/board_llm.py` 연결, 상주 실행은 아님 — [BOARD_RUNBOOK](BOARD_RUNBOOK.md). 경로·상주 실행·토크나이저·취소/성능/NPU delegation은 현장 검증 |
-| Bridge/MCU | 공식 RPC API 기반 adapter·nonblocking/cancel/watchdog 초안. 실제 board core compile, LED polarity·package 버전·router·timeout/단절/센서 연결 미검증 |
-| 물리 카메라 | 영상 파일 capture·loop·MJPEG 검증. 실제 USB 권한·index·연결 끊김 현장 확인 |
-| 물리 태블릿 | Chromium 실제 UI·녹음 transport·WebAudio·태블릿 너비 검증. iPad/Android 권한·실제 mic/speaker·HTTPS tailnet 설정은 현장 장치 필요 |
-
-구체적인 연결 순서는 [보드 runbook](BOARD_RUNBOOK.md), [태블릿 runbook](TABLET_DEMO.md), [담당자 계약](CONTRACTS.md). Tailscale Serve는 기존 tailnet 서비스 설정을 자동 변경하지 않았고 설치·HTTPS 명령을 문서화했다. 앱/테스트 프로세스는 검증 종료 후 모두 정리한다. logs/와 tmp/ QA 산출물만 남기고 Mac 공유 모델 서버는 건드리지 않는다.
-
-최종 정리 확인: 모든 앱 supervisor 정상 종료, tmp의 supervisor lock 없음, 사용한 로컬 포트8000/8001/8002/8080/18081에 listener 없음. 유지한 앱/테스트 프로세스는 없다. 실행을 재개하려면 루트 README의 명령을 사용한다. 구현은 a6f86b0으로 main에 commit/push했다.
+과거 기록은 [Gemma](gemma_evaluation/README.md), [Qwen](qwen_evaluation/README.md), [Vision](vision_evaluation/README.md), [STT](stt_evaluation/README.md)에 보존한다. 이전 스키마·프롬프트·bundle 결과를 현재 코드의 성능으로 해석하지 않는다.
