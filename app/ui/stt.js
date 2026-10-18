@@ -42,8 +42,10 @@ async function saveTake(take) {
   results = body.takes;
 }
 
-async function dropTake(index) {
-  const query = index === null ? '' : `?index=${index}`;
+async function dropTake(key) {
+  // Rows that share a recording are discarded together; null clears everything.
+  const query = key === null ? ''
+    : key.startsWith('row-') ? `?index=${key.slice(4)}` : `?take_id=${encodeURIComponent(key)}`;
   const response = await fetch(`/api/stt/results${query}`, {method: 'DELETE'});
   const body = await response.json();
   results = body.takes || [];
@@ -156,29 +158,69 @@ function summarise(source) {
     ? `${(median(results.map(r => r.stt_ms)) / 1000).toFixed(1)}s` : '—';
   if (source) $('sttSource').textContent = source;
 
-  const rows = $('sttRows');
-  rows.replaceChildren();
-  results.forEach((r, i) => {
+  renderTable();
+}
+
+// One row per recording, one column per model: the whole point is reading the
+// same sentence across models without hunting for its pair.
+function renderTable() {
+  const models = [];
+  const takes = new Map();
+  results.forEach((take, position) => {
+    const model = take.model || take.source || 'pipeline';
+    if (!models.includes(model)) models.push(model);
+    const key = take.take_id || `row-${position}`;
+    if (!takes.has(key)) takes.set(key, {expected: take.expected, by: {}, key});
+    takes.get(key).by[model] = take;
+  });
+
+  const head = $('sttHead');
+  head.replaceChildren();
+  const headRow = document.createElement('tr');
+  for (const label of ['Expected', ...models, '']) {
+    const cell = document.createElement('th');
+    cell.textContent = label;
+    headRow.append(cell);
+  }
+  head.append(headRow);
+
+  const body = $('sttRows');
+  body.replaceChildren();
+  for (const take of [...takes.values()].reverse()) {
     const row = document.createElement('tr');
-    const latency = r.stt_ms ? `${(r.stt_ms / 1000).toFixed(1)}s` : '—';
-    for (const value of [r.model || r.source || '—', r.expected, r.heard,
-                         `${Math.round(r.wer * 100)}%`, latency]) {
+    const expected = document.createElement('td');
+    expected.textContent = take.expected;
+    row.append(expected);
+
+    for (const model of models) {
+      const entry = take.by[model];
       const cell = document.createElement('td');
-      cell.textContent = value;
+      if (!entry) {
+        cell.textContent = '—';
+      } else {
+        const said = document.createElement('div');
+        said.textContent = entry.heard || '—';
+        const badge = document.createElement('span');
+        badge.className = `verdict ${entry.wer === 0 ? 'hit' : 'miss'}`;
+        badge.textContent = `${Math.round(entry.wer * 100)}%` +
+          (entry.stt_ms ? ` · ${(entry.stt_ms / 1000).toFixed(1)}s` : '');
+        cell.append(said, badge);
+      }
       row.append(cell);
     }
-    // A fumbled take says nothing about the model, so single rows can go.
-    const cell = document.createElement('td');
+
+    const actions = document.createElement('td');
     const drop = document.createElement('button');
     drop.type = 'button';
     drop.className = 'secondary';
     drop.textContent = '✕';
-    drop.title = 'Discard this take';
-    drop.onclick = () => dropTake(i).catch(() => showError('Could not discard that take.'));
-    cell.append(drop);
-    row.append(cell);
-    rows.prepend(row);
-  });
+    drop.title = 'Discard this recording';
+    drop.onclick = () => dropTake(take.key)
+      .catch(() => showError('Could not discard that take.'));
+    actions.append(drop);
+    row.append(actions);
+    body.append(row);
+  }
 }
 
 function showError(message) {

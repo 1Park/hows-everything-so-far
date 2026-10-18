@@ -215,9 +215,15 @@ def create_app(settings=None, clients=None, hardware=None):
         return {"takes": takes}
 
     @app.delete("/api/stt/results")
-    async def stt_delete_results(index: int = Query(default=-1, ge=-1)):
+    async def stt_delete_results(
+        index: int = Query(default=-1, ge=-1),
+        take_id: str = Query(default="", max_length=40),
+    ):
         takes = read_takes()
-        if index < 0:
+        if take_id:
+            # One recording produced a row per model; discarding it drops them all.
+            takes = [take for take in takes if take.get("take_id") != take_id]
+        elif index < 0:
             takes = []
         elif index < len(takes):
             takes.pop(index)
