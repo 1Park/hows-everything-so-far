@@ -36,7 +36,7 @@ python scripts/build_vision_worker.py --sdk "$HOME/git/executorch" \
 
 ## 시작
 
-아래는 제공 SDK가 `~/git/executorch`, bundle이 `dinov2-qnn-v5`(오렌지주스 포함)에 있는 배치 예다. 실제 경로를 확인하고 **기존 listener가 없는 서비스만** 시작한다. 선택 env를 각 프로세스에 명시한다.
+아래는 제공 SDK가 `~/git/executorch`, bundle이 `dinov2-qnn-v5e`(오렌지주스, 데모 자리 과자봉지 포함)에 있는 배치 예다. 실제 경로를 확인하고 **기존 listener가 없는 서비스만** 시작한다. 선택 env를 각 프로세스에 명시한다.
 
 ```sh
 mkdir -p logs tmp
@@ -45,7 +45,7 @@ export LD_LIBRARY_PATH="$HOME/git/executorch/build-x86/backends/qualcomm:/usr/li
 export ADSP_LIBRARY_PATH=/usr/lib
 
 VISION_MODEL_BACKEND=external VISION_ADAPTER=services.vision.backend:create_backend \
-VISION_MODEL_PATH=models/board/vision/dinov2-qnn-v5 \
+VISION_MODEL_PATH=models/board/vision/dinov2-qnn-v5e \
 VISION_WORKER_BIN="$PWD/models/board/bin/qnn_vision_worker" \
 nohup .venv/bin/python -m uvicorn services.vision.server:create_app --factory \
   --host 127.0.0.1 --port 8001 > logs/vision-8001.log 2>&1 < /dev/null &

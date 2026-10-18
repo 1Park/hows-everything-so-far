@@ -133,6 +133,13 @@ function modePill(label, source, ready = true) {
 }
 async function checkConnection() {
   try {
+    const mappingResponse = await fetch('/api/vision-categories');
+    if (mappingResponse.ok) {
+      const mapping = await mappingResponse.json();
+      $('categoryMapping').textContent = 'DINO category mapping (read-only): '
+        + Object.entries(mapping.groups).map(([name, members]) => `${members.join(' + ')} → ${name}`).join(' · ')
+        + '. Requests can select any member of the groups observed in this scene.';
+    }
     const response = await fetch('/ready'); const info = await response.json(); if (info.policy) policy = info.policy;
     const sources = $('sources'); sources.replaceChildren();
     for (const [name, data] of Object.entries(info.dependencies)) sources.append(modePill(name.toUpperCase(), data.source, data.ready));
@@ -248,12 +255,28 @@ function render(next, authoritative = false) {
     $('sceneTitle').textContent = 'Watching for a stable scene';
     $('sceneSubtitle').textContent = $('captureStatus').textContent;
   }
+  const choices = $('drinkChoices'); choices.replaceChildren();
+  $('untrainedCategories').checked = !!state.untrained_categories;
+  $('untrainedCategories').disabled = ['observing','interpreting','listening','transcribing','loading','returning'].includes(state.phase);
+  $('demoCategoryMapping').textContent = state.untrained_categories
+    ? 'DEMO ON · water → water / sparkling water / soda · coke → coke / coke zero / coffee'
+    : 'Off · No additional drink variants.';
+  choices.hidden = !state.target || monitoring;
+  for (const item of state.allowed_items || []) {
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'secondary drink-choice';
+    const icon = {sparkling_water:'water', soda:'water', coke_zero:'coke'}[item] || item;
+    const image = document.createElement('img'); image.src = `/ui/${icon}.svg`; image.alt = ''; image.width = 48; image.height = 48;
+    const label = document.createElement('span'); label.textContent = item.replaceAll('_', ' ');
+    button.append(image, label); button.disabled = !canEdit() || !!pendingAction;
+    button.onclick = () => send(`${item.replaceAll('_', ' ')}, please`).catch(() => {});
+    choices.append(button);
+  }
   $('requestCard').hidden = !state.card || !['card','interpreting','not_understood','error','loading','returning','done'].includes(state.phase);
   if (monitoring) $('requestCard').hidden = true;
   if (state.card) {
-    $('cardDrink').textContent = state.card.item.replace('_', ' ');
+    $('cardDrink').textContent = state.card.item.replaceAll('_', ' ');
     $('revision').textContent = `v${state.card.revision}`;
-    $('targetId').textContent = `Target ${state.card.object_id} · Frozen at proposal · ${state.qwen_source || 'pending'} Qwen`;
+    $('targetId').textContent = `Target ${state.card.object_id} · Frozen at proposal · ${state.qwen_source || 'pending'} LLM`;
     // CSS presentation of the frozen target. Never supplied as model crop/preprocessing.
     const b = state.target.bbox, width = b.x2-b.x1, height = b.y2-b.y1;
     $('targetImage').style.backgroundImage = `url("${state.snapshot_url}")`;
@@ -318,6 +341,12 @@ $('captureMode').onchange = async () => {
   try {updateCapture(await post('/api/capture', {mode}));}
   catch {paintCapture();}
   finally {$('captureMode').disabled = false;}
+};
+$('untrainedCategories').onchange = async () => {
+  const enabled = $('untrainedCategories').checked;
+  $('untrainedCategories').disabled = true;
+  try {render(await post('/api/demo-features', {untrained_categories:enabled}));}
+  catch {api('/api/state').then(render).catch(() => {});}
 };
 async function send(utterance) {
   if(!canEdit() || pendingAction) return;

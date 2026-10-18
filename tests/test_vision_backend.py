@@ -99,12 +99,31 @@ def test_label_conversion():
     obs = to_observation([0.05, 0.05, 0.9], ["water__full", "coke__mid", "empty"])
     assert obs["item"] == "unknown" and obs["fill_ratio"] < 0.1 and obs["confidence"] == pytest.approx(0.9)
     obs = to_observation([0.5, 0.5], ["coffee__low", "coffee__full"])
-    assert obs["item"] == "coffee" and obs["confidence"] == pytest.approx(0.5)
+    assert obs["item"] == "coke" and obs["confidence"] == pytest.approx(0.5)
     assert obs["fill_ratio"] == pytest.approx((0.18 + 0.85) / 2)
     assert obs["item_confidence"] == pytest.approx(1.0)  # 음료는 확실, 잔량만 애매
     obs = to_observation([0.6, 0.3, 0.1], ["coke__low", "coffee__low", "empty"])
-    assert obs["item"] == "coke" and obs["item_confidence"] == pytest.approx(0.6 / 0.9, abs=1e-3)
+    assert obs["item"] == "coke" and obs["item_confidence"] == pytest.approx(1.0)
     assert to_observation([0.1, 0.9], ["coke__low", "empty"])["item_confidence"] is None
+
+
+def test_category_merge_preserves_fill_and_combines_probability_mass():
+    classes = ["coffee__full", "coke__low", "water__mid"]
+    obs = to_observation([0.3, 0.3, 0.4], classes)
+    assert obs["item"] == "coke"  # The merged .6 beats water's .4.
+    assert obs["item_confidence"] == pytest.approx(.6)
+    assert obs["fill_ratio"] == pytest.approx(.3 * .85 + .3 * .18 + .4 * .5)
+    assert obs["confidence"] == pytest.approx(.4)  # Levels remain uncertain.
+    assert to_observation([1.0], ["coffee__low"])["item"] == "coke"
+
+
+def test_category_mapping_is_read_only():
+    from app.server import create_app
+    with TestClient(create_app(Settings(qwen_backend="fixture"))) as client:
+        mapping = client.get("/api/vision-categories").json()
+        assert mapping["groups"] == {"water": ["water"], "coke": ["coke", "coffee"], "orange_juice": ["orange_juice"]}
+        assert mapping["editable"] is False
+        assert client.post("/api/vision-categories", json={"groups": {}}).status_code == 405
 
 
 def test_confidence_treats_low_and_empty_as_one_refill_level():
@@ -113,10 +132,10 @@ def test_confidence_treats_low_and_empty_as_one_refill_level():
     assert obs["item"] == "water" and obs["confidence"] == pytest.approx(0.9)  # 이전: min(0.6, 0.5) = 0.5
     obs = to_observation([0.5, 0.4, 0.1], ["empty", "water__low", "water__full"])
     assert obs["item"] == "unknown" and obs["confidence"] == pytest.approx(0.9)  # 빈 잔 쪽도 같은 규칙
-    # 리필 여부가 갈리는 헷갈림(low↔full)과 음료 헷갈림(coke↔coffee)은 그대로 점수를 낮춘다
+    # low↔full은 여전히 불확실하지만 coke↔coffee는 같은 그룹이다.
     assert to_observation([0.5, 0.5], ["coffee__low", "coffee__full"])["confidence"] == pytest.approx(0.5)
     obs = to_observation([0.45, 0.45, 0.1], ["coke__low", "coffee__low", "empty"])
-    assert obs["confidence"] == pytest.approx(0.55)
+    assert obs["confidence"] == pytest.approx(1.0)
     # full↔mid는 합치지 않는다
     assert to_observation([0.5, 0.5], ["water__full", "water__mid"])["confidence"] == pytest.approx(0.5)
 
@@ -148,3 +167,6 @@ def test_split_other():
     assert drop and cls == ["coke__low", "empty"] and p == pytest.approx([0.5, 0.5])
     drop, p, cls = split_other([0.7, 0.3], ["coke__low", "empty"])
     assert not drop and cls == ["coke__low", "empty"]
+    # other 가 가장 높으면 0.5 미만이어도 뺀다 (보드: 오렌지주스 잔에 겹친 과자봉지 0.47 vs 0.38)
+    assert split_other([0.38, 0.15, 0.47], ["orange_juice__low", "coke__low", "other"])[0]
+    assert not split_other([0.45, 0.15, 0.40], ["orange_juice__low", "coke__low", "other"])[0]

@@ -6,6 +6,28 @@ fixture 또는 아래 external backend를 명시적으로 선택한다. 자동 f
 
 ## DINOv2 backend (`backend.py`)
 
+### 카테고리 통합
+
+기존 DINO `.pte`와 logistic regression `head.json`은 변경하지 않는다.
+softmax 이후 `coffee`와 `coke`의 확률을 합산해 대표 클래스 **`coke`** 로 반환하고,
+`water`는 유지한다. 잔량 단계는 합치지 않으며 기존 확률 가중 평균을 유지한다.
+음료 신뢰도는 통합한 확률로 계산한다. 따라서 관찰 결과의 `coke`는 커피도 포함한다.
+고객이 명시한 coffee 요청 및 메뉴는 그대로 coffee를 사용할 수 있다.
+Controller는 현재 frozen scene의 모든 관찰 카테고리를 펼쳐 `allowed_items`를 만든다:
+water만 있으면 water, coke 그룹만 있으면 coke/coffee, 둘 다 있으면 세 음료다.
+LLM 프롬프트에 이 목록을 전달하고, 모델이 목록 밖 음료를 반환하면 Controller가
+`not_understood`로 처리해 확인을 차단한다. UI의 음료 그림 버튼도 같은 목록을 사용한다.
+unknown은 선택지를 추가하지 않는다. 고객의 선택은 요청 카드이며 자동 물리 승인이 아니다.
+
+고정 매핑의 원본은 `common/vision_categories.py`, 적용은 `labels.py`에 있다.
+Demo tools의 읽기 전용 표시와 `GET /api/vision-categories`가 같은 매핑을 사용한다.
+런타임 수정 API는 제공하지 않는다. 이 통합은 DINO backend 후처리에 적용되며
+fixture 및 별도 외부 adapter의 결과를 Controller에서 강제로 바꾸지는 않는다.
+
+추가 하위 음료는 Controller의 demo-only 토글로만 활성화한다 (기본 OFF).
+water → water/sparkling water/soda, coke → coke/coke zero/coffee이며 DINO head 클래스는
+추가하지 않는다. Vision 계약의 관찰 enum과 고객 요청 enum은 분리되어 있다.
+
 ```sh
 VISION_MODEL_BACKEND=external \
 VISION_ADAPTER=services.vision.backend:create_backend \
@@ -23,7 +45,7 @@ python -m uvicorn services.vision.server:create_app --factory --host 127.0.0.1 -
 
 - 흐름: 이미지 bytes → 컵 박스 (`boxes.mode`: `yolo` .pte / 고정 `rois` / `center`) → crop (`yolo`는 기본 `crop_mode: pad` = 박스×1.15 + 회색 패딩) → DINOv2 .pte → head → `item`·`fill_ratio`·`confidence`·`item_confidence` ([labels.py](labels.py)).
 - head에 `other` 클래스(캔·병)가 있으면 p(other) ≥ 0.5인 박스는 결과에서 뺀다. object_id는 남은 컵 기준으로 다시 매긴다.
-- YOLO 모드 head는 추론과 같은 crop으로 학습한다 (`ml/training/make_crops.py` → `make_head --data data/crops`). 보드 배포 bundle: `models/board/vision/dinov2-qnn-v5` (물·콜라·커피·오렌지주스 × full/mid/low + empty + other, 클래스 14개). 아래 지연 비교 기록은 당시 `dinov2-qnn-v3` bundle을 사용했다.
+- YOLO 모드 head는 추론과 같은 crop으로 학습한다 (`ml/training/make_crops.py` → `make_head --data data/crops`). 보드 배포 bundle: `models/board/vision/dinov2-qnn-v5e` (물·콜라·커피·오렌지주스 × full/mid/low + empty + other, 클래스 14개). 아래 지연 비교 기록은 당시 `dinov2-qnn-v3` bundle을 사용했다.
 - 서비스는 시작 시 DINO와 YOLO(detector)를 모두 로드하고 준비 신호를 기다린다. 기존 bundle의 `runner=cli`는 서비스 안에서 상주 worker로 연결하며 bundle 파일은 수정하지 않는다. `py`는 Python 런타임 모델을 한 번 로드해 유지한다. 학습·독립 진단의 `CliRunner`는 기존 일회성 동작을 유지한다.
 - 의존성: numpy + Pillow (OpenCV·ultralytics 불필요). 추론은 전용 스레드 1개에서 직렬 실행.
 - bundle·worker 없음 또는 시작 로드 실패면 서비스 시작에 실패한다. `/ready`는 실제 worker 생존 여부와 `runners.dino/detector`의 resident·PID를 표시한다. 추론 실패·timeout·취소는 해당 worker를 회수하고 ready=false가 되며, 서비스 재시작으로 복구한다. fixture/일회성 CLI 자동 전환 없음.

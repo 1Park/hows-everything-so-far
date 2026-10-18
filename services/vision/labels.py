@@ -8,12 +8,14 @@
                잔량 확신도는 low와 empty를 한 묶음(REFILL_LEVELS)으로 본다. 둘 다 리필 대상이라, 투명한 물이
                조금 남은 잔처럼 low↔empty 사이에서 헷갈려도 리필 판단은 흔들리지 않기 때문이다.
                이 묶음이 이기면 음료 확신도에도 반대편을 더한다: 음료 잔이면 + p(empty), 빈 잔(unknown)이면
-               + Σ p(<drink>__low). coke↔coffee, low↔full 사이 헷갈림은 그대로 점수를 낮춘다.
+               + Σ p(<drink>__low). low↔full 사이 헷갈림은 그대로 점수를 낮춘다.
   item_confidence : 음료가 있다고 볼 때 "어느 음료인지"만의 확신도 = 최고 음료 marginal / 음료 marginal 합.
                     empty/unknown 확률은 빼고 정규화한다. item 이 unknown 이면 None.
-                    coke↔coffee 처럼 음료만 애매한 경우를 Controller가 고객에게 묻는 데 쓴다.
+                    카테고리 통합 후의 확신도다 (coffee + coke → coke).
 Controller 정책(기본 confidence ≥ 0.7, fill_ratio ≤ 0.3 / 보드 .env.board 0.6, 0.35)은 이 값을 그대로 쓴다.
 """
+
+from common.vision_categories import VISION_CATEGORY_MAP
 
 DRINKS = ("water", "coke", "coffee", "orange_juice")
 # 단계 → 대표 잔량 비율. full/mid/low 구간(합성 데이터 생성 기준)의 중앙값 근처. bundle.json 으로 덮어쓸 수 있다.
@@ -25,15 +27,20 @@ def parse(label):
     if label == "empty":
         return "unknown", "empty"
     drink, _, level = label.partition("__")
-    return (drink if drink in DRINKS else "unknown"), level
+    return VISION_CATEGORY_MAP.get(drink, "unknown"), level
 
 
 OTHER = "other"
-OTHER_DROP = 0.5  # p(other) 가 이 이상이면 컵이 아닌 것으로 보고 결과에서 뺀다
+OTHER_DROP = 0.5  # p(other) 가 이 이상이거나, 모든 클래스 중 가장 높으면 컵이 아닌 것으로 보고 결과에서 뺀다
 
 
 def split_other(probs, classes, drop=OTHER_DROP):
-    """→ (컵이 아님 여부, other 를 뺀 확률, other 를 뺀 클래스). other 클래스가 없는 head 면 그대로."""
+    """→ (컵이 아님 여부, other 를 뺀 확률, other 를 뺀 클래스). other 클래스가 없는 head 면 그대로.
+
+    other 가 가장 높은 클래스면 0.5 미만이어도 뺀다: 보드에서 오렌지주스 잔이 과자봉지 앞에 겹치자 봉지 박스가
+    other 0.47 / orange_juice__low 0.38 로 나왔고, other 를 빼고 정규화하면 오렌지주스 리필 대상이 됐다.
+    교차검증 컵 453장에서 이 규칙으로 더 버려지는 컵은 없었다.
+    """
     if OTHER not in classes:
         return False, list(probs), list(classes)
     i = classes.index(OTHER)
@@ -41,7 +48,8 @@ def split_other(probs, classes, drop=OTHER_DROP):
     rest = [float(p) for j, p in enumerate(probs) if j != i]
     cls = [c for j, c in enumerate(classes) if j != i]
     total = sum(rest)
-    return p_other >= drop, ([p / total for p in rest] if total > 0 else rest), cls
+    not_cup = p_other >= drop or p_other >= max(float(p) for p in probs)
+    return not_cup, ([p / total for p in rest] if total > 0 else rest), cls
 
 
 def to_observation(probs, classes, fill_ratio=None):

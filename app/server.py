@@ -17,6 +17,7 @@ from app.events import EventLog
 from app.media import VideoSource
 from common.api import ApiError, create_api
 from common.config import ROOT, load_settings
+from common.vision_categories import VISION_CATEGORY_GROUPS
 from common.contracts import (
     CancelInput,
     ConfirmInput,
@@ -28,6 +29,7 @@ from common.contracts import (
     SttTake,
     CaptureModeInput,
     CaptureStatus,
+    DemoFeaturesInput,
 )
 from services.stt.normalize import normalize
 from common.media import read_upload, validate_audio, validate_image
@@ -134,6 +136,15 @@ def create_app(settings=None, clients=None, hardware=None):
     @app.get("/api/state", response_model=StateSnapshot)
     async def state():
         return controller.state()
+
+    @app.get("/api/vision-categories")
+    async def vision_categories():
+        return {"groups": VISION_CATEGORY_GROUPS, "editable": False,
+                "scope": "DINO classifier post-processing"}
+
+    @app.post("/api/demo-features", response_model=StateSnapshot)
+    async def demo_features(body: DemoFeaturesInput):
+        return await controller.set_demo_features(body.untrained_categories)
 
     @app.get("/api/capture", response_model=CaptureStatus)
     async def capture_status():
