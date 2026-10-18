@@ -1,8 +1,8 @@
 # stt_cases.py
 
-원본 경로: `evaluation/stt_cases.py` · 원본 SHA-256: `c2ea4d87b674b41cb430e1452bffd8c8e1a5bdb3ad0ca81c146d4fbbf825dccf`
+Original path: `evaluation/stt_cases.py` · Original SHA-256: `c2ea4d87b674b41cb430e1452bffd8c8e1a5bdb3ad0ca81c146d4fbbf825dccf`
 
-원본 내용을 아래 코드 블록에 보존했다. 실행 가능한 파일로 복원하는 방법은 [평가 인덱스](README.md)를 참조한다. 줄바꿈은 Markdown 저장 과정에서 정규화될 수 있다.
+The original content is preserved in the code block below. See the [evaluation index](README.md) for how to restore it as an executable file. Line endings may have been normalized when it was stored as Markdown.
 
 ````python
 import hashlib

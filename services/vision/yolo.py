@@ -1,17 +1,18 @@
-"""YOLO11n .pte 후처리 — numpy만 (ultralytics 불필요).
+"""YOLO11n .pte postprocessing — numpy only (no ultralytics needed).
 
-.pte 출력 (ultralytics Detect export 모드, 디코드 포함):
-  (1, 84, 8400) = [cx, cy, w, h (640 입력 픽셀), COCO 80클래스 점수(sigmoid)] × 앵커 8400
+.pte output (ultralytics Detect export mode, decoding included):
+  (1, 84, 8400) = [cx, cy, w, h (640 input pixels), 80 COCO class scores (sigmoid)] × 8400 anchors
 """
 
 import numpy as np
 
-# COCO에서 컵으로 인정할 클래스. 실사 jar는 cup/vase/bowl로 섞여 나와 이름은 믿지 않고 "컵 비슷하면 컵"으로 본다.
+# COCO classes accepted as cups. Real jars come out as a mix of cup/vase/bowl, so the name is not
+# trusted: anything cup-like counts as a cup.
 GLASS_IDS = {39: "bottle", 40: "wine glass", 41: "cup", 45: "bowl", 75: "vase"}
 
 
 def nms(boxes, scores, iou_th):
-    """클래스 무시(agnostic) NMS. boxes xyxy (N,4) → 남길 index."""
+    """Class-agnostic NMS. boxes xyxy (N,4) → indices to keep."""
     order = scores.argsort()[::-1]
     keep = []
     area = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
@@ -29,10 +30,10 @@ def nms(boxes, scores, iou_th):
 
 
 def postprocess(out, meta, size_wh, conf=0.25, iou=0.7, glass_only=True):
-    """(1,84,8400) → [(xyxy 원본 픽셀, score, class_name)], score 내림차순.
+    """(1,84,8400) → [(xyxy in original pixels, score, class_name)], by descending score.
 
-    NMS는 모든 클래스 박스로 먼저 하고 컵 클래스는 그 뒤에 거른다 (= ultralytics agnostic_nms).
-    같은 컵에 cup/vase 이중 박스가 나오는 것을 막는다.
+    NMS runs over boxes of all classes first, and cup classes are filtered afterwards
+    (= ultralytics agnostic_nms). This prevents duplicate cup/vase boxes on the same cup.
     """
     p = np.asarray(out).reshape(84, -1).T  # (8400, 84)
     cls_scores = p[:, 4:]

@@ -1,16 +1,16 @@
 # Export and deployment bundle
 
-학습 checkpoint 또는 제공 모델을 보드용 `.pte`로 export하는 코드·양자화·출력 검증·bundle 생성 도구를 둔다.
+Holds code that exports trained checkpoints or provided models to `.pte` for the board, plus quantization, output validation and bundle creation tools.
 
-주최 측이 지원하는 QCS8275 checkout·QAIRT/QNN SDK·export 환경을 사용한다. 공식 최신 버전이나 다른 chipset target으로 임의 대체하지 않는다. Docker 환경 정의는 상위 `ml/`에 둔다.
+Use the QCS8275 checkout, QAIRT/QNN SDK and export environment supported by the organizers. Do not substitute the latest official version or a different chipset target on your own. The Docker environment definition lives in the parent `ml/`.
 
-입력 shape·dtype·layout·전처리·출력 계약을 확인하고, 필요한 calibration·양자화·QNN lowering·export를 수행한다. `.pte` 생성 성공과 실제 보드 실행·NPU delegation 검증은 별도 단계다.
+Check the input shape, dtype, layout, preprocessing and output contract, then perform the required calibration, quantization, QNN lowering and export. Successfully generating a `.pte` and verifying real board execution and NPU delegation are separate steps.
 
-결과는 `models/`의 버전별 bundle에 저장한다. 모델 파일 외에도 필요 시 tokenizer·labels·샘플 입력·reference 출력·metadata를 함께 준비한다. 보드 runtime 서버는 이 bundle을 설정 경로로 읽는다. export 도구를 프로덕션 서버에 포함하지 않는다.
+Results are stored in versioned bundles under `models/`. Besides the model files, prepare the tokenizer, labels, sample inputs, reference outputs and metadata as needed. The board runtime server reads these bundles from a configured path. Export tools are not included in the production server.
 
-## 파일
+## Files
 
-- `export_qnn.py` — YOLO/DINOv2 → QNN HTP `.pte` (x86 Docker, `--quant 16a8w|fp16|8a8w`, Mac은 `--dry-run`)
-- `export_xnnpack.py` — DINOv2 CLS → XNNPACK CPU `.pte` + parity·속도
-- `export_onnx.py` — DINOv2 CLS → ONNX (AI Hub 등 참고용)
-- `make_bundle.py` — Vision 서비스용 bundle(`bundle.json`+파일) 생성
+- `export_qnn.py` — YOLO/DINOv2 → QNN HTP `.pte` (x86 Docker, `--quant 16a8w|fp16|8a8w`, `--dry-run` on Mac)
+- `export_xnnpack.py` — DINOv2 CLS → XNNPACK CPU `.pte` + parity and speed
+- `export_onnx.py` — DINOv2 CLS → ONNX (for reference, e.g. AI Hub)
+- `make_bundle.py` — creates a bundle (`bundle.json` + files) for the Vision service

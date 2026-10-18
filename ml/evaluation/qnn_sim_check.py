@@ -1,7 +1,7 @@
-"""x86 컨테이너에서 QNN .pte를 HTP 시뮬레이터로 실행해 보드 없이 양자화 모델 정확도를 검증.
+"""Run a QNN .pte on the HTP simulator in the x86 container to check quantized-model accuracy without the board.
 
-컨테이너의 ExecuTorch Python 런타임엔 QnnBackend가 등록돼 있고, x86 QAIRT의 libQnnHtp.so가 HTP를 시뮬레이션한다.
-느리다 (YOLO 1회 ~3초) → 샘플 수를 작게.
+The container's ExecuTorch Python runtime has QnnBackend registered, and x86 QAIRT's libQnnHtp.so simulates the HTP.
+It is slow (~3 s per YOLO run) -> keep the sample count small.
 
   ml/docker-run.sh python -m ml.evaluation.qnn_sim_check yolo   models/experiments/vision/qnn/SM8650_16a8w/yolo11n_qnn.pte
   ml/docker-run.sh python -m ml.evaluation.qnn_sim_check dinov2 models/experiments/vision/qnn/SM8650_16a8w/dinov2_small_cls_qnn.pte
@@ -67,7 +67,7 @@ def check_yolo(pte, n):
 
 
 def check_dinov2(pte, n):
-    """양자화 임베딩 vs fp32: cosine + head 정확도 (head를 양자화 임베딩으로 학습했을 때 / fp32로 학습했을 때)."""
+    """Quantized vs fp32 embeddings: cosine + head accuracy (head trained on quantized embeddings / on fp32)."""
     from sklearn.linear_model import LogisticRegression
     from sklearn.pipeline import make_pipeline
     from sklearn.preprocessing import StandardScaler

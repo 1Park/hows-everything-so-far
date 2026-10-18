@@ -1,12 +1,12 @@
-"""DINOv2 임베딩 + few-shot 분류 정확도 평가.
+"""Evaluate few-shot classification accuracy on DINOv2 embeddings.
 
-클래스 폴더명 규칙: <drink>__<level> 또는 empty
-  joint 정확도: 7클래스 그대로
-  fill 정확도: 예측/정답의 level 부분만 비교 (empty 포함)
-  drink 정확도: 정답이 empty가 아닌 샘플만, 예측 drink 비교 (empty로 예측하면 오답)
-  conf gate: 스펙의 CONF_MIN 이상만 채택했을 때 coverage와 그 안에서의 정확도
+Class folder naming: <drink>__<level> or empty
+  joint accuracy: the 7 classes as-is
+  fill accuracy: compare only the level part of prediction/label (empty included)
+  drink accuracy: only samples whose label is not empty; compare predicted drink (predicting empty is wrong)
+  conf gate: coverage when only predictions >= the spec's CONF_MIN are accepted, and accuracy within them
 
-사용 예:
+Usage:
   python -m ml.evaluation.eval_fewshot --data data/synthetic --model small --shots 1 3 5 10
 """
 
@@ -53,13 +53,13 @@ def l2n(x):
 
 
 def predict(method, Xtr, ytr, Xte, n_cls):
-    """returns (pred, prob) — prob은 (N, n_cls) softmax/확률"""
+    """returns (pred, prob) — prob is (N, n_cls) softmax/probabilities"""
     if method == "proto":
-        sc = StandardScaler().fit(Xtr)  # train으로만 fit
+        sc = StandardScaler().fit(Xtr)  # fit on train only
         Xtr, Xte = sc.transform(Xtr), sc.transform(Xte)
         protos = l2n(np.stack([Xtr[ytr == c].mean(0) for c in range(n_cls)]))
         sim = l2n(Xte) @ protos.T
-        logits = sim / 0.05  # 온도: cosine 유사도를 확률처럼 보기 위한 값 (튜닝 대상)
+        logits = sim / 0.05  # temperature: makes cosine similarity read like a probability (tunable)
     elif method == "logreg":
         clf = make_pipeline(StandardScaler(), LogisticRegression(max_iter=3000, C=0.1))
         clf.fit(Xtr, ytr)
@@ -103,7 +103,7 @@ def main():
     X = embed_all(paths, args.model, args.pool, args.device, out_dir / f"emb_{tag}.npz")
     print(f"{len(paths)} images, {len(classes)} classes, emb dim {X.shape[1]}")
 
-    # 클래스별 고정 test split, 나머지 pool에서 k-shot 샘플링
+    # fixed per-class test split; sample k-shot from the remaining pool
     rng = np.random.default_rng(args.seed)
     test_idx, pool = [], {}
     for c in range(len(classes)):

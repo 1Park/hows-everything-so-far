@@ -14,8 +14,8 @@ def test_main_box_needs_exactly_one_box_over_center():
     size = (100, 100)
     cup, can_left = det(30, 20, 70, 90), det(0, 10, 25, 90)
     assert main_box([can_left, cup], size) is cup
-    assert main_box([can_left], size) is None  # 가운데 잔을 YOLO가 놓친 사진
-    assert main_box([cup, det(40, 0, 80, 60)], size) is None  # 뒤에 캔이 겹친 사진
+    assert main_box([can_left], size) is None  # photo where YOLO missed the center cup
+    assert main_box([cup, det(40, 0, 80, 60)], size) is None  # photo with a can overlapping behind
 
 
 def imbalanced():
@@ -28,7 +28,7 @@ def test_balanced_class_weight_raises_minority_recall(monkeypatch):
     X, y = imbalanced()
     real_import = builtins.__import__
 
-    def no_sklearn(name, *args, **kwargs):  # 보드처럼 numpy 경사하강 경로를 쓴다
+    def no_sklearn(name, *args, **kwargs):  # use the numpy gradient-descent path, like the board
         if name.startswith("sklearn"):
             raise ImportError(name)
         return real_import(name, *args, **kwargs)

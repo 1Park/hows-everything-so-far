@@ -1,78 +1,78 @@
-# 보드 배포·실행
+# Board deployment and operation
 
-코드·설정 변경은 **로컬 수정 → 검증 → commit/push → 보드 배포** 순서로 한다. 보드 레포를 직접 수정하지 않는다. 실험·빌드는 `/tmp` 등 별도 경로에서 수행하고 임시 소스 변경은 복원한다. 모델·SDK·외부 Whisper 서버는 앱 배포와 별도 관리한다.
+Code and settings changes follow **local edit → verify → commit/push → deploy to board**. Do not edit the board repo directly. Run experiments and builds in a separate path such as `/tmp`, and restore any temporary source changes. Models, the SDK, and the external Whisper server are managed separately from the app deployment.
 
-## 실행 구조
+## Runtime layout
 
-| 포트 | 서비스 | 실행 주체 |
+| Port | Service | Run by |
 | --- | --- | --- |
 | 8080 | Controller/UI | `dev.py --mode direct --with-stt` |
-| 8000 (localhost) | Qwen API → 상주 Gemma4 | 별도 Uvicorn |
-| 8001 (localhost) | Vision → 상주 YOLO + DINOv2 | 별도 Uvicorn |
-| 8002 (localhost) | STT API → whisper.cpp HTTP | 위 supervisor |
-| 8003 (localhost) | TTS → Piper, 디코더 상주 NPU | 별도 Uvicorn |
-| 8178 | 외부 whisper.cpp | 레포 밖에서 관리 |
+| 8000 (localhost) | Qwen API → resident Gemma4 | separate Uvicorn |
+| 8001 (localhost) | Vision → resident YOLO + DINOv2 | separate Uvicorn |
+| 8002 (localhost) | STT API → whisper.cpp HTTP | the supervisor above |
+| 8003 (localhost) | TTS → Piper, decoder resident on NPU | separate Uvicorn |
+| 8178 | external whisper.cpp | managed outside the repo |
 
-이 배치에서 `integration`/`board` 모드나 `start-board.sh`를 추가 실행하면 모델 서버 포트가 충돌한다. 이 도구들은 네 서비스를 모두 새로 관리할 때만 사용한다.
+In this layout, also running `integration`/`board` mode or `start-board.sh` causes model server port conflicts. Use those tools only when they manage all four services from scratch.
 
-## 준비
+## Preparation
 
-레포 루트에서 `.venv`와 의존성(`pip install -c requirements.lock -e '.[dev,camera]'`)을 준비한다. 제공 SDK·QNN 라이브러리·모델 bundle은 별도 설치한다. [과거 설치 기록](board-installation-20261017.md)은 재설치 명령의 기준으로 사용하지 않는다.
+From the repo root, set up `.venv` and the dependencies (`pip install -c requirements.lock -e '.[dev,camera]'`). Install the provided SDK, QNN libraries, and model bundles separately. Do not use the [past installation record](board-installation-20261017.md) as the reference for reinstall commands.
 
-- Gemma: `.env.board`의 `QWEN_MODEL_BACKEND=executorch`, `QWEN_MODEL=gemma4`. `bash scripts/board_llm.sh use gemma4`로 기본 선택을 고정한다. 경로·실행 수명은 [LLM 서비스](../services/qwen/README.md)를 따른다.
-- Vision: `.env.board` 기본 내부 backend는 fixture다. 실제 모델은 아래처럼 external factory·bundle·worker를 명시해야 한다. bundle은 디렉터리이며 `bundle.json`, `.pte`, head가 필요하다.
-- TTS: `.env.board`의 `TTS_*`. voice와 NPU 디코더(`<voice>.dec_f384.pte`)를 `models/board/tts/`에 두고 `.venv`에 `.[tts]` 의존성을 설치한다. `TTS_BACKEND=http`에서는 TTS가 없으면 `/ready=503`과 재생 오류를 표시하며 이전 WAV로 대체하지 않는다. [TTS 서비스](../services/tts/README.md).
-- STT: `.env.board`의 Whisper adapter가 `127.0.0.1:8178`에 연결한다. 외부 서버를 먼저 준비한다.
-- 카메라·ALSA 장치는 `.env.board`와 현장 장치 목록을 대조한다. `python scripts/diagnose.py`로 읽기 전용 진단을 수행한다.
+- Gemma: `QWEN_MODEL_BACKEND=executorch`, `QWEN_MODEL=gemma4` in `.env.board`. Pin the default selection with `bash scripts/board_llm.sh use gemma4`. Paths and process lifetime follow the [LLM service](../services/qwen/README.md).
+- Vision: the default internal backend in `.env.board` is fixture. The real model requires explicitly setting the external factory, bundle, and worker as shown below. A bundle is a directory and needs `bundle.json`, `.pte`, and a head.
+- TTS: `TTS_*` in `.env.board`. Put the voice and the NPU decoder (`<voice>.dec_f384.pte`) in `models/board/tts/` and install the `.[tts]` dependencies into `.venv`. With `TTS_BACKEND=http`, missing TTS shows `/ready=503` and a playback error, and it does not fall back to the old WAVs. [TTS service](../services/tts/README.md).
+- STT: the Whisper adapter in `.env.board` connects to `127.0.0.1:8178`. Prepare the external server first.
+- Check the camera and ALSA devices in `.env.board` against the on-site device list. Run `python scripts/diagnose.py` for read-only diagnostics.
 
-Vision worker는 제공 SDK를 수정하지 않고 별도 경로에서 빌드한다:
+Build the Vision worker in a separate path without modifying the provided SDK:
 
 ```sh
 python scripts/build_vision_worker.py --sdk "$HOME/git/executorch" \
   --build-dir "$HOME/git/executorch/build-x86" --output-dir /tmp/vision-worker-build
 ```
 
-생성 binary를 배포할 `models/board/bin/qnn_vision_worker`에 배치한다. 이 파일과 모델 가중치는 Git에 포함되지 않는다. [Vision 세부 설정](../services/vision/README.md).
+Place the generated binary at `models/board/bin/qnn_vision_worker` for deployment. This file and the model weights are not in Git. [Vision settings in detail](../services/vision/README.md).
 
-## 시작
+## Start
 
-### USB 분리와 독립적인 실행 (권장)
+### Running independently of USB disconnects (recommended)
 
-ADB shell에서 시작한 프로세스는 USB 분리 시 종료될 수 있다. Controller/STT와 각 모델 서버는
-`scripts/systemd/*.service`를 user systemd에 설치해 실행한다. 이 unit은 현재 보드의
-`~/project/hows-everything-so-far` 경로 기준이며, 다른 경로에서는 unit도 수정한다.
+Processes started from an ADB shell may be killed when USB is disconnected. Run the Controller/STT and each model server
+by installing `scripts/systemd/*.service` into user systemd. These units assume the current board path
+`~/project/hows-everything-so-far`; for a different path, edit the units too.
 
 ```sh
 loginctl enable-linger arduino
 mkdir -p ~/.config/systemd/user ~/.config/refill-assist
-# 기존 실제 Vision의 환경을 ~/.config/refill-assist/vision.env 에 기록:
+# Record the existing real Vision environment in ~/.config/refill-assist/vision.env:
 # VISION_MODEL_BACKEND=external
 # VISION_ADAPTER=services.vision.backend:create_backend
-# VISION_MODEL_PATH=<실제 bundle 절대경로>
-# VISION_WORKER_BIN=<실제 worker 절대경로>
-# LD_LIBRARY_PATH=<현재 SDK library 경로>
-# ADSP_LIBRARY_PATH=<현재 DSP library 경로>
-# TTS worker/library 환경은 ~/.config/refill-assist/tts.env 에 같은 방식으로 기록한다.
-# Whisper unit의 ~/whisper.cpp 및 모델 경로도 설치 위치와 대조한다.
+# VISION_MODEL_PATH=<absolute path of the real bundle>
+# VISION_WORKER_BIN=<absolute path of the real worker>
+# LD_LIBRARY_PATH=<current SDK library path>
+# ADSP_LIBRARY_PATH=<current DSP library path>
+# Record the TTS worker/library environment in ~/.config/refill-assist/tts.env the same way.
+# Also check ~/whisper.cpp and the model paths in the Whisper units against the install location.
 cp scripts/systemd/refill-*.service ~/.config/systemd/user/
 systemctl --user daemon-reload
-# 기존 Controller/STT supervisor와 Vision listener를 확인·종료한 후:
+# After checking for and stopping the existing Controller/STT supervisor and Vision listener:
 systemctl --user enable --now refill-llm refill-vision refill-tts refill-whisper-tiny refill-whisper-base refill-controller
 systemctl --user status refill-controller refill-llm refill-vision refill-tts refill-whisper-tiny refill-whisper-base
 ```
 
-배포 후에는 `systemctl --user restart refill-controller`로 앱을 재시작한다.
-Vision 코드가 바뀌면 `systemctl --user restart refill-vision`도 수행한다.
-종료는 `systemctl --user stop refill-controller refill-vision`이며, systemd와 별도 supervisor를
-중복 실행하지 않는다. 로그는 기존 `logs/controller.log`, `logs/stt.log` 및
-`journalctl --user -u refill-controller -u refill-vision`에서 확인한다.
-Controller unit은 각 모델 unit을 Wants/After로 연결한다. linger와 위 여섯 unit의 enable로
-로그인·노트북 USB 없이 재부팅 시 자동 시작한다. `prepare_board_start.py`가 점유 포트·실행 중
-supervisor를 확인한 뒤 종료된 프로세스의 lock/ready/stop만 정리한다. 모델 준비 완료 전에는
-`/ready`가 503일 수 있다. arduino-router는 별도 시스템 서비스이며 enable 상태를 확인한다.
-검증: USB 없이 `/ready`의 실제 모델·TTS·마이크·Bridge 준비와 태블릿 접속을 확인한다.
+After deploying, restart the app with `systemctl --user restart refill-controller`.
+If the Vision code changed, also run `systemctl --user restart refill-vision`.
+Stop with `systemctl --user stop refill-controller refill-vision`; do not run systemd and a separate supervisor
+at the same time. Logs are in the existing `logs/controller.log`, `logs/stt.log`, and
+`journalctl --user -u refill-controller -u refill-vision`.
+The Controller unit links each model unit with Wants/After. With linger and the six units above enabled,
+everything starts automatically on reboot without a login or laptop USB. `prepare_board_start.py` checks occupied ports and running
+supervisors, then cleans up only the lock/ready/stop files of exited processes. Before the models are ready,
+`/ready` may return 503. arduino-router is a separate system service; check that it is enabled.
+Verify: without USB, check that `/ready` reports the real models, TTS, microphone, and Bridge as ready, and that the tablet can connect.
 
-아래는 제공 SDK가 `~/git/executorch`, bundle이 `dinov2-qnn-v5e`(오렌지주스, 데모 자리 과자봉지 포함)에 있는 배치 예다. 실제 경로를 확인하고 **기존 listener가 없는 서비스만** 시작한다. 선택 env를 각 프로세스에 명시한다.
+Below is an example layout with the provided SDK at `~/git/executorch` and the bundle at `dinov2-qnn-v5e` (includes orange juice and the snack bag at the demo spot). Check the actual paths and start **only services that have no existing listener**. Set the selected env explicitly for each process.
 
 ```sh
 mkdir -p logs tmp
@@ -99,7 +99,7 @@ echo $! > tmp/tts-8003.pid
 .venv/bin/python scripts/dev.py --mode direct --with-stt --env-file .env.board
 ```
 
-Gemma4와 Vision은 서버 시작 시 모델을 로드하므로 생성/invoke 없이 `/ready`가 준비된다. Gemma의 `runner.resident/llm/pid`, Vision의 `runners`를 확인한다. Controller `/ready`는 종속 서비스 상태도 보여준다.
+Gemma4 and Vision load their models at server start, so `/ready` becomes ready without any generate/invoke call. Check Gemma's `runner.resident/llm/pid` and Vision's `runners`. The Controller `/ready` also shows the state of dependent services.
 
 ```sh
 curl -fsS http://127.0.0.1:8000/ready
@@ -108,12 +108,12 @@ curl -fsS http://127.0.0.1:8003/ready
 curl -fsS http://127.0.0.1:8080/ready
 ```
 
-태블릿은 `http://<board-address>:8080/`으로 접속한다. [보드 마이크·스피커 흐름](TABLET_DEMO.md). 데모 전 실제 이미지·발화·카드 수정·Confirm·Cancel을 확인한다. fixture 결과와 실제 모델 출력을 구분한다.
+The tablet connects to `http://<board-address>:8080/`. [Board microphone/speaker flow](TABLET_DEMO.md). Before the demo, check real images, utterances, card edits, Confirm, and Cancel. Keep fixture results distinct from real model output.
 
-## 종료·복구
+## Shutdown and recovery
 
-Controller/STT는 Ctrl+C 또는 같은 env의 `dev.py --mode direct --stop`으로 종료한다. 별도 Vision/Gemma는 자동 종료되지 않는다. 위 PID 파일과 `/proc/<pid>/cmdline`을 대조한 뒤 해당 Uvicorn PID에 TERM을 보낸다. 전체 Python·runner를 대상으로 한 광범위 종료는 사용하지 않는다. 외부 Whisper·router·MCU·Tailscale은 유지한다.
+Stop the Controller/STT with Ctrl+C or `dev.py --mode direct --stop` with the same env. A separate Vision/Gemma does not stop automatically. Check the PID files above against `/proc/<pid>/cmdline`, then send TERM to that Uvicorn PID. Do not use broad kills that target all Python processes or runners. Leave the external Whisper, router, MCU, and Tailscale running.
 
-Vision worker가 실패하면 `/ready=false`이며 Vision 서비스를 재시작한다. Gemma worker 오류는 다음 생성 요청에서 재로드할 수 있다. 준비 실패는 로그·파일·라이브러리 경로를 확인하며 fixture로 우회하지 않는다.
+If the Vision worker fails, `/ready=false`; restart the Vision service. A Gemma worker error can be recovered by reloading on the next generation request. For readiness failures, check the logs, files, and library paths; do not work around them with fixtures.
 
-Hardware 기본은 mock이다. `bridge`는 [`RouterClient`](../app/hardware/router.py)의 `/var/run/arduino-router.sock`을 통해 통신한다. UART는 arduino-router만 소유한다. MCU 빌드·LED 극성·센서·watchdog 검증은 [firmware 안내](../firmware/README.md)를 따른다.
+Hardware defaults to mock. `bridge` communicates through `/var/run/arduino-router.sock` in [`RouterClient`](../app/hardware/router.py). Only arduino-router owns the UART. MCU build, LED polarity, sensor, and watchdog verification follow the [firmware guide](../firmware/README.md).

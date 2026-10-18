@@ -1,206 +1,206 @@
-# Vision 평가 기록 — DINOv2 + YOLO11n (로컬 / QNN 시뮬레이터)
+# Vision evaluation records — DINOv2 + YOLO11n (local / QNN simulator)
 
-이하 수치·PID·배포 상태는 각 실행 당시의 기록이다. 현재 설정·상주 구조는 [Vision 서비스](../../services/vision/README.md)와 [보드 runbook](../BOARD_RUNBOOK.md)을 따른다.
+The numbers, PIDs, and deployment states below are records from each run at the time. Current settings and the resident structure follow the [Vision service](../../services/vision/README.md) and the [board runbook](../BOARD_RUNBOOK.md).
 
-기준일: 2026-10-15 ~ 10-17. **Mac(M4)과 x86 Docker HTP 시뮬레이터 결과이며 보드 실측이 아니다.** 보드 수치는 별도로 기록한다. 합성 이미지는 실제 정확도 증거가 아니다.
+Dates: 2026-10-15 ~ 10-17. **These are Mac (M4) and x86 Docker HTP simulator results, not board measurements.** Board numbers are recorded separately. Synthetic images are not evidence of real accuracy.
 
-재현 코드: `ml/` ([ml/README.md](../../ml/README.md)), 런타임: `services/vision/`.
+Reproduction code: `ml/` ([ml/README.md](../../ml/README.md)); runtime: `services/vision/`.
 
-## 보드 상주 실행 전후 지연 (2026-10-18 UTC)
+## Board latency before/after resident execution (2026-10-18 UTC)
 
-별도 `/tmp`의 로컬 코드 사본으로만 실험했으며 보드 레포·기존 Vision/Gemma 서비스는
-수정·재시작하지 않았다. 기존 Gemma4 worker PID 133141은 유지됐다. 아래 수치는
-HTTP/카메라/네트워크를 제외한 직접 Vision pipeline invoke 시간이다.
+Experiments used only a local copy of the code in a separate `/tmp`; the board repo and the existing Vision/Gemma services were
+not modified or restarted. The existing Gemma4 worker PID 133141 was kept. The numbers below are
+direct Vision pipeline invoke times, excluding HTTP/camera/network.
 
-| 항목 | 기존 CLI | DINO+YOLO 상주 |
+| Item | Previous CLI | Resident DINO+YOLO |
 | --- | ---: | ---: |
-| 전체 invoke 중앙값 | 778.978 ms | 102.309 ms |
-| 전체 invoke p95 | 901.521 ms | 104.053 ms |
-| 검출 단계 중앙값 | 380.278 ms | 56.448 ms |
-| DINO 단계 중앙값 | 406.668 ms | 44.737 ms |
-| pipeline 초기 구성/로드 | 4.189 ms (Python wrapper만) | 515.092 ms (두 모델 로드 포함) |
+| Full invoke median | 778.978 ms | 102.309 ms |
+| Full invoke p95 | 901.521 ms | 104.053 ms |
+| Detection stage median | 380.278 ms | 56.448 ms |
+| DINO stage median | 406.668 ms | 44.737 ms |
+| Pipeline initial setup/load | 4.189 ms (Python wrapper only) | 515.092 ms (includes loading both models) |
 
-전체 반복 invoke 중앙값은 약 7.61배 빨라졌고 지연은 86.9% 감소했다. 같은 이미지와
-`dinov2-qnn-v3` bundle로 각각 워밍업 3회 + 측정 20회를 실행했다. 이미지의 검출 컵은
-3개이며 46회 모두 해석 출력이 일치했다. 상주 DINO/YOLO PID가 처음부터 끝까지
-동일함을 확인했고 종료 후 실험 worker는 모두 회수했다. 단일 이미지·순서대로 실행한
-측정이며 OS cold-cache나 모델 정확도·동시 부하 전체의 검증은 아니다.
+The median of repeated full invokes is about 7.61× faster, and latency dropped by 86.9%. Each was run with the same image and
+the `dinov2-qnn-v3` bundle: 3 warm-up runs + 20 measured runs. The image has 3 detected cups,
+and the interpreted output matched in all 46 runs. The resident DINO/YOLO PIDs were confirmed to stay
+the same from start to finish, and all experiment workers were reaped afterward. This is a single-image, sequential
+measurement and does not verify OS cold cache, model accuracy, or concurrent load as a whole.
 
-[측정 요약](resident-20261018.md), [전체 샘플·입력 hash·PID](resident-20261018.json),
-[SDK source hash·실제 빌드 명령](resident-build-20261018.json).
-정식 서비스에는 별도 push·worker 배포·Vision 재시작이 필요하다.
+[Measurement summary](resident-20261018.md), [all samples, input hashes, PIDs](resident-20261018.json),
+[SDK source hash and actual build commands](resident-build-20261018.json).
+The production service needs a separate push, worker deployment, and Vision restart.
 
-## 구성
+## Pipeline
 
 ```text
-원본 이미지 → YOLO11n(COCO, 파인튜닝 없음) 컵 박스 → 박스×1.35 정사각 crop
+original image → YOLO11n (COCO, no fine-tuning) cup boxes → box×1.35 square crop
            → DINOv2-small CLS(384) → StandardScaler + LogisticRegression head
            → item / fill_ratio / confidence (services/vision/labels.py)
 ```
 
-- DINOv2 가중치는 고정(`facebook/dinov2-small`), 학습하는 것은 head(384×클래스 수)뿐 = linear probe.
-- 내부 클래스 `<drink>__<full|mid|low>` + `empty` → 계약 `fill_ratio`는 단계 대표값(0.85/0.5/0.18/0.02)의 확률 기대값.
+- DINOv2 weights are frozen (`facebook/dinov2-small`); only the head (384×number of classes) is trained = linear probe.
+- Internal classes `<drink>__<full|mid|low>` + `empty` → the contract's `fill_ratio` is the probability-weighted expectation of the per-level representative values (0.85/0.5/0.18/0.02).
 
-## Few-shot 정확도 (합성 이미지, Mac fp32)
+## Few-shot accuracy (synthetic images, Mac fp32)
 
-`python -m ml.evaluation.eval_fewshot --data data/synthetic` — 10클래스, test 200장, logreg.
+`python -m ml.evaluation.eval_fewshot --data data/synthetic` — 10 classes, 200 test images, logreg.
 
-| 음료 조합 | shots/class | joint | fill | drink |
+| Drink set | shots/class | joint | fill | drink |
 |---|---:|---:|---:|---:|
-| **water / coke / coffee** (현재 데모) | 5 | 60.2% | 67.8% | 84.6% |
+| **water / coke / coffee** (current demo) | 5 | 60.2% | 67.8% | 84.6% |
 | | 10 | 74.5% | 78.6% | 90.7% |
 | | 20 | **83.0%** | 86.0% | **93.3%** |
-| cola / orange juice / water (이전 실험) | 20 | 90.0% | 91.5% | 96.7% |
+| cola / orange juice / water (earlier experiment) | 20 | 90.0% | 91.5% | 96.7% |
 
-- **coke ↔ coffee 혼동이 주 오류** (20-shot에서 어두운 음료 60장 중 5~8장). 합성에선 coke=반투명+기포+거품, coffee=불투명+크레마로만 구분 → 실사에서 반드시 확인.
-- CLS 단독 + 표준화가 가장 좋았음 (CLS+patch-mean, 세로 띠 patch pooling보다 높음). 표준화 없으면 크게 하락.
-- dinov2-small ≥ dinov2-base (같거나 더 정확, 4배 가벼움).
+- **coke ↔ coffee confusion is the main error** (5~8 of 60 dark-drink images at 20-shot). In synthetic data they differ only by coke = translucent + bubbles + foam, coffee = opaque + crema → must be checked on real photos.
+- CLS alone + standardization worked best (better than CLS+patch-mean or vertical-strip patch pooling). Without standardization, accuracy drops sharply.
+- dinov2-small ≥ dinov2-base (same or better accuracy, 4× lighter).
 
-## 실사 (MacBook 카메라, 2클래스: coke__full 11 / water__full 60)
+## Real photos (MacBook camera, 2 classes: coke__full 11 / water__full 60)
 
-| 학습 → 테스트 | 결과 |
+| Train → test | Result |
 |---|---|
-| 실사 3-shot → 실사 | 100% (water 60장 대부분 연속 프레임이라 낙관적) |
-| 합성만 → 실사 | 음료 종류 91~98%, **잔량은 실패** (잔 모양 차이) → 잔량은 실사 몇 장 필요 |
+| Real 3-shot → real | 100% (optimistic, since most of the 60 water images are consecutive frames) |
+| Synthetic only → real | Drink type 91~98%, **fill level fails** (glass shape differs) → fill level needs a few real photos |
 
-## 컵 검출 (COCO YOLO11n, 파인튜닝 없음)
+## Cup detection (COCO YOLO11n, no fine-tuning)
 
-- 실사 jar 71장 중 69장(97%) 검출. 클래스 이름은 vase 41 / cup 26 / bowl 2 → 이름 대신 컵류 클래스 묶음 사용.
-- `agnostic NMS` 필수 (같은 컵 cup+vase 이중 박스). 2~3잔 합성 장면에서 박스 수 = 컵 수 11/12.
+- Detected 69 of 71 real jar images (97%). Class names were vase 41 / cup 26 / bowl 2 → a group of cup-like classes is used instead of names.
+- `agnostic NMS` is required (double cup+vase boxes on the same cup). In synthetic 2~3-glass scenes, box count = cup count in 11/12.
 
-## Vision 서비스 end-to-end (Mac, XNNPACK .pte)
+## Vision service end-to-end (Mac, XNNPACK .pte)
 
-`services.vision.backend:create_backend` + bundle `dinov2-xnnpack-yolo` (YOLO·DINOv2 모두 XNNPACK fp32, head=실사 2클래스).
-실사 crop 3장을 1280×720에 배치한 장면 6장 → `POST /v1/analyze`:
+`services.vision.backend:create_backend` + bundle `dinov2-xnnpack-yolo` (YOLO and DINOv2 both XNNPACK fp32, head = real-photo 2 classes).
+6 scenes with 3 real crops placed on 1280×720 → `POST /v1/analyze`:
 
-- 응답 전부 `VisionResult` 검증 통과, 컵 3개 잡힌 장면의 item 9/9 정답
-- 컵 수 불일치 3/6은 원본 사진 배경에 실제로 찍힌 다른 잔 (+1장은 1개 누락)
-- HTTP 지연 p50 102 ms (Mac CPU XNNPACK)
+- All responses passed `VisionResult` validation; item 9/9 correct in scenes where all 3 cups were detected
+- In 3/6 with a cup-count mismatch, other glasses were actually present in the background of the original photo (+1 image missed one)
+- HTTP latency p50 102 ms (Mac CPU XNNPACK)
 
-## 지연시간 (Mac M4, batch 1)
+## Latency (Mac M4, batch 1)
 
-| 모델 | CPU 1 thread | CPU 4 threads | MPS | XNNPACK .pte |
+| Model | CPU 1 thread | CPU 4 threads | MPS | XNNPACK .pte |
 |---|---:|---:|---:|---:|
 | dinov2-small 224 | 22.7 ms | 17.8 ms | 10.2 ms | 18.6 ms |
 | dinov2-base 224 | 66.0 ms | 55.2 ms | 27.0 ms | — |
 | YOLO11n 640 | 16.9 ms | — | 9.9 ms | 21~25 ms |
 
-## QNN(HTP) export + 시뮬레이터 (x86 Docker, SM8650 = HTP v75 리허설)
+## QNN (HTP) export + simulator (x86 Docker, SM8650 = HTP v75 rehearsal)
 
-QCS8275도 HTP v75 (Ultralytics QNN 문서, Qualcomm Dragonwing 문서). **일반 ExecuTorch 1.5.1에는 QCS8275 타깃이 없어 SM8650으로 리허설만 함 — 보드 배포용 아님.**
+QCS8275 is also HTP v75 (Ultralytics QNN docs, Qualcomm Dragonwing docs). **Stock ExecuTorch 1.5.1 has no QCS8275 target, so this was only a rehearsal on SM8650 — not for board deployment.**
 
-| 모델 | quant | NPU 미지원 op | 시뮬레이터 검증 |
+| Model | quant | Ops unsupported on NPU | Simulator check |
 |---|---|---:|---|
-| YOLO11n | 16a8w | 0 | fp32 박스 25/27 일치(IoU>0.8), class score max\|diff\| 0.85 |
-| DINOv2-small CLS | 16a8w | 0 | **fp32 대비 cosine 0.58** → fp32 head 24%, 재학습 head 54.5% (fp32 61%) |
-| DINOv2-small CLS | **fp16** | 0 | **cosine 0.9992**, fp32 head 그대로 사용 가능 |
-| DINOv2-small CLS | 16a16w | — | cosine 0.08 (사용 금지) |
+| YOLO11n | 16a8w | 0 | 25/27 boxes match fp32 (IoU>0.8), class score max\|diff\| 0.85 |
+| DINOv2-small CLS | 16a8w | 0 | **cosine 0.58 vs. fp32** → fp32 head 24%, retrained head 54.5% (fp32 61%) |
+| DINOv2-small CLS | **fp16** | 0 | **cosine 0.9992**, fp32 head usable as is |
+| DINOv2-small CLS | 16a16w | — | cosine 0.08 (do not use) |
 
-- 결론: DINOv2는 **fp16 우선**, 안 되면 16a8w + **보드 .pte 특징으로 head 재학습** (`ml/training/make_head.py`).
-- XNNPACK int8 근사에서도 같은 경향: Mac fp32 head를 int8 모델에 쓰면 88.8% → 68.2%.
-- 공식 번들 `dino_v2.pte`가 ImageNet 1000 logits여도 특징으로 사용 가능 (합성 10클래스 86.2% vs CLS 88.8%).
+- Conclusion: for DINOv2, **prefer fp16**; if that fails, 16a8w + **retrain the head on board .pte features** (`ml/training/make_head.py`).
+- The same trend holds for an XNNPACK int8 approximation: using the Mac fp32 head on the int8 model drops 88.8% → 68.2%.
+- Even though the official bundle `dino_v2.pte` outputs ImageNet 1000 logits, it can be used for features (synthetic 10 classes 86.2% vs. CLS 88.8%).
 
-## 콜라·커피 애매할 때 묻는 임계값 (2026-10-17, 실사 286장)
+## Threshold for asking when cola vs. coffee is ambiguous (2026-10-17, 286 real photos)
 
-`item_confidence` = 음료 확률 합 중 최고 음료의 비중. 콜라·커피 사진 190장, 5-fold × 5 seeds 평균.
+`item_confidence` = share of the top drink in the summed drink probabilities. 190 cola/coffee photos, mean over 5-fold × 5 seeds.
 
-| 임계 | 묻는 비율 | 잡는 혼동 | 묻지 않고 틀림 |
+| Threshold | Ask rate | Confusions caught | Wrong without asking |
 |---:|---:|---:|---:|
 | 0.7 | 10.3% | 65% | 2.3% |
 | **0.8** | **17.3%** | **87%** | **0.8%** |
 | 0.9 | 31.6% | 100% | 0% |
 
-혼동 방향: 콜라→커피 8.7% (101장 중 8.8), 커피→콜라 3.1% (89장 중 2.8). 파인트 잔 콜라가 커피와 가장 헷갈림.
-라벨 정리(14건, `data/relabel_log.tsv`) 후 종합 89.3%, 리필 판단 precision 98.3% / recall 69.4%.
+Confusion direction: cola→coffee 8.7% (8.8 of 101), coffee→cola 3.1% (2.8 of 89). Cola in a pint glass is most often confused with coffee.
+After label cleanup (14 cases, `data/relabel_log.tsv`): overall 89.3%, refill decision precision 98.3% / recall 69.4%.
 
-## 컵이 아닌 물체(캔·병) 걸러내기 (2026-10-17)
+## Filtering out non-cup objects (cans, bottles) (2026-10-17)
 
-COCO YOLO11n은 캔·병도 `cup`으로 잡는다(실측: 노란 탄산수 캔 0.81, 콜라 캔 0.64). 클래스 이름으로는 못 거른다.
+COCO YOLO11n also detects cans and bottles as `cup` (measured: yellow sparkling-water can 0.81, cola can 0.64). Class names cannot filter them.
 
-- head에 `other` 클래스 추가 (캔·병 28장, `ml.tools.camera collect --classes other`). Vision은 p(other) ≥ 0.5면 결과에서 뺀다
-- 교차검증(5-fold × 5 seeds): other 28장 중 95.7% 걸러냄, **컵 286장 중 잘못 걸러냄 0장**, 컵 분류 89.3% 유지
-- **crop 방식이 더 중요했다.** 정사각형 ×1.35 확장은 세로로 긴 캔이나 화면 가장자리 물체에서 옆 컵이 crop에 같이 들어가 분류가 옆 물체를 따라갔다(캔 옆 커피잔 → 캔을 coffee로)
+- Added an `other` class to the head (28 can/bottle images, `ml.tools.camera collect --classes other`). Vision drops a result when p(other) ≥ 0.5
+- Cross-validation (5-fold × 5 seeds): filtered 95.7% of the 28 other images, **0 of 286 cup images wrongly filtered**, cup classification kept at 89.3%
+- **The crop method mattered more.** With square ×1.35 expansion, for tall cans or objects at the frame edge, the neighboring cup got into the crop and the classification followed the neighbor (coffee cup next to a can → can classified as coffee)
 
-| crop (YOLO 모드) | 노란 캔 | 커피 잔 | 빈 잔 | 콜라 캔 | 3컵 장면 |
+| crop (YOLO mode) | Yellow can | Coffee cup | Empty glass | Cola can | 3-cup scene |
 |---|---|---|---|---|---|
-| 정사각형 ×1.35 (이전) | coffee | coffee | empty | empty | 9/9 |
-| 정사각형 ×1.0 | other | coffee | coffee_low ✗ | other | 9/9 |
-| **회색 패딩 ×1.15 (현재 기본)** | **other** | **coffee** | **empty** | **other** | **9/9** |
+| Square ×1.35 (previous) | coffee | coffee | empty | empty | 9/9 |
+| Square ×1.0 | other | coffee | coffee_low ✗ | other | 9/9 |
+| **Gray padding ×1.15 (current default)** | **other** | **coffee** | **empty** | **other** | **9/9** |
 
-`pad_crop`: 박스를 1.15배만 넓혀 자르고 정사각형의 남는 부분은 회색(114)으로 채운다. 박스 중심을 고정해 가장자리에서도 밀리지 않는다.
+`pad_crop`: crops the box widened by only 1.15× and fills the rest of the square with gray (114). The box center is fixed, so it does not shift at the edges either.
 
-## head를 YOLO crop으로 학습 (2026-10-17, 보드 bundle v3)
+## Training the head on YOLO crops (2026-10-17, board bundle v3)
 
-증상: 보드에서 콜라캔이 `coke__full`로 나옴. 원인 두 가지.
-- head는 사진 전체(756 정사각 ROI, 배경 포함)로 학습했는데, 추론은 YOLO 박스 pad crop만 본다
-- coke__full 사진 44장 중 약 절반에 빨간 콜라캔이 잔 옆에 찍혀 있고, other에는 콜라캔이 2장뿐 → "빨간 캔 = coke"로 배움
+Symptom: on the board, a cola can came out as `coke__full`. Two causes.
+- The head was trained on whole photos (756 square ROI, including background), but inference only sees the YOLO box pad crop
+- About half of the 44 coke__full photos had a red cola can next to the glass, and other had only 2 cola cans → it learned "red can = coke"
 
-수정: `ml/training/make_crops.py`로 학습 사진을 추론과 같은 crop으로 자른다. 라벨 박스는 **이미지 중심을 포함하는 박스가 정확히 1개일 때만** 쓴다 (0개 = 투명 잔을 YOLO가 놓침, 2개 이상 = 뒤에 캔이 겹침 → 건너뜀. 중심에 가까운 박스로 대신 고르면 캔이 컵 라벨로 들어갔다: 15장 중 12장). 314장 → crop 246장. `class_weight=balanced`.
+Fix: `ml/training/make_crops.py` crops the training photos the same way as inference. A label box is used **only when exactly one box contains the image center** (0 = YOLO missed a clear glass, 2 or more = a can overlaps behind → skipped. Picking the box closest to the center instead put cans in with cup labels: 12 of 15 images). 314 images → 246 crops. `class_weight=balanced`.
 
-평가 (보드 fp16 `.pte` 특징, 컵 crop 226장 5-fold × 3~5 seeds / 옆 물체 crop에서 눈으로 고른 캔·병 112장은 학습에 안 쓴 사진 기준):
+Evaluation (board fp16 `.pte` features; 226 cup crops, 5-fold × 3~5 seeds / 112 cans and bottles hand-picked from neighbor-object crops, on photos not used for training):
 
-| head | 컵 잘못 버림 | 음료 맞춤 | 빨간 콜라캔 걸러냄 | 노란 캔·병 걸러냄 | 실제 보드 프레임 (잔 3 + 캔·병 5) |
+| head | Cups wrongly dropped | Drink correct | Red cola cans filtered | Yellow cans/bottles filtered | Real board frame (3 glasses + 5 cans/bottles) |
 |---|---:|---:|---:|---:|---|
-| v1 사진 전체로 학습 (기존) | 0* | 97.8%* | 8% | 62% | 노란 캔 → water, 콜라캔 → coke |
-| v2 crop + 옆 물체 캔 crop 전부를 other로 | 1/226 | 98.7% | 97% | 100% | **잔 2개까지 버림** (화면 아래에 잘린 잔) |
-| crop + 가장자리 안 닿은 캔 crop만 other로 + 균형 | 1/226 | 97.8% | 97% | 99% | 캔 crop 뒤에 콜라캔이 보이는 유리잔을 버림 |
-| **v3 crop만 + 균형 (배포)** | **0/226** | **97.3%** | **86%** | **96%** | **잔 살림, 캔 2개·병뚜껑 버림**, 과자봉지는 unknown |
+| v1 trained on whole photos (previous) | 0* | 97.8%* | 8% | 62% | yellow can → water, cola can → coke |
+| v2 crops + all neighbor-object can crops as other | 1/226 | 98.7% | 97% | 100% | **drops up to 2 glasses** (glasses cut off at the bottom of the frame) |
+| crops + only can crops not touching the edge as other + balanced | 1/226 | 97.8% | 97% | 99% | drops a glass with a cola can visible behind it in the can crop |
+| **v3 crops only + balanced (deployed)** | **0/226** | **97.3%** | **86%** | **96%** | **keeps the glasses, drops 2 cans and a bottle cap**, snack bag is unknown |
 
-\* v1은 이 사진으로 학습해서 낙관적. 옆 물체 캔 crop은 대부분 사진 가장자리에서 잘려 있어서 other로 넣으면 "잘린 물체 = other"를 배우고, 데모 화면 아래에 걸린 진짜 잔도 버린다 → v3는 넣지 않았다.
+\* v1 is optimistic because it was trained on these photos. Most neighbor-object can crops are cut off at the photo edge, so adding them as other teaches "cut-off object = other" and also drops real glasses at the bottom of the demo frame → v3 does not include them.
 
-남은 한계: 학습에 안 쓴 콜라캔의 약 14%는 통과(잔 바로 뒤에 겹친 캔). bundle은 박스를 최대 6개만 본다(`max_objects`). 실제 데모 자리에서 캔을 놓고 라이브 확인은 아직.
+Remaining limits: about 14% of cola cans not used in training still pass (cans overlapping directly behind a glass). The bundle looks at no more than 6 boxes (`max_objects`). A live check with cans placed at the actual demo spot has not been done yet.
 
-## 물 full/mid/low 추가 (2026-10-17, 보드 bundle v4c)
+## Adding water full/mid/low (2026-10-17, board bundle v4c)
 
-v3는 물 잔을 거의 전부 빈 잔으로 봤다: 새로 찍은 water__full 31장 중 28장을 `unknown`(empty)으로, 잔량 평균 0.19. 물은 투명해서 water__full 60장(맥북 내장 카메라, 작은 유리병)만으로는 부족했다.
+v3 saw almost every water glass as empty: of 31 newly taken water__full photos, 28 came out `unknown` (empty), mean fill level 0.19. Water is transparent, so the 60 water__full images (MacBook built-in camera, small glass jar) were not enough.
 
-Brio(맥에 연결)로 데모 잔을 찍어 추가: water__full 37 / mid 22 / low 40 + low 29 (라벨 2장 수정, `data/relabel_log.tsv`). 맥 XNNPACK YOLO로 crop하고 맥 fp32 DINOv2로 특징을 뽑아 기존 보드 fp16 특징과 섞었다 (보드 실측 cosine 0.9995라 같은 특징 공간). 연속 촬영 5장씩 묶어 같은 fold에만 넣는 5-fold × 5 seeds, 기준 잔량 ≤ 0.35 · confidence ≥ 0.6:
+Added photos of the demo glasses taken with a Brio (connected to the Mac): water__full 37 / mid 22 / low 40 + low 29 (2 labels fixed, `data/relabel_log.tsv`). Crops were made with Mac XNNPACK YOLO and features extracted with Mac fp32 DINOv2, then mixed with the existing board fp16 features (board-measured cosine 0.9995, so the same feature space). 5-fold × 5 seeds with each group of 5 consecutive shots kept in the same fold, criteria fill level ≤ 0.35 · confidence ≥ 0.6:
 
-| head | 음료 맞춤 | 리필 판단 일치 | 물 low 잡음 (1차 / 추가 촬영) | 물 full·mid 오탐 | 콜라·커피 low 잡음 | 빨간 캔 / 노란 캔·병 걸러냄 |
+| head | Drink correct | Refill decision match | Water low caught (1st / extra shoot) | Water full/mid false positives | Cola/coffee low caught | Red cans / yellow cans/bottles filtered |
 |---|---:|---:|---|---:|---:|---|
-| v3 (물 mid/low 없음) | — | — | 물을 `unknown`으로 봄 (low 23/27는 빈 잔으로 잡힘) | **24/49** | — | 84% / 95% |
-| v4 (물 low 27장) | 98.5% | 92.0% | 18/27 · 16/23 | 3/49 | 30/36 | 81% / 92% |
-| **v4c (물 low 50장, 배포)** | **99.1%** | **93.5%** | 18/27 · **21/23** | 3/49 | 30/36 | 81% / 92% |
+| v3 (no water mid/low) | — | — | sees water as `unknown` (low 23/27 caught as empty glasses) | **24/49** | — | 84% / 95% |
+| v4 (27 water low) | 98.5% | 92.0% | 18/27 · 16/23 | 3/49 | 30/36 | 81% / 92% |
+| **v4c (50 water low, deployed)** | **99.1%** | **93.5%** | 18/27 · **21/23** | 3/49 | 30/36 | 81% / 92% |
 
-- 작은 유리병 사진(water__full 0000-0059, coke__full 0000-0010)을 빼고 학습해도 차이 없음 (물 low 18/27 그대로) → 유지
-- 놓친 물 low는 라벨이 맞고(10~25%) mid/full로 본 경우. 투명한 물 + 뒤 배경이 원인으로 보임
-- 수집 도구: `ml/tools/board_collect.py` (보드 Controller `/api/frame` → 왼쪽부터 라벨). 이번 촬영은 보드가 연결되지 않아 맥 `ml.tools.camera collect`로 함
+- Training without the small glass jar photos (water__full 0000-0059, coke__full 0000-0010) made no difference (water low stays 18/27) → kept
+- The missed water lows had correct labels (10~25%) and were seen as mid/full. Transparent water + the background behind it appear to be the cause
+- Collection tool: `ml/tools/board_collect.py` (board Controller `/api/frame` → labels from the left). This shoot used Mac `ml.tools.camera collect` because the board was not connected
 
-## 오렌지주스 추가 (2026-10-18, 보드 bundle v5)
+## Adding orange juice (2026-10-18, board bundle v5)
 
-메뉴에 오렌지주스(`orange_juice`)를 넣었다. Brio(맥 연결)로 데모 잔 사진 full 60 / mid 50 / low 49장 → YOLO crop 130장 (맥 XNNPACK YOLO, 맥 fp32 DINOv2 특징). v4c 데이터와 합쳐 클래스 14개, `class_weight=balanced`. 연속 5장 묶음 5-fold × 5 seeds, 기준 잔량 ≤ 0.35 · confidence ≥ 0.6:
+Orange juice (`orange_juice`) was added to the menu. Demo glass photos with a Brio (connected to the Mac): full 60 / mid 50 / low 49 → 130 YOLO crops (Mac XNNPACK YOLO, Mac fp32 DINOv2 features). Combined with the v4c data for 14 classes, `class_weight=balanced`. 5-fold × 5 seeds with groups of 5 consecutive shots, criteria fill level ≤ 0.35 · confidence ≥ 0.6:
 
-| 음료 | 음료 맞춤 | 리필 대상 잡음 (low·empty) | full·mid 오탐 |
+| Drink | Drink correct | Refill targets caught (low/empty) | full/mid false positives |
 |---|---:|---:|---:|
-| **오렌지주스** | **100%** | **36/36** | 1/93 |
-| 물 | 100% | 40/50 | 2/97 |
-| 콜라·커피 | 98.0% | 33/36 | 0/117 |
-| 빈 잔 | — | 24/24 | — |
+| **Orange juice** | **100%** | **36/36** | 1/93 |
+| Water | 100% | 40/50 | 2/97 |
+| Cola/coffee | 98.0% | 33/36 | 0/117 |
+| Empty glass | — | 24/24 | — |
 
-- 오렌지주스 잔량 평균: full 0.82 / mid 0.54 / low 0.20 (불투명하고 색이 진해 단계가 또렷함)
-- 노란 탄산수 캔·병 39장 중 오렌지주스로 본 것 1장. 빨간 캔 걸러냄 78% (v4c 81%), 노란 캔·병 92%
-- 보드 프레임(잔 3 + 캔·병 5)은 v4c와 같은 판정
+- Orange juice mean fill level: full 0.82 / mid 0.54 / low 0.20 (opaque with strong color, so the levels are distinct)
+- Of 39 yellow sparkling-water cans/bottles, 1 was seen as orange juice. Red cans filtered 78% (v4c 81%), yellow cans/bottles 92%
+- Board frame (3 glasses + 5 cans/bottles) gives the same result as v4c
 
-## 과자봉지가 오렌지주스로 나온 문제 (2026-10-18, 보드 bundle v5e)
+## Snack bag detected as orange juice (2026-10-18, board bundle v5e)
 
-데모 자리에서 빨간 과자봉지를 오렌지주스 잔 앞뒤로 겹치자 봉지 박스가 `orange_juice` 리필 대상(27%, conf 74%)으로 나왔다.
+At the demo spot, when a red snack bag overlapped in front of or behind an orange juice glass, the bag's box came out as an `orange_juice` refill target (27%, conf 74%).
 
-- 원인: 오렌지주스 학습 사진 뒤에 주황 팩·봉지가 자주 찍혔고 그중 1장은 봉지 crop이 오렌지주스 라벨로 들어감(빨간 캔 crop 1장도). `other`에는 이런 봉지가 없었다. 문제 장면의 봉지 박스에는 오렌지주스 잔 가장자리도 같이 들어 있었다.
-- 수정: 잘못된 2장 제거, 오렌지주스 사진 옆 crop 중 봉지·빨간 캔·병을 `other`로 추가, **보드 카메라로 데모 자리에서 수집**(`ml/tools/board_collect.py` 방식, 봉지 단독·잔과 겹침·손으로 잡음 3세션, 봉지·캔·병 → other, 잔 → orange_juice mid/low).
-- 그래도 문제 장면 봉지는 other 0.47 / orange_juice__low 0.38 → **other가 가장 높으면 0.5 미만이어도 버리도록** `split_other` 변경.
+- Cause: orange packs and bags often appeared behind the orange juice training photos, and in one of them a bag crop went in with an orange juice label (also one red can crop). `other` had no bags like this. In the problem scene, the bag's box also contained the edge of the orange juice glass.
+- Fix: removed the 2 wrong images, added bag/red can/bottle crops from next to the orange juice photos as `other`, and **collected at the demo spot with the board camera** (`ml/tools/board_collect.py` method, 3 sessions: bag alone, overlapping a glass, held by hand; bags/cans/bottles → other, glasses → orange_juice mid/low).
+- Even so, the bag in the problem scene scored other 0.47 / orange_juice__low 0.38 → changed `split_other` to **drop the object when other is the highest, even below 0.5**.
 
-| | 문제 장면 봉지 | 그 옆 오렌지주스 잔 | 학습 안 한 세션 뒷부분 (봉지·캔·병 14 / 잔 5) | 교차검증 컵 버림 |
+| | Bag in problem scene | Orange juice glass next to it | Later part of an untrained session (14 bags/cans/bottles / 5 glasses) | Cups dropped in cross-validation |
 |---|---|---|---|---|
-| v5 | orange_juice 리필 대상 (other ≈ 0) | 살림 | — | 2/455 |
-| **v5e + 새 규칙** | **버림** (other 0.47) | 살림 | 14/14 버림 / 5/5 살림 | **1/453** |
+| v5 | orange_juice refill target (other ≈ 0) | kept | — | 2/455 |
+| **v5e + new rule** | **dropped** (other 0.47) | kept | 14/14 dropped / 5/5 kept | **1/453** |
 
-남은 한계: 문제 장면 하나와 같은 날 세션으로만 확인. 데모 때는 봉지·캔을 잔과 겹치지 않게 두는 편이 안전하다.
+Remaining limits: checked only on the one problem scene and sessions from the same day. During the demo, it is safer to keep bags and cans from overlapping the glasses.
 
-## 보드 NPU 실측 (2026-10-17, VENTUNO Q / QCS8275, 주최 측 ExecuTorch + QNN 2.49)
+## Board NPU measurements (2026-10-17, VENTUNO Q / QCS8275, organizer ExecuTorch + QNN 2.49)
 
-| 모델 | 형식 | 지연 | 정확도 |
+| Model | Format | Latency | Accuracy |
 |---|---|---:|---|
-| DINOv2-small CLS | fp16, 46 MB | **5.8~6.0 ms/장** | fp32 대비 cosine 0.9995 (min 0.9991) → Mac head 그대로 사용 가능 |
-| YOLO11n | 16a8w, 3.3 MB | **16 ms/장** | fp32 박스 19/21 일치(IoU>0.8), 놓친 2개는 배경 저신뢰 잔 |
+| DINOv2-small CLS | fp16, 46 MB | **5.8~6.0 ms/image** | cosine 0.9995 vs. fp32 (min 0.9991) → Mac head usable as is |
+| YOLO11n | 16a8w, 3.3 MB | **16 ms/image** | 19/21 boxes match fp32 (IoU>0.8); the 2 missed are low-confidence glasses in the background |
 
-SM8650 x86 시뮬레이터 리허설과 같은 경향(DINOv2 fp16 0.9992 / YOLO 25/27). 측정: `ml/evaluation/board_npu_check.py`. 설치 절차·경로는 [BOARD_RUNBOOK](../BOARD_RUNBOOK.md#보드-executorch-설치-기록-2026-10-17-qcventuno002).
+Same trend as the SM8650 x86 simulator rehearsal (DINOv2 fp16 0.9992 / YOLO 25/27). Measured with `ml/evaluation/board_npu_check.py`. For the installation procedure and paths, see the [board installation record](../board-installation-20261017.md#board-executorch-installation-record-2026-10-17-qcventuno002).

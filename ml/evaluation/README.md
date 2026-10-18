@@ -1,20 +1,20 @@
 # Offline model evaluation
 
-검출·종류·잔량 모델의 오프라인 평가와 PyTorch / export 결과 비교 코드를 둔다.
+Holds offline evaluation code for the detection, type and fill-level models, and code that compares PyTorch / export outputs.
 
-- 이미지·정답·객체별 결과·실패 사례 비교
-- 학습에 사용하지 않은 데이터 평가
-- 동일 입력·전처리로 변환 전후 출력 비교
-- 보드에서 수집한 실제 latency·메모리·delegation 기록 분석
+- Comparison of images, ground truth, per-object results and failure cases
+- Evaluation on data not used for training
+- Comparison of outputs before and after conversion with the same input and preprocessing
+- Analysis of real latency, memory and delegation records collected on the board
 
-대량 출력은 `models/` 하위 실험 폴더 등에 저장한다. 공유할 설정·요약 보고서는 `docs/`에 두고 모델·데이터 버전과 실행 위치를 명시한다. 생성된 설명용 사진과 fixture는 실측 정확도 자료로 취급하지 않는다.
+Store bulk outputs in places such as experiment folders under `models/`. Put shareable configs and summary reports in `docs/`, and state the model/data versions and where it was run. Generated illustrative photos and fixtures are not treated as measured accuracy data.
 
-과거 Qwen 텍스트·유사 STT 치환 평가 아카이브는 `docs/qwen_evaluation/`에 그대로 둔다. 앱의 unit/integration 테스트와 모델 정확도 평가는 구분한다.
+The archive of past Qwen text and STT-like substitution evaluations stays as is in `docs/qwen_evaluation/`. Keep the app's unit/integration tests separate from model accuracy evaluation.
 
-## 파일
+## Files
 
-- `eval_fewshot.py` — DINOv2 임베딩 + prototype/logreg few-shot, CONF_MIN coverage
-- `bench_latency.py` — Mac CPU/MPS 지연시간
-- `detect_test.py` — COCO YOLO11n 컵 검출 (파인튜닝 없이)
-- `yolo_et.py` — YOLO `.pte` + numpy 후처리 vs ultralytics 비교
-- `qnn_sim_check.py` — QNN `.pte`를 x86 HTP 시뮬레이터로 실행해 fp32와 비교 (Docker)
+- `eval_fewshot.py` — DINOv2 embeddings + prototype/logreg few-shot, CONF_MIN coverage
+- `bench_latency.py` — Mac CPU/MPS latency
+- `detect_test.py` — COCO YOLO11n cup detection (without fine-tuning)
+- `yolo_et.py` — YOLO `.pte` + numpy postprocessing vs ultralytics comparison
+- `qnn_sim_check.py` — runs a QNN `.pte` on the x86 HTP simulator and compares it with fp32 (Docker)

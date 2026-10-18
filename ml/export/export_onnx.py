@@ -1,9 +1,9 @@
-"""DINOv2 백본(+CLS 풀링) → ONNX. Qualcomm AI Hub에 올려 QCS8275 NPU 프로파일링할 때 쓴다.
+"""DINOv2 backbone (+CLS pooling) -> ONNX. Used for uploading to Qualcomm AI Hub to profile on the QCS8275 NPU.
 
-입력: pixel_values float32 (1,3,224,224), common.preprocess 결과
-출력: embedding float32 (1,D)  — small: 384, base: 768
+Input: pixel_values float32 (1,3,224,224), output of common.preprocess
+Output: embedding float32 (1,D)  — small: 384, base: 768
 
-사용 예:
+Usage:
   python -m ml.export.export_onnx --model small
 """
 
@@ -36,7 +36,7 @@ def main():
     try:
         import onnxruntime as ort
     except ImportError:
-        print("onnxruntime 미설치 — parity 체크 생략 (pip install onnxruntime)")
+        print("onnxruntime not installed — skipping parity check (pip install onnxruntime)")
         return
     with torch.no_grad():
         ref = head(x).numpy()

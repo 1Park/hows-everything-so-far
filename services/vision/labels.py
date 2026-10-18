@@ -1,26 +1,34 @@
-"""모델 내부 클래스 확률 → 공개 계약 필드 (item, fill_ratio, confidence).
+"""Internal model class probabilities → public contract fields (item, fill_ratio, confidence).
 
-내부 클래스 이름 규칙: "<drink>__<level>" (예: "coke__low"), "empty", 또는 "other"(컵이 아닌 물체: 캔·병).
-  other    : YOLO가 cup으로 잘못 잡는 물체. split_other()로 먼저 걸러내고, 남은 확률을 정규화해 아래 값을 계산한다.
-  item       : drink별 확률을 합한 marginal의 최댓값. empty가 가장 크면 "unknown".
-  fill_ratio : level별 대표 비율의 기대값 Σ p(class)·ratio(level). 계약은 0..1 연속값이라 단계 라벨을 비율로 바꾼다.
-  confidence : min(음료 확신도, 잔량 확신도) — 종류·잔량 둘 다 확신할 때만 높다.
-               잔량 확신도는 low와 empty를 한 묶음(REFILL_LEVELS)으로 본다. 둘 다 리필 대상이라, 투명한 물이
-               조금 남은 잔처럼 low↔empty 사이에서 헷갈려도 리필 판단은 흔들리지 않기 때문이다.
-               이 묶음이 이기면 음료 확신도에도 반대편을 더한다: 음료 잔이면 + p(empty), 빈 잔(unknown)이면
-               + Σ p(<drink>__low). low↔full 사이 헷갈림은 그대로 점수를 낮춘다.
-  item_confidence : 음료가 있다고 볼 때 "어느 음료인지"만의 확신도 = 최고 음료 marginal / 음료 marginal 합.
-                    empty/unknown 확률은 빼고 정규화한다. item 이 unknown 이면 None.
-                    카테고리 통합 후의 확신도다 (coffee + coke → coke).
-Controller 정책(기본 confidence ≥ 0.7, fill_ratio ≤ 0.3 / 보드 .env.board 0.6, 0.35)은 이 값을 그대로 쓴다.
+Internal class names: "<drink>__<level>" (e.g. "coke__low"), "empty", or "other" (non-cup objects:
+cans, bottles).
+  other    : objects YOLO wrongly detects as cups. split_other() filters them out first, and the
+             remaining probabilities are renormalized before computing the values below.
+  item       : argmax of the per-drink marginal probabilities. "unknown" if empty is the largest.
+  fill_ratio : expected value Σ p(class)·ratio(level) over per-level representative ratios. The
+               contract wants a continuous 0..1 value, so level labels are mapped to ratios.
+  confidence : min(drink confidence, level confidence) — high only when both drink and level are sure.
+               Level confidence treats low and empty as one group (REFILL_LEVELS). Both mean refill,
+               so confusing low↔empty, as with a glass holding a little clear water, does not change
+               the refill decision.
+               When this group wins, the opposite side is added to drink confidence as well:
+               + p(empty) for a drink cup, + Σ p(<drink>__low) for an empty cup (unknown).
+               Confusion between low↔full still lowers the score.
+  item_confidence : confidence in which drink it is, assuming there is one = top drink marginal /
+                    sum of drink marginals. empty/unknown probability is left out before
+                    normalizing. None when item is unknown.
+                    Measured after category merging (coffee + coke → coke).
+Controller policy (default confidence ≥ 0.7, fill_ratio ≤ 0.3 / board .env.board 0.6, 0.35) uses
+these values as is.
 """
 
 from common.vision_categories import VISION_CATEGORY_MAP
 
 DRINKS = ("water", "coke", "coffee", "orange_juice")
-# 단계 → 대표 잔량 비율. full/mid/low 구간(합성 데이터 생성 기준)의 중앙값 근처. bundle.json 으로 덮어쓸 수 있다.
+# level → representative fill ratio, near the middle of each full/mid/low band (as used for
+# synthetic data generation). bundle.json can override it.
 DEFAULT_FILL_RATIO = {"full": 0.85, "mid": 0.5, "low": 0.18, "empty": 0.02}
-REFILL_LEVELS = ("low", "empty")  # 잔량 확신도에서 한 묶음으로 보는 단계 (둘 다 리필 대상)
+REFILL_LEVELS = ("low", "empty")  # levels grouped together for level confidence (both need refill)
 
 
 def parse(label):
@@ -31,15 +39,17 @@ def parse(label):
 
 
 OTHER = "other"
-OTHER_DROP = 0.5  # p(other) 가 이 이상이거나, 모든 클래스 중 가장 높으면 컵이 아닌 것으로 보고 결과에서 뺀다
+OTHER_DROP = 0.5  # not a cup (dropped) if p(other) ≥ this or other is the top class
 
 
 def split_other(probs, classes, drop=OTHER_DROP):
-    """→ (컵이 아님 여부, other 를 뺀 확률, other 를 뺀 클래스). other 클래스가 없는 head 면 그대로.
+    """→ (not a cup, probs without other, classes without other). Unchanged if the head has no
+    other class.
 
-    other 가 가장 높은 클래스면 0.5 미만이어도 뺀다: 보드에서 오렌지주스 잔이 과자봉지 앞에 겹치자 봉지 박스가
-    other 0.47 / orange_juice__low 0.38 로 나왔고, other 를 빼고 정규화하면 오렌지주스 리필 대상이 됐다.
-    교차검증 컵 453장에서 이 규칙으로 더 버려지는 컵은 없었다.
+    Drop when other is the top class even below 0.5: on the board, an orange juice glass in front of
+    a snack bag gave the bag box other 0.47 / orange_juice__low 0.38, and renormalizing without
+    other turned it into an orange juice refill target. On 453 cross-validation cup images this
+    rule drops no additional cups.
     """
     if OTHER not in classes:
         return False, list(probs), list(classes)
@@ -64,7 +74,7 @@ def to_observation(probs, classes, fill_ratio=None):
     refill = sum(level_p.get(lv, 0.0) for lv in REFILL_LEVELS)
     level_conf = max([refill] + [v for k, v in level_p.items() if k not in REFILL_LEVELS])
     item_conf_part = item_p[item]
-    if refill >= level_conf:  # low·empty 쪽 판단: 둘 사이 헷갈림은 음료 확신도도 깎지 않는다
+    if refill >= level_conf:  # low/empty side wins: confusion between them does not lower drink confidence either
         if item == "unknown":
             item_conf_part += sum(float(p) for p, c in zip(probs, classes) if c != "empty" and parse(c)[1] == "low")
         else:

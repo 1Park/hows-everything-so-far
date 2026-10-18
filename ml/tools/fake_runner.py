@@ -1,8 +1,8 @@
-"""Mac 테스트용 가짜 qnn_executor_runner — 같은 CLI 플래그/파일 규칙을 executorch.runtime 으로 흉내낸다.
+"""Fake qnn_executor_runner for Mac testing — mimics the same CLI flags/file conventions with executorch.runtime.
 
-CliRunner 의 파일 입출력 경로를 보드 없이 검증하기 위한 것. 보드에서는 진짜 runner 를 쓴다.
+Lets us verify CliRunner's file I/O path without the board. The board uses the real runner.
   ml/tools/fake_runner.sh --model_path x.pte --input_list_path input_list.txt --output_folder_path outputs
-입력 raw 는 float32 (1,3,S,S) 로 가정 (S 는 파일 크기로 추정).
+Input raw files are assumed to be float32 (1,3,S,S) (S is inferred from the file size).
 """
 
 import argparse

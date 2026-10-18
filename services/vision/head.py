@@ -1,10 +1,12 @@
-"""분류 head — 임베딩(또는 ImageNet logits) → 클래스 확률. numpy만 (sklearn 없어도 동작).
+"""Classification head — embeddings (or ImageNet logits) → class probabilities. numpy only
+(works without sklearn).
 
-JSON 형식 (camera.save_head 와 동일): {classes, mean, scale, W, b}
+JSON format (same as camera.save_head): {classes, mean, scale, W, b}
   z = (x - mean) / scale ; logits = z @ W.T + b ; softmax
 
-⚠️ head 는 보드에서 실제로 돌릴 .pte 가 낸 특징으로 학습해야 한다 (ml/training/make_head.py).
-   Mac fp32 특징으로 학습한 head 를 양자화 모델에 쓰면 정확도가 크게 떨어진다 (README 참고).
+⚠️ Train the head on features from the .pte that will actually run on the board
+   (ml/training/make_head.py). A head trained on Mac fp32 features loses a lot of accuracy
+   on the quantized model (see README).
 """
 
 import json
@@ -30,14 +32,16 @@ class Head:
     def predict_proba(self, X):
         X = np.asarray(X, np.float64).reshape(len(X), -1)
         if X.shape[1] != self.dim:
-            raise ValueError(f"특징 차원 {X.shape[1]} ≠ head {self.dim} — head를 이 .pte 출력으로 다시 학습할 것")
+            raise ValueError(f"feature dim {X.shape[1]} ≠ head {self.dim} — retrain the head on this .pte's output")
         return softmax(((X - self.mean) / self.scale) @ self.W.T + self.b)
 
 
 def fit_head(X, y, classes, C=0.1, iters=3000, lr=0.5, class_weight=None):
-    """StandardScaler + 다항 로지스틱 회귀. sklearn 있으면 그것(Mac과 동일), 없으면 numpy 경사하강.
+    """StandardScaler + multinomial logistic regression. Uses sklearn when available (same as
+    on the Mac), otherwise numpy gradient descent.
 
-    class_weight="balanced": 클래스별 장수 차이를 가중치로 보정 (예: other에 캔 crop을 많이 넣었을 때).
+    class_weight="balanced": reweights for uneven per-class image counts (e.g. many can crops in
+    other).
     """
     X = np.asarray(X, np.float64).reshape(len(X), -1)
     y = np.asarray(y)
@@ -50,7 +54,7 @@ def fit_head(X, y, classes, C=0.1, iters=3000, lr=0.5, class_weight=None):
 
         lr_ = LogisticRegression(max_iter=3000, C=C, class_weight=class_weight).fit(Z, y)
         W, b = lr_.coef_, lr_.intercept_
-        if k == 2:  # sklearn 2클래스는 W 1행 → softmax 형태로 펼침
+        if k == 2:  # sklearn stores 2 classes as one W row → expand to softmax form
             W, b = np.vstack([-W[0] / 2, W[0] / 2]), np.array([-b[0] / 2, b[0] / 2])
         how = "sklearn"
     except ImportError:
@@ -58,9 +62,9 @@ def fit_head(X, y, classes, C=0.1, iters=3000, lr=0.5, class_weight=None):
         W, b = np.zeros((k, d)), np.zeros(k)
         Y = np.eye(k)[y]
         sw = np.ones(n)
-        if class_weight == "balanced":  # sklearn과 같은 정의: n / (k * 클래스 장수)
+        if class_weight == "balanced":  # same definition as sklearn: n / (k * class count)
             sw = n / (k * np.bincount(y, minlength=k)[y])
-        lam = 1.0 / (C * n)  # sklearn 목적함수(합 CE + ||W||²/2C)를 n으로 나눈 것
+        lam = 1.0 / (C * n)  # sklearn's objective (summed CE + ||W||²/2C) divided by n
         for _ in range(iters):
             G = (softmax(Z @ W.T + b) - Y) * sw[:, None]
             W -= lr * (G.T @ Z / n + lam * W)

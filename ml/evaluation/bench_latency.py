@@ -1,9 +1,9 @@
-"""로컬 지연시간 측정 (batch 1, 224x224, fp32).
+"""Local latency measurement (batch 1, 224x224, fp32).
 
-주의: Mac M4 CPU/MPS 수치는 VENTUNO Q(Hexagon NPU)와 다르다. 상대 비교·감 잡기용.
-  --threads 4 는 보드 big 코어 수(A78 x4)에 맞춘 대략적인 CPU 비교군일 뿐, 코어 성능은 M4가 훨씬 높다.
+Note: Mac M4 CPU/MPS numbers differ from VENTUNO Q (Hexagon NPU). Use them for relative comparison and a rough feel.
+  --threads 4 is only a rough CPU baseline matching the board's big-core count (A78 x4); M4 cores are much faster.
 
-사용 예:
+Usage:
   python -m ml.evaluation.bench_latency --model small --devices cpu mps --threads 1 4
 """
 
@@ -51,7 +51,7 @@ def main():
     args = ap.parse_args()
 
     rows = []
-    # 전처리 (PIL resize/crop/normalize) — 보드에서도 CPU에서 돈다
+    # Preprocessing (PIL resize/crop/normalize) — runs on the CPU on the board too
     paths, _, _ = load_dataset(args.data)
     imgs = [Image.open(p).copy() for p in paths[:50]]
     t0 = time.perf_counter()

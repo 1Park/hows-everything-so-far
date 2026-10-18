@@ -1,8 +1,8 @@
 # english_cases.py
 
-원본 경로: `evaluation/english_cases.py` · 원본 SHA-256: `efd943846fc558b4a58d34df51a25da047af8508f4f6838f0a1c35f104567151`
+Original path: `evaluation/english_cases.py` · Original SHA-256: `efd943846fc558b4a58d34df51a25da047af8508f4f6838f0a1c35f104567151`
 
-원본 내용을 아래 코드 블록에 보존했다. 실행 가능한 파일로 복원하는 방법은 [평가 인덱스](README.md)를 참조한다. 줄바꿈은 Markdown 저장 과정에서 정규화될 수 있다.
+The original content is preserved in the code block below. See the [evaluation index](README.md) for how to restore it as an executable file. Line endings may have been normalized when it was stored as Markdown.
 
 ````python
 SYSTEM_EN = """Interpret restaurant refill requests. Output exactly one JSON object, with no explanation or Markdown.

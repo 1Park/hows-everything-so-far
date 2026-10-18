@@ -1,47 +1,47 @@
-# TTS 서비스 (보드)
+# TTS service (board)
 
-`server.py:create_app`, 기본 127.0.0.1:8003. `POST /v1/speak {"text": "..."}` → `audio/wav` (22050 Hz mono), `GET /ready`, `/health`.
+`server.py:create_app`, default 127.0.0.1:8003. `POST /v1/speak {"text": "..."}` → `audio/wav` (22050 Hz mono), `GET /ready`, `/health`.
 
-- 엔진: Piper voice `en_US-hfc_female-medium` (데모용 말투: 12% 빠르게, 억양 변화 크게, 피크 -1 dBFS).
-- **앞부분은 CPU, 디코더는 NPU.** voice `.onnx`를 앞부분(발음·길이 예측·flow, 입력마다 출력 길이가 바뀜)과
-  디코더(HiFi-GAN, Conv/ConvTranspose만)로 나눠 디코더만 ExecuTorch QNN fp16으로 돌린다.
-  디코더는 latent 길이를 고정해야 해서 `<voice>.dec_f<N>.pte`를 길이별로 두고, 문장마다 맞는 가장 작은 것을 골라
-  0으로 채운 뒤 잘라낸다. 맞는 길이가 없거나 `.pte`가 없으면 그 문장은 CPU 디코더로 만든다.
-- NPU 디코더는 Vision과 같은 상주 worker(`TTS_WORKER_BIN`, 비우면 `VISION_WORKER_BIN`)로 모델을 올려둔다.
-- 디코더 export: `ml/export/export_piper_decoder.py` (보드 ExecuTorch venv).
+- Engine: Piper voice `en_US-hfc_female-medium` (demo speaking style: 12% faster, larger pitch variation, -1 dBFS peak).
+- **Front end on CPU, decoder on NPU.** The voice `.onnx` is split into the front end (phonemes, duration prediction, flow; output length changes per input) and
+  the decoder (HiFi-GAN, Conv/ConvTranspose only), and only the decoder runs on ExecuTorch QNN fp16.
+  The decoder needs a fixed latent length, so there is one `<voice>.dec_f<N>.pte` per length; for each sentence the smallest one that fits is chosen,
+  zero-padded, and then trimmed. If no length fits or the `.pte` is missing, that sentence is generated with the CPU decoder.
+- The NPU decoder keeps its model loaded in the same resident worker as Vision (`TTS_WORKER_BIN`; if empty, `VISION_WORKER_BIN`).
+- Decoder export: `ml/export/export_piper_decoder.py` (board ExecuTorch venv).
 
-| 설정 | 의미 |
+| Setting | Meaning |
 |---|---|
-| `TTS_VOICE_PATH` | Piper voice `.onnx` (같은 폴더에 `.onnx.json`). front/dec 그래프는 처음 실행 때 옆에 만든다 |
-| `TTS_DECODER_DIR` | `<voice>.dec_f<N>.pte`가 있는 폴더. 비우면 CPU 디코더만 |
-| `TTS_WORKER_BIN` | 상주 QNN worker. 비우면 `VISION_WORKER_BIN` |
-| `TTS_BACKEND` | Controller 쪽 설정. `http`면 상태마다 말할 문장(`speech`)을 이 서비스로 읽게 한다 |
+| `TTS_VOICE_PATH` | Piper voice `.onnx` (with `.onnx.json` in the same folder). The front/dec graphs are created next to it on the first run |
+| `TTS_DECODER_DIR` | Folder containing `<voice>.dec_f<N>.pte`. If empty, CPU decoder only |
+| `TTS_WORKER_BIN` | Resident QNN worker. If empty, `VISION_WORKER_BIN` |
+| `TTS_BACKEND` | Controller-side setting. With `http`, the sentence to say for each state (`speech`) is read out through this service |
 
-Controller는 상태마다 말할 문장(`app/speech.py`)을 `StateSnapshot.speech`로 내보내고, 태블릿은
-`GET /api/speech/{session_id}/{sequence}`로 그 음성을 받아 재생한다. `TTS_BACKEND=http`에서는
-실패 시 이전 WAV로 대체하지 않고 오류를 표시하며, 안내 완료 ACK·자동 녹음을 시작하지 않는다.
-Enable sound의 환영 음성과 Replay voice도 같은 TTS를 사용한다. 환영·테스트 문장은
-`GET /api/speech-preview`로 생성한다. 같은 문장은 Controller가 캐시한다.
-개발에서 명시적으로 `TTS_BACKEND=disabled`를 사용한 경우에만 기존 고정 WAV를 사용한다.
-http 설정에서는 TTS 준비 여부를 Controller `/ready` 성공 조건에 포함한다.
+The Controller exports the sentence to say for each state (`app/speech.py`) as `StateSnapshot.speech`, and the tablet
+fetches that audio from `GET /api/speech/{session_id}/{sequence}` and plays it. With `TTS_BACKEND=http`,
+a failure does not fall back to the previous WAV; an error is shown, and the prompt-finished ACK and auto recording are not started.
+The Enable sound welcome voice and Replay voice use the same TTS. The welcome and test sentences are
+generated with `GET /api/speech-preview`. The Controller caches identical sentences.
+The old fixed WAVs are used only when `TTS_BACKEND=disabled` is set explicitly in development.
+With the http setting, TTS readiness is part of the Controller `/ready` success condition.
 
-## 보드 실측 (2026-10-18)
+## Board measurements (2026-10-18)
 
-데모 문장 7개(음성 1.7~3.9초), 서비스 HTTP 왕복 중앙값. 같은 문장은 Controller 캐시로 두 번째부터 즉시.
+7 demo sentences (1.7–3.9 s of audio), median service HTTP round trip. Repeated sentences are instant from the second time on thanks to the Controller cache.
 
-| 디코더 | HTTP 왕복 | 디코더 | 앞부분(CPU) |
+| Decoder | HTTP round trip | Decoder | Front end (CPU) |
 |---|---:|---:|---:|
-| CPU | 495 ms | 274 ms (길이 따라 200~310) | 215 ms |
-| **NPU fp16, 384 프레임 고정** | **373 ms** | **185 ms (길이 무관)** | 175 ms |
+| CPU | 495 ms | 274 ms (200–310 depending on length) | 215 ms |
+| **NPU fp16, fixed 384 frames** | **373 ms** | **185 ms (independent of length)** | 175 ms |
 
-- NPU 출력은 CPU 대비 cosine 0.9999 (SNR 33 dB). 시작할 때 모델 로드 약 2.5초.
-- 128·256 프레임 export는 QNN "VTCM Allocation" 단계에서 멈춰서(15분+) 384 하나만 쓴다. 한 줄(150~335 프레임)을
-  통째로 디코더 1번으로 만들고, 384를 넘는 긴 줄만 문장별로 나눈다.
+- NPU output vs CPU: cosine 0.9999 (SNR 33 dB). Model load at startup takes about 2.5 s.
+- The 128- and 256-frame exports hang at the QNN "VTCM Allocation" step (15+ min), so only 384 is used. A whole line (150–335 frames) is
+  generated in a single decoder pass, and only long lines over 384 are split by sentence.
 
-## 실행
+## Running
 
 ```sh
-.venv/bin/pip install piper-tts==1.8.0 onnxruntime==1.31.0 onnx==1.23.2   # 보드 1회
+.venv/bin/pip install piper-tts==1.8.0 onnxruntime==1.31.0 onnx==1.23.2   # once on the board
 setsid nohup .venv/bin/python -m uvicorn services.tts.server:create_app --factory \
   --host 127.0.0.1 --port 8003 > ~/model_output/logs/tts-8003.log 2>&1 < /dev/null &
 ```

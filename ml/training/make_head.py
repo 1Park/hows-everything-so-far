@@ -1,13 +1,14 @@
-"""보드에서 head 학습: 학습 사진(data/real/<class>/*.jpg)을 **보드 .pte**에 통과시켜 특징을 뽑고 head JSON 저장.
+"""Train the head on the board: run training photos (data/real/<class>/*.jpg) through the **board .pte**,
+extract features, and save the head JSON.
 
-Mac fp32 특징으로 학습한 head 는 양자화 .pte 와 안 맞으므로 이걸 보드에서 돌린다.
-sklearn 이 없으면 numpy 경사하강으로 학습.
+A head trained on Mac fp32 features does not match the quantized .pte, so run this on the board.
+Falls back to numpy gradient descent if sklearn is missing.
 
   python -m ml.training.make_head --data data/real --dino-pte dino.pte --runner py --out models/experiments/vision/heads/head_board.json
   python -m ml.training.make_head --data data/real --dino-pte dino.pte --runner cli \
       --runner-bin $QNN_RUNNER --dino-out-shape 1 384 --out models/experiments/vision/heads/head_board.json
 
-YOLO 모드 bundle이면 학습 사진을 먼저 추론과 같은 crop으로 바꾼다 (ml/training/make_crops.py):
+For a YOLO-mode bundle, first turn the training photos into the same crops as inference (ml/training/make_crops.py):
   python -m ml.training.make_crops --data data/real --bundle <bundle> --runner-bin $QNN_RUNNER --out data/crops
   python -m ml.training.make_head --data data/crops --class-weight balanced ...
 """
@@ -34,9 +35,9 @@ def main():
     ap.add_argument("--runner", choices=["py", "cli"], default="py")
     ap.add_argument("--runner-bin")
     ap.add_argument("--dino-out-shape", type=int, nargs="+", default=[1, 384])
-    ap.add_argument("--batch", type=int, default=16, help="cli runner 한 번에 넣을 장 수")
+    ap.add_argument("--batch", type=int, default=16, help="images per cli runner call")
     ap.add_argument("--C", type=float, default=0.1)
-    ap.add_argument("--class-weight", choices=["balanced"], help="클래스별 장수 차이 보정")
+    ap.add_argument("--class-weight", choices=["balanced"], help="correct for per-class image count imbalance")
     ap.add_argument("--out", default="models/experiments/vision/heads/head_board.json")
     args = ap.parse_args()
 

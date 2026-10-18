@@ -1,4 +1,5 @@
-"""TTS 서비스: POST /v1/speak {"text"} → audio/wav. 기본 127.0.0.1:8003, 보드 전용 (Piper + NPU 디코더)."""
+"""TTS service: POST /v1/speak {"text"} → audio/wav. Default 127.0.0.1:8003, board only
+(Piper + NPU decoder)."""
 
 import asyncio
 import json
@@ -27,7 +28,7 @@ def create_app(settings=None, backend=None):
                     PiperTTS, settings.tts_voice_path, settings.tts_decoder_dir,
                     settings.tts_worker_bin or settings.vision_worker_bin,
                 )
-            except Exception as error:  # 준비 실패는 /ready 503으로 알린다 (fixture 대체 없음)
+            except Exception as error:  # setup failures surface as /ready 503 (no fixture fallback)
                 state["error"] = f"{type(error).__name__}: {error}"
         try:
             yield

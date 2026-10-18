@@ -8,7 +8,7 @@ let audioContext = null, playingSource = null;
 let draftVersion = 0, transcriptionVersion = 0, micVersion = 0;
 let micPending = false, transcribing = false, pendingAction = null;
 let audioVersion = 0;
-let policy = {min_confidence: 0.7, low_fill_threshold: 0.3};  // /ready 값으로 덮어씀
+let policy = {min_confidence: 0.7, low_fill_threshold: 0.3};  // overwritten by /ready values
 let captureState = null;
 let restartDisplayRevision = -1, restartDisplayDeadline = null;
 const captureTerminal = ['idle','done','cancelled','declined','skipped','expired','error'];
@@ -57,7 +57,8 @@ function updateCapture(next) {
 }
 const audioBuffers = new Map();
 const editablePhases = ['offered','card','not_understood','error'];
-// 사진틀 비율을 실제 사진(카메라 4:3, fixture 등) 비율에 맞춘다 → 박스 좌표가 사진과 일치
+// Match the photo frame to the real photo's aspect ratio (camera 4:3, fixtures, ...) so box
+// coordinates line up with the photo
 function syncFrameRatio() {
   const img = $('sceneImage');
   if (img?.naturalWidth && img.naturalHeight) $('scene').style.setProperty('--ar', String(img.naturalWidth / img.naturalHeight));
@@ -315,8 +316,10 @@ function render(next, authoritative = false) {
   const boxes = $('boxes'); boxes.replaceChildren(); const objects = $('objects'); objects.replaceChildren();
   for (const obj of (monitoring ? [] : state.scene?.objects || [])) {
     const selected = obj.object_id === state.target?.object_id;
-    // 리필 필요 = Controller 정책과 같은 잔량·confidence 기준 (빈 잔 unknown도 눈으로는 리필 대상이라 표시)
-    // Vision은 빈 잔을 item unknown으로 보낸다 (계약에 empty 없음) → 화면에서만 empty로 표시
+    // Needs refill = same fill/confidence thresholds as the Controller policy (an empty cup
+    // reported as unknown is still visibly a refill target, so it is marked too)
+    // Vision sends empty cups as item unknown (the contract has no empty) → shown as empty
+    // on screen only
     const item = obj.item === 'unknown' && obj.fill_ratio !== null && obj.fill_ratio <= 0.1 ? 'empty' : obj.item.replace('_', ' ');
     const refill = obj.fill_ratio !== null && obj.fill_ratio <= policy.low_fill_threshold && obj.confidence >= policy.min_confidence;
     const box = document.createElement('div'); box.className = 'bbox' + (selected ? ' selected' : '') + (refill ? ' refill' : '');

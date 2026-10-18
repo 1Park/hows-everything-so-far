@@ -1,13 +1,13 @@
-# 보드 LLM 상주
+# Resident board LLM
 
-현재 동작·설정은 [LLM 서비스](../services/qwen/README.md), 실행은 [보드 runbook](BOARD_RUNBOOK.md)을 따른다. Gemma4는 서버 시작 시 생성 호출 없이 preload한다. `/ready`의 `runner.resident/llm/pid`가 실제 로드 상태다.
+Current behavior and settings follow the [LLM service](../services/qwen/README.md); operation follows the [board runbook](BOARD_RUNBOOK.md). Gemma4 is preloaded at server start without a generation call. `runner.resident/llm/pid` in `/ready` is the actual load state.
 
-## 과거 검증 (2026-10-17)
+## Past verification (2026-10-17)
 
-아래는 이전 스키마(portion/clarify)의 QA 기록이며 현재 제품 정확도 결과가 아니다.
+The following is a QA record for the previous schema (portion/clarify) and is not a current product accuracy result.
 
-- Gemma4 첫 호출 4.505초(load 2.895초), 후속 두 호출 1.569초/1.569초, 동일 worker PID.
-- 명시 model ID 전환 검증: Gemma4 첫 호출 5.606초, 재사용 1.863/1.881초, Gemma3 전환 4.418초, Gemma4 복귀 5.272초.
-- [원본 응답·통계](qwen_evaluation/resident-worker-20261017.json). 소수 smoke 요청이며 전체 시나리오 정확도·현재 invoke 지연을 보장하지 않는다.
+- Gemma4 first call 4.505 s (load 2.895 s), next two calls 1.569 s/1.569 s, same worker PID.
+- Explicit model ID switch check: Gemma4 first call 5.606 s, reuse 1.863/1.881 s, switch to Gemma3 4.418 s, back to Gemma4 5.272 s.
+- [Raw responses and stats](qwen_evaluation/resident-worker-20261017.json). These are a few smoke requests and do not guarantee full-scenario accuracy or current invoke latency.
 
-상주 worker 재사용은 대화 이력 재사용과 다르다. 요청마다 KV를 초기화한다. `board_llm.sh ask`는 일회성 CLI 진단이며 HTTP 상주 성능과 구분한다.
+Reusing the resident worker is not the same as reusing conversation history. KV is reset for every request. `board_llm.sh ask` is a one-shot CLI diagnostic and is separate from resident HTTP performance.

@@ -1,8 +1,8 @@
 # qwen_stt_analysis.json
 
-원본 경로: `evaluation/qwen_stt_analysis.json` · 원본 SHA-256: `604bac8d4c03982b1e4a8948769fe0fb6d290e3fc6a8b3363355e0c6e7f6cfde`
+Original path: `evaluation/qwen_stt_analysis.json` · Original SHA-256: `604bac8d4c03982b1e4a8948769fe0fb6d290e3fc6a8b3363355e0c6e7f6cfde`
 
-원본 내용을 아래 코드 블록에 보존했다. 실행 가능한 파일로 복원하는 방법은 [평가 인덱스](README.md)를 참조한다. 줄바꿈은 Markdown 저장 과정에서 정규화될 수 있다.
+The original content is preserved in the code block below. See the [evaluation index](README.md) for how to restore it as an executable file. Line endings may have been normalized when it was stored as Markdown.
 
 ````json
 {
