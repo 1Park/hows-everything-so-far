@@ -1,6 +1,6 @@
 # 보드 LLM 상주 실행
 
-Qwen 서비스의 `board` backend(기존 `executorch`도 호환)는 주최 측 번들의 **`qnn_llm_runner_host`**를 자식 프로세스로 유지한다. FastAPI 프로세스만 살아 있는 것이 아니라 모델 가중치와 QNN context가 실제로 상주한다. 별도 SDK 교체·재빌드는 필요 없다.
+Qwen 서비스의 `executorch` backend는 주최 측 번들의 **`qnn_llm_runner_host`**를 자식 프로세스로 유지한다. FastAPI 프로세스만 살아 있는 것이 아니라 모델 가중치와 QNN context가 실제로 상주한다. 별도 SDK 교체·재빌드는 필요 없다.
 
 ## 동작
 

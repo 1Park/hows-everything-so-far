@@ -34,7 +34,7 @@ class Settings(BaseModel):
     qwen_base_url: HttpUrl = "http://won-macmini:8000"
     qwen_host: str = "127.0.0.1"
     qwen_port: int = Field(8000, ge=1, le=65535)
-    qwen_model_backend: Literal["mlx", "fixture", "executorch", "board", "qwen_cli"] = "mlx"
+    qwen_model_backend: Literal["mlx", "fixture", "executorch", "qwen_cli"] = "mlx"
     qwen_upstream_url: HttpUrl = "http://won-macmini:8000"
     qwen_model: str = "mlx-community/Qwen3-0.6B-4bit"
     qnn_llama_runner: str = ""

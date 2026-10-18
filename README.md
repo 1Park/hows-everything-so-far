@@ -90,8 +90,8 @@ python scripts/evaluate_qwen.py --proxy
 <!-- Native runner implementation status -->
 ### Native ExecuTorch runner status
 
-The board uses resident Gemma4 (`QWEN_MODEL_BACKEND=board`, with the legacy
-`executorch` setting supported). It preloads at server startup. The following
+The board uses resident Gemma4 (`QWEN_MODEL_BACKEND=executorch`).
+It preloads at server startup. The following
 Qwen CLI adapter is optional and selected only with `QWEN_MODEL_BACKEND=qwen_cli`.
 
 Qwen's former placeholder now invokes the QC native runner via
