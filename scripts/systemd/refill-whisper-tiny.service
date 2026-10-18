@@ -1,0 +1,18 @@
+[Unit]
+Description=Refill Assist speech recognition (tiny)
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+WorkingDirectory=%h/whisper.cpp
+# Four threads each: both models run side by side so a comparison is not a
+# comparison of thread counts.
+ExecStart=%h/whisper.cpp/build/bin/whisper-server -m models/ggml-tiny.en.bin --host 0.0.0.0 --port 8179 -t 4 --prompt "juice, cola, water, sprite, refill, no thanks"
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=15
+KillMode=control-group
+
+[Install]
+WantedBy=default.target

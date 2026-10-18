@@ -1,0 +1,19 @@
+[Unit]
+Description=Refill Assist resident board LLM API
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+WorkingDirectory=%h/project/hows-everything-so-far
+Environment=REFILL_ENV_FILE=%h/project/hows-everything-so-far/.env.board
+# Model choice, runner path and the QNN library paths come from
+# scripts/board_llm.sh config, so nothing machine-local is duplicated here.
+ExecStart=%h/project/hows-everything-so-far/.venv/bin/python -m uvicorn services.qwen.server:create_app --factory --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=25
+KillMode=control-group
+
+[Install]
+WantedBy=default.target

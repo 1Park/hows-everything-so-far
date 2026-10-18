@@ -1,15 +1,15 @@
 [Unit]
 Description=Refill Assist Controller UI and STT API
-Wants=refill-vision.service
-After=refill-vision.service
-StartLimitIntervalSec=60
-StartLimitBurst=3
+Wants=refill-vision.service refill-llm.service refill-tts.service refill-whisper-tiny.service refill-whisper-base.service
+After=refill-vision.service refill-llm.service refill-tts.service refill-whisper-tiny.service refill-whisper-base.service
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
 WorkingDirectory=%h/project/hows-everything-so-far
 Environment=PYTHONUNBUFFERED=1
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStartPre=%h/project/hows-everything-so-far/.venv/bin/python scripts/prepare_board_start.py --env-file .env.board
 ExecStart=%h/project/hows-everything-so-far/.venv/bin/python scripts/dev.py --mode direct --with-stt --env-file .env.board
 Restart=on-failure
 RestartSec=3
