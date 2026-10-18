@@ -5,6 +5,7 @@ from collections import deque
 from app.hardware.io import BridgeHardware, MockHardware
 from app.audio import BoardMicrophone
 from app.events import EventLog
+from app.speech import speech_for
 from common.api import ApiError, log
 from common.contracts import CurrentRequest, RequestCard, StateEvent, uid
 
@@ -92,6 +93,7 @@ class Controller:
             "transcript": self.transcript,
             "stt_source": self.stt_source,
             "capture": self.capture_status,
+            "speech": speech_for(self.phase, self.target, self.card, self.settings.item_confirm_threshold),
         }
 
     def show_phase_led(self, phase):
