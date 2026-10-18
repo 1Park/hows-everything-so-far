@@ -2,7 +2,7 @@ const $ = id => document.getElementById(id);
 // The mock history is an evening bar in Los Angeles (scripts/make_mock_events.py), so hours
 // and days are bucketed in the venue's time zone, not the viewing browser's.
 const VENUE_TZ = 'America/Los_Angeles';
-const DRINKS = ['water','coke','coffee','beer','cocktail','unknown'];
+const DRINKS = ['water','coke','coffee','orange_juice','beer','cocktail','unknown'];
 const COLORS = {water:'#4a8fb8', coke:'#a23b2a', coffee:'#6b4a2e', beer:'#d9a13b', cocktail:'#c45d8a', unknown:'#a9ab9f'};
 const color = item => COLORS[item] || '#7f9a6a';
 const NS = 'http://www.w3.org/2000/svg';

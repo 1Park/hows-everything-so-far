@@ -31,6 +31,8 @@ def test_speech_lines_name_the_drink_and_cover_each_outcome():
     assert "call me if you need anything" in speech_for("declined", None, None, 0.8)
     assert "didn't catch that" in speech_for("not_understood", None, None, 0.8)
     assert speech_for("done", obj("water"), card("coke"), 0.8) == "Your coke refill is on its way."
+    assert speech_for("offered", obj("orange_juice"), None, 0.8).startswith("Your orange juice is running low")
+    assert speech_for("card", None, card("orange_juice"), 0.8).startswith("One more orange juice")
     assert speech_for("observing", None, None, 0.8) is None and speech_for("skipped", None, None, 0.8) is None
 
 
@@ -124,3 +126,19 @@ def test_controller_speech_is_disabled_by_default():
 @pytest.mark.parametrize("phase", ["idle", "observing", "listening", "skipped"])
 def test_silent_phases(phase):
     assert speech_for(phase, None, None, 0.8) is None
+
+
+async def test_fixture_language_backend_understands_orange_juice():
+    import json
+
+    from common.backends import FixtureTextBackend
+    from common.contracts import Generation, Message
+
+    def ask(utterance):
+        content = json.dumps({"current_request": {"item": "water"}, "utterance": utterance})
+        return Generation(model="m", messages=[Message(role="user", content=content)])
+
+    out = await FixtureTextBackend().generate(ask("An orange juice please"))
+    assert json.loads(out["choices"][0]["message"]["content"]) == {"intent": "refill", "item": "orange_juice"}
+    out = await FixtureTextBackend().generate(ask("Apple juice please"))
+    assert json.loads(out["choices"][0]["message"]["content"])["intent"] == "not_understood"

@@ -87,9 +87,12 @@ class FixtureTextBackend:
         elif re.search(r"\b(no|nope|fine|don't need)\b", utterance):
             intent = "decline"
         else:
-            drinks = [d for d in ("water", "coke", "coffee") if re.search(rf"\b{d}\b", utterance)]
+            utterance = re.sub(r"\b(orange juice|oj)\b", "orange_juice", utterance)
+            drinks = [
+                d for d in ("water", "coke", "coffee", "orange_juice") if re.search(rf"\b{d}\b", utterance)
+            ]
             if len(drinks) > 1 or re.search(
-                r"\b(juice|tea|time|maybe|whatever|not sure|ignore)\b", utterance
+                r"\b(juice|lemonade|tea|time|maybe|whatever|not sure|ignore)\b", utterance
             ):
                 intent = "not_understood"
             elif drinks:
