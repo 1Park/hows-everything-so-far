@@ -66,14 +66,14 @@ def test_window_types_counts_order_gap_and_empty():
     assert window.best is None and window.samples == 0
 
 
-def test_best_frame_within_five_seconds_is_kept_with_its_result():
-    window = StableWindow(seconds=5, max_gap=2)
+def test_best_frame_within_three_seconds_is_kept_with_its_result():
+    window = StableWindow(max_gap=2)
     overlap = scene(obj(), obj("coffee", identity="2"))
     separated = scene(obj(), obj("coffee", box=(.6, 0, 1, .5), identity="2"), identity="best")
-    for t in range(6):
+    for t in range(4):
         candidate = separated if t == 2 else overlap
         best = window.add(t, f"jpeg-{t}".encode(), "image/jpeg", candidate)
-        if t < 5:
+        if t < 3:
             assert best is None
     assert best.data == b"jpeg-2" and best.result is separated and best.score == 0
 
@@ -104,15 +104,15 @@ async def test_scan_selects_analyzed_frame_once_pauses_and_latches():
     clock = [0]
     capture = AutoCapture(controller, Camera(), clock=lambda: clock[0])
     try:
-        for t in range(11):
+        for t in range(7):
             clock[0] = t*.5
             await capture.scan_once()
-        assert controller.phase == "offered" and len(calls) == 11
+        assert controller.phase == "offered" and len(calls) == 7
         assert controller.snapshot[0] == calls[2]
         assert controller.scene.objects[1].bbox.x1 == .6
-        # The winning analysis is reused; no 12th Vision invoke on start.
+        # The winning analysis is reused; no 8th Vision invoke on start.
         await capture.scan_once()
-        assert len(calls) == 11
+        assert len(calls) == 7
         token = controller.token
         await controller.cancel(controller.session_id)
         for t in range(12, 25):

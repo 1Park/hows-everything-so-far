@@ -20,7 +20,7 @@ const url = process.env.REFILL_URL || 'http://127.0.0.1:8088';
     await page.reload(); // mode/window belongs to the server, not this browser.
     await page.waitForFunction(() => document.querySelector('#captureMode').value === 'auto');
     await page.waitForFunction(() => document.querySelector('#phase').textContent === 'OFFERED', null, {timeout:15000});
-    assert(Date.now()-started >= 4800, 'Must observe for five seconds, not freeze immediately');
+    assert(Date.now()-started >= 2800, 'Must observe for three seconds, not freeze immediately');
     await page.waitForFunction(() => !document.querySelector('#boxes').hidden);
     const state = await (await page.request.get(`${url}/api/state`)).json();
     assert.equal(state.scene.source, 'fixture');
@@ -54,7 +54,7 @@ const url = process.env.REFILL_URL || 'http://127.0.0.1:8088';
       await page.screenshot({path:`tmp/browser-qa/auto-capture-${width}.png`,fullPage:true});
     }
     assert.deepEqual(errors, []);
-    console.log(JSON.stringify({passed:true,checks:['five-second automatic start','mode survives reload',
+    console.log(JSON.stringify({passed:true,checks:['three-second automatic start','mode survives reload',
       'frozen frame/bbox alignment','mode change preserves active session','rearm resets window','desktop/mobile layout']}));
   } finally {await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

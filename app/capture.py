@@ -71,7 +71,7 @@ class Candidate:
 
 
 class StableWindow:
-    def __init__(self, seconds=5, max_gap=1):
+    def __init__(self, seconds=3, max_gap=1):
         self.seconds, self.max_gap = seconds, max_gap
         self.reset()
 

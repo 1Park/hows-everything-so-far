@@ -177,7 +177,7 @@ class CaptureStatus(Contract):
     status: Literal["manual", "scanning", "stabilizing", "paused", "waiting", "error"] = "manual"
     revision: int = 0
     stable_seconds: float = 0
-    required_seconds: float = 5
+    required_seconds: float = 3
     samples: int = 0
     source: Literal["fixture", "external"] | None = None
     overlap_area: float | None = None

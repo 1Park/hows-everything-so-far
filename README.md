@@ -46,7 +46,7 @@ macOS/Linux는 `.venv/bin/python`과 `cp .env.example .env`를 사용한다.
 | [scripts/](scripts/README.md) | supervisor·진단·빌드·평가 도구 |
 
 카메라와 마이크는 Controller, UI·스피커는 브라우저가 소유한다. 선택 영상/USB 입력은 `.[camera]`를 설치하고 `CAMERA_SOURCE`로 지정한다. 빈 값은 명시적 샘플 이미지다.
-캡처는 기본 수동이며 UI에서 Automatic으로 바꾸면 5초 안정성 판정 후 시작한다. [자동 캡처](docs/AUTO_CAPTURE.md).
+캡처는 기본 수동이며 UI에서 Automatic으로 바꾸면 3초 안정성 판정 후 시작한다. [자동 캡처](docs/AUTO_CAPTURE.md).
 
 ## 문서·검증
 
