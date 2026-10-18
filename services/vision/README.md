@@ -46,12 +46,50 @@ python -m uvicorn services.vision.server:create_app --factory --host 127.0.0.1 -
 |---|---|
 | `VISION_MODEL_PATH` | bundle 디렉터리 (`bundle.json`, `.pte`, `head.json`). 상대 경로는 레포 루트 기준. `ml/export/make_bundle.py`가 생성 |
 | `VISION_RUNNER_BIN` | bundle이 `cli` runner일 때만 — 보드 `qnn_executor_runner` 경로 |
+| `VISION_WORKER_BIN` | 서비스에서 DINO·YOLO를 상주시키는 native worker 경로. CLI bundle을 사용할 때 필수 |
 
 - 흐름: 이미지 bytes → 컵 박스 (`boxes.mode`: `yolo` .pte / 고정 `rois` / `center`) → crop (`yolo`는 기본 `crop_mode: pad` = 박스×1.15 + 회색 패딩) → DINOv2 .pte → head → `item`·`fill_ratio`·`confidence`·`item_confidence` ([labels.py](labels.py)).
 - head에 `other` 클래스(캔·병)가 있으면 p(other) ≥ 0.5인 박스는 결과에서 뺀다. object_id는 남은 컵 기준으로 다시 매긴다.
 - YOLO 모드 head는 추론과 같은 crop으로 학습한다 (`ml/training/make_crops.py` → `make_head --data data/crops`). 보드 배포 bundle: `models/board/vision/dinov2-qnn-v3`.
-- runner: `py` = `executorch.runtime` (모델 1회 로드 후 재사용, torch 필요) / `cli` = `qnn_executor_runner` 규칙(`input_list.txt` 한 줄=1회, `outputs/output_{i}_0.raw`), 컵 N개를 1회 실행으로 묶음. 보드에 Python 바인딩이 있는지 먼저 확인.
+- 서비스는 시작 시 DINO와 YOLO(detector)를 모두 로드하고 준비 신호를 기다린다. 기존 bundle의 `runner=cli`는 서비스 안에서 상주 worker로 연결하며 bundle 파일은 수정하지 않는다. `py`는 Python 런타임 모델을 한 번 로드해 유지한다. 학습·독립 진단의 `CliRunner`는 기존 일회성 동작을 유지한다.
 - 의존성: numpy + Pillow (OpenCV·ultralytics 불필요). 추론은 전용 스레드 1개에서 직렬 실행.
-- bundle 없음·로드 실패 → `/ready` 503, `/v1/analyze` 503 `vision_not_ready`. fixture 자동 전환 없음.
+- bundle·worker 없음 또는 시작 로드 실패면 서비스 시작에 실패한다. `/ready`는 실제 worker 생존 여부와 `runners.dino/detector`의 resident·PID를 표시한다. 추론 실패·timeout·취소는 해당 worker를 회수하고 ready=false가 되며, 서비스 재시작으로 복구한다. fixture/일회성 CLI 자동 전환 없음.
 - 카메라는 열지 않는다 (Controller VideoSource 소유). object_id는 장면 안에서만 유일 (`cup-0`… 왼쪽부터).
 - 검증: `tests/test_vision_backend.py` (가짜 runner로 계약·오류 경로), Mac XNNPACK bundle로 실제 HTTP 6장면 → [평가 기록](../../docs/vision_evaluation/README.md).
+
+## 상주 worker 빌드·배포
+
+주최 측 기존 SDK/빌드의 compiler flags와 linked QNN 라이브러리를 사용한다.
+SDK 소스와 빌드 디렉터리는 수정하지 않으며, 생성 소스·object·binary·build manifest는
+지정한 출력 경로에만 쓴다. SDK에 이미 있는 stdin 확장도 생성 사본에서만 처리한다.
+지원하지 않는 소스/빌드 구조는 명시적으로 실패한다.
+
+```sh
+python scripts/build_vision_worker.py --sdk "$HOME/git/executorch" \
+  --build-dir "$HOME/git/executorch/build-x86" --output-dir /tmp/vision-worker-build
+```
+
+실험은 로컬 코드 사본을 `/tmp`에 복사해 실행한다. 정식 배포는 로컬 변경 push 후
+배포 절차로 binary를 `models/board/bin/qnn_vision_worker`에 배치하고,
+`VISION_WORKER_BIN`을 설정한 뒤 Vision 서비스를 재시작한다. `.env.board`에 경로가
+있어도 worker 파일은 따로 빌드·배포해야 한다. 서비스 재시작 없이 기존 프로세스가
+상주 방식으로 바뀌지는 않는다.
+
+동작: `--vision_resident=true`로 모델·method·QNN context를 한 번 로드하고,
+`VISION_READY` 이후 stdin의 요청별 input-list/output-directory 두 줄을 처리한다.
+완료는 `VISION_DONE`으로 동기화한다. 입력·출력 파일은 요청마다 격리하고 검증하며,
+ETDump 이벤트 누적은 상주 모드에서 비활성화한다. 원래 QNN 입력/출력 및 연산은 유지한다.
+
+## 변경 전후 지연 비교
+
+```sh
+python scripts/benchmark_vision_residency.py --bundle /actual/bundle \
+  --cli /actual/qnn_executor_runner --worker /tmp/vision-worker-build/qnn_vision_worker \
+  --image /actual/cups.jpg --output /tmp/vision-latency.json --warmups 3 --repetitions 20
+```
+
+동일 이미지·bundle로 CLI 23회(워밍업3+측정20), 상주 23회를 순서대로 실행한다.
+pipeline 시작 로드 시간과 첫 invoke, 반복 invoke의 중앙값·평균·p95, boxes/DINO 시간을
+분리하고 모든 출력의 동등성을 확인한다. HTTP·카메라·네트워크를 제외한 직접 pipeline
+wall time이다. OS cold cache/전체 모델 정확도 검증은 아니며 원본 샘플·hash·PID를
+새 JSON/Markdown 파일로 남긴다.

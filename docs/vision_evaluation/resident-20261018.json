@@ -1,0 +1,2456 @@
+{
+  "created_at": "2026-10-18T00:01:47.786921+00:00",
+  "platform": "Linux-6.8.0-1078-qcom-aarch64-with-glibc2.39",
+  "bundle": "/home/arduino/project/hows-everything-so-far/models/board/vision/dinov2-qnn-v3",
+  "image": "/home/arduino/project/hows-everything-so-far/docs/assets/cups-example.jpg",
+  "image_sha256": "ae7816d156dce79dcd35f092bddccad9f714e9fd0f58f696aa0c232c49dfc45c",
+  "bundle_sha256": "d796e1ef0c32d6e67b4f421afebeb9269a6fcf2e29184c3d24fc18ffa703659c",
+  "cli": "/home/arduino/git/executorch/build-x86/examples/qualcomm/executor_runner/qnn_executor_runner",
+  "worker": "/tmp/codex-vision-resident.3DWAWn/build/qnn_vision_worker",
+  "scope": "Direct pipeline wall time; excludes HTTP/camera/network. Ordered CLI then resident; OS caches may be warm.",
+  "warmups": 3,
+  "repetitions": 20,
+  "modes": {
+    "cli": {
+      "startup_ms": 4.188556998997228,
+      "startup_runners": {
+        "dino": {
+          "resident": false,
+          "runner": "cli:qnn_executor_runner:dino.pte"
+        },
+        "detector": {
+          "resident": false,
+          "runner": "cli:qnn_executor_runner:detector.pte"
+        }
+      },
+      "rows": [
+        {
+          "index": 0,
+          "warmup": true,
+          "invoke_ms": 742.634451999038,
+          "dropped": 0,
+          "boxes_ms": 391.2137079969398,
+          "dino_ms": 341.91602200007765,
+          "total_ms": 735.4055719988537,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 1,
+          "warmup": true,
+          "invoke_ms": 902.117759000248,
+          "dropped": 0,
+          "boxes_ms": 459.6896410002955,
+          "dino_ms": 438.3466959989164,
+          "total_ms": 898.5820159978175,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 2,
+          "warmup": true,
+          "invoke_ms": 720.6182240006456,
+          "dropped": 0,
+          "boxes_ms": 335.8805300013046,
+          "dino_ms": 383.36867799807806,
+          "total_ms": 719.7280639993551,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 3,
+          "warmup": false,
+          "invoke_ms": 777.965208999376,
+          "dropped": 0,
+          "boxes_ms": 362.91927799902624,
+          "dino_ms": 413.75910400165594,
+          "total_ms": 777.2003629979736,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 4,
+          "warmup": false,
+          "invoke_ms": 695.9229740023147,
+          "dropped": 0,
+          "boxes_ms": 323.3024099972681,
+          "dino_ms": 371.4607670008263,
+          "total_ms": 695.0802619976457,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 5,
+          "warmup": false,
+          "invoke_ms": 805.2126019974821,
+          "dropped": 0,
+          "boxes_ms": 364.2763659991033,
+          "dino_ms": 439.79060700075934,
+          "total_ms": 804.4243180011108,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 6,
+          "warmup": false,
+          "invoke_ms": 763.9109369993093,
+          "dropped": 0,
+          "boxes_ms": 312.6582549994055,
+          "dino_ms": 450.1568439991388,
+          "total_ms": 763.2284339997568,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 7,
+          "warmup": false,
+          "invoke_ms": 766.8490719988768,
+          "dropped": 0,
+          "boxes_ms": 441.4798840007279,
+          "dino_ms": 322.81980300103896,
+          "total_ms": 766.1696940012916,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 8,
+          "warmup": false,
+          "invoke_ms": 868.6519519978901,
+          "dropped": 0,
+          "boxes_ms": 464.9949190024927,
+          "dino_ms": 399.6271229989361,
+          "total_ms": 865.3083470017009,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 9,
+          "warmup": false,
+          "invoke_ms": 806.1097389982024,
+          "dropped": 0,
+          "boxes_ms": 379.00241000170354,
+          "dino_ms": 425.7764389985823,
+          "total_ms": 805.1565580026363,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 10,
+          "warmup": false,
+          "invoke_ms": 856.7369599986705,
+          "dropped": 0,
+          "boxes_ms": 397.67846899849246,
+          "dino_ms": 457.82911100104684,
+          "total_ms": 855.9925289991952,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 11,
+          "warmup": false,
+          "invoke_ms": 891.2281300035829,
+          "dropped": 0,
+          "boxes_ms": 455.3538399995887,
+          "dino_ms": 434.743868001533,
+          "total_ms": 890.495366002142,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 12,
+          "warmup": false,
+          "invoke_ms": 778.2678619987564,
+          "dropped": 0,
+          "boxes_ms": 364.94735599990236,
+          "dino_ms": 411.0593519981194,
+          "total_ms": 777.6114529988263,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 13,
+          "warmup": false,
+          "invoke_ms": 718.382429000485,
+          "dropped": 0,
+          "boxes_ms": 381.55366799765034,
+          "dino_ms": 333.22202900308184,
+          "total_ms": 715.2122609986691,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 14,
+          "warmup": false,
+          "invoke_ms": 977.3931900017487,
+          "dropped": 0,
+          "boxes_ms": 406.48803200019756,
+          "dino_ms": 568.3556170006341,
+          "total_ms": 976.534436998918,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 15,
+          "warmup": false,
+          "invoke_ms": 732.5971170030243,
+          "dropped": 0,
+          "boxes_ms": 390.36380399920745,
+          "dino_ms": 337.35397099735565,
+          "total_ms": 729.3094999986351,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 16,
+          "warmup": false,
+          "invoke_ms": 759.9412290001055,
+          "dropped": 0,
+          "boxes_ms": 354.0938770020148,
+          "dino_ms": 402.27640100056306,
+          "total_ms": 756.7588730016723,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 17,
+          "warmup": false,
+          "invoke_ms": 684.8293330003798,
+          "dropped": 0,
+          "boxes_ms": 354.07569900053204,
+          "dino_ms": 326.73840999996173,
+          "total_ms": 684.18401800227,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 18,
+          "warmup": false,
+          "invoke_ms": 897.5282020001032,
+          "dropped": 0,
+          "boxes_ms": 408.9989779968164,
+          "dino_ms": 484.93973100266885,
+          "total_ms": 894.3242829991505,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 19,
+          "warmup": false,
+          "invoke_ms": 739.035316000809,
+          "dropped": 0,
+          "boxes_ms": 373.81405500127585,
+          "dino_ms": 362.9427109990502,
+          "total_ms": 738.3647930000734,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 20,
+          "warmup": false,
+          "invoke_ms": 830.8740449974721,
+          "dropped": 0,
+          "boxes_ms": 448.0396449980617,
+          "dino_ms": 378.1525080012216,
+          "total_ms": 827.8949720006494,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 21,
+          "warmup": false,
+          "invoke_ms": 814.1011170009733,
+          "dropped": 0,
+          "boxes_ms": 352.40100499868277,
+          "dino_ms": 459.18739400076447,
+          "total_ms": 813.0996539985063,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 22,
+          "warmup": false,
+          "invoke_ms": 779.6879150009772,
+          "dropped": 0,
+          "boxes_ms": 399.9682659996324,
+          "dino_ms": 374.6858800004702,
+          "total_ms": 776.3402460004727,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        }
+      ],
+      "first_invoke_ms": 742.634451999038,
+      "summary": {
+        "invoke_ms": {
+          "median_ms": 778.9778884998668,
+          "mean_ms": 797.261266500027,
+          "p95_ms": 901.5214514001855
+        },
+        "boxes_ms": {
+          "median_ms": 380.27803899967694,
+          "mean_ms": 386.8205107995891,
+          "p95_ms": 455.8358939497339
+        },
+        "dino_ms": {
+          "median_ms": 406.6678764993412,
+          "mean_ms": 407.74388350037043,
+          "p95_ms": 489.11052530256717
+        }
+      },
+      "final_runners": {
+        "dino": {
+          "resident": false,
+          "runner": "cli:qnn_executor_runner:dino.pte"
+        },
+        "detector": {
+          "resident": false,
+          "runner": "cli:qnn_executor_runner:detector.pte"
+        }
+      }
+    },
+    "resident": {
+      "startup_ms": 515.0918729996192,
+      "startup_runners": {
+        "dino": {
+          "resident": true,
+          "pid": 139935,
+          "runner": "resident",
+          "model": "dino.pte"
+        },
+        "detector": {
+          "resident": true,
+          "pid": 139947,
+          "runner": "resident",
+          "model": "detector.pte"
+        }
+      },
+      "rows": [
+        {
+          "index": 0,
+          "warmup": true,
+          "invoke_ms": 122.48389500018675,
+          "dropped": 0,
+          "boxes_ms": 68.01759800146101,
+          "dino_ms": 53.44749099822366,
+          "total_ms": 121.86550700062071,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 1,
+          "warmup": true,
+          "invoke_ms": 110.06384900247212,
+          "dropped": 0,
+          "boxes_ms": 61.34543799998937,
+          "dino_ms": 47.69158400085871,
+          "total_ms": 109.4036380018224,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 2,
+          "warmup": true,
+          "invoke_ms": 104.23096299928147,
+          "dropped": 0,
+          "boxes_ms": 58.031884000229184,
+          "dino_ms": 45.16902300019865,
+          "total_ms": 103.59226200307603,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 3,
+          "warmup": false,
+          "invoke_ms": 103.33944900048664,
+          "dropped": 0,
+          "boxes_ms": 56.75281599906157,
+          "dino_ms": 45.56282699923031,
+          "total_ms": 102.70751899952302,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 4,
+          "warmup": false,
+          "invoke_ms": 103.11517700029071,
+          "dropped": 0,
+          "boxes_ms": 57.34609999854001,
+          "dino_ms": 44.75094800000079,
+          "total_ms": 102.44986199904815,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 5,
+          "warmup": false,
+          "invoke_ms": 106.09425099755754,
+          "dropped": 0,
+          "boxes_ms": 62.721327998588094,
+          "dino_ms": 42.38500200153794,
+          "total_ms": 105.43221699845162,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 6,
+          "warmup": false,
+          "invoke_ms": 103.21330200167722,
+          "dropped": 0,
+          "boxes_ms": 57.586413000535686,
+          "dino_ms": 44.64391700093984,
+          "total_ms": 102.62507100196672,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 7,
+          "warmup": false,
+          "invoke_ms": 101.95209999801591,
+          "dropped": 0,
+          "boxes_ms": 55.69984400062822,
+          "dino_ms": 45.261054001457524,
+          "total_ms": 101.36188999967999,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 8,
+          "warmup": false,
+          "invoke_ms": 101.07865900135948,
+          "dropped": 0,
+          "boxes_ms": 57.560476001526695,
+          "dino_ms": 42.564064999169204,
+          "total_ms": 100.4941780010995,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 9,
+          "warmup": false,
+          "invoke_ms": 94.40613400147413,
+          "dropped": 0,
+          "boxes_ms": 52.33858099745703,
+          "dino_ms": 41.1696330011182,
+          "total_ms": 93.84253800089937,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 10,
+          "warmup": false,
+          "invoke_ms": 96.0221810018993,
+          "dropped": 0,
+          "boxes_ms": 53.0381149983441,
+          "dino_ms": 41.98677100066561,
+          "total_ms": 95.36462699907133,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 11,
+          "warmup": false,
+          "invoke_ms": 95.05842900034622,
+          "dropped": 0,
+          "boxes_ms": 52.81764499886776,
+          "dino_ms": 41.280310000729514,
+          "total_ms": 94.39858199766604,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 12,
+          "warmup": false,
+          "invoke_ms": 96.2600470011239,
+          "dropped": 0,
+          "boxes_ms": 53.91749300179072,
+          "dino_ms": 41.33786300008069,
+          "total_ms": 95.72598300292157,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 13,
+          "warmup": false,
+          "invoke_ms": 100.87188800025615,
+          "dropped": 0,
+          "boxes_ms": 56.98531700181775,
+          "dino_ms": 42.648389000532916,
+          "total_ms": 99.98995700152591,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 14,
+          "warmup": false,
+          "invoke_ms": 95.22269900116953,
+          "dropped": 0,
+          "boxes_ms": 51.7577969985723,
+          "dino_ms": 42.541148999589495,
+          "total_ms": 94.65905199976987,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 15,
+          "warmup": false,
+          "invoke_ms": 102.47022699695663,
+          "dropped": 0,
+          "boxes_ms": 56.750577001366764,
+          "dino_ms": 44.72256300141453,
+          "total_ms": 101.83236000011675,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 16,
+          "warmup": false,
+          "invoke_ms": 101.6147029986314,
+          "dropped": 0,
+          "boxes_ms": 55.529999001009855,
+          "dino_ms": 45.18121000000974,
+          "total_ms": 101.06834600082948,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 17,
+          "warmup": false,
+          "invoke_ms": 102.89465499954531,
+          "dropped": 0,
+          "boxes_ms": 55.71562500335858,
+          "dino_ms": 46.17095399953541,
+          "total_ms": 102.2696010004438,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 18,
+          "warmup": false,
+          "invoke_ms": 102.14777700093691,
+          "dropped": 0,
+          "boxes_ms": 55.96630299987737,
+          "dino_ms": 45.21803300303873,
+          "total_ms": 101.54673299985006,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 19,
+          "warmup": false,
+          "invoke_ms": 103.13298999972176,
+          "dropped": 0,
+          "boxes_ms": 56.6695340021397,
+          "dino_ms": 45.50230599852512,
+          "total_ms": 102.56449799999245,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 20,
+          "warmup": false,
+          "invoke_ms": 102.67574799945578,
+          "dropped": 0,
+          "boxes_ms": 56.90177599899471,
+          "dino_ms": 44.8816780008201,
+          "total_ms": 102.13527800078737,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 21,
+          "warmup": false,
+          "invoke_ms": 103.94512800121447,
+          "dropped": 0,
+          "boxes_ms": 56.51745100112748,
+          "dino_ms": 46.51475699938601,
+          "total_ms": 103.38767800203641,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        },
+        {
+          "index": 22,
+          "warmup": false,
+          "invoke_ms": 103.28554200168583,
+          "dropped": 0,
+          "boxes_ms": 56.377763001364656,
+          "dino_ms": 45.999650999874575,
+          "total_ms": 102.73694600255112,
+          "objects": [
+            {
+              "object_id": "cup-0",
+              "bbox": {
+                "x1": 0.09503,
+                "y1": 0.23112,
+                "x2": 0.29554,
+                "y2": 0.70189
+              },
+              "item": "unknown",
+              "fill_ratio": 0.1385,
+              "confidence": 0.7921,
+              "item_confidence": null
+            },
+            {
+              "object_id": "cup-1",
+              "bbox": {
+                "x1": 0.41119,
+                "y1": 0.22971,
+                "x2": 0.60306,
+                "y2": 0.69765
+              },
+              "item": "coke",
+              "fill_ratio": 0.6911,
+              "confidence": 0.5499,
+              "item_confidence": 0.9368
+            },
+            {
+              "object_id": "cup-2",
+              "bbox": {
+                "x1": 0.71957,
+                "y1": 0.22734,
+                "x2": 0.91982,
+                "y2": 0.70367
+              },
+              "item": "coke",
+              "fill_ratio": 0.5038,
+              "confidence": 0.7139,
+              "item_confidence": 0.7144
+            }
+          ],
+          "matches_baseline": true
+        }
+      ],
+      "first_invoke_ms": 122.48389500018675,
+      "summary": {
+        "invoke_ms": {
+          "median_ms": 102.30900199894677,
+          "mean_ms": 100.94005430019024,
+          "p95_ms": 104.05258415103162
+        },
+        "boxes_ms": {
+          "median_ms": 56.44760700124607,
+          "mean_ms": 55.94754765024845,
+          "p95_ms": 57.84315875043831
+        },
+        "dino_ms": {
+          "median_ms": 44.73675550070766,
+          "mean_ms": 44.01615400038281,
+          "p95_ms": 46.18814414952794
+        }
+      },
+      "final_runners": {
+        "dino": {
+          "resident": true,
+          "pid": 139935,
+          "runner": "resident",
+          "model": "dino.pte"
+        },
+        "detector": {
+          "resident": true,
+          "pid": 139947,
+          "runner": "resident",
+          "model": "detector.pte"
+        }
+      }
+    }
+  },
+  "all_outputs_match": true
+}

@@ -23,6 +23,7 @@ class Settings(BaseModel):
     vision_adapter: str = ""
     vision_model_path: str = ""  # services.vision.backend bundle directory (bundle.json)
     vision_runner_bin: str = ""  # only for bundles using the CLI runner (qnn_executor_runner)
+    vision_worker_bin: str = ""  # persistent qnn worker, built with scripts/build_vision_worker.py
     stt_backend: Literal["fixture", "http"] = "fixture"
     stt_base_url: HttpUrl = "http://127.0.0.1:8002"
     stt_host: str = "127.0.0.1"

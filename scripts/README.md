@@ -12,6 +12,8 @@
 | smoke.py | 실제 Controller HTTP를 통해 리필/수정/stale/duplicate/완료/STT/skip 검증 |
 | evaluate_qwen.py --proxy | 실제 local proxy→Mac 음료 평가, temperature0, timestamp 신규 결과 |
 | evaluate_gemma.py | 보드 HTTP Gemma 평가: 원본20 + 합성 STT 왜곡20, 동일 제품 프롬프트, 케이스별 input/output/시간을 신규 JSON·Markdown에 기록 |
+| build_vision_worker.py | 주최 측 SDK를 수정하지 않고 별도 출력 경로에서 DINO/YOLO 상주 native worker 빌드 |
+| benchmark_vision_residency.py | 같은 이미지·bundle로 CLI/상주 invoke 시간·초기 로드·출력 동등성 비교, 신규 JSON/Markdown 기록 |
 | browser_check.cjs | 실제 Chromium 녹음/fixtureSTT/고정 오디오/카드/확인/취소/반응형/재연결 |
 | browser_board_voice.cjs | 자동 인식→태블릿 안내 재생 완료→보드 fixture 녹음→STT→카드, 브라우저 마이크 미사용 |
 

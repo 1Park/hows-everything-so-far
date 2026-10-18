@@ -79,9 +79,10 @@ def test_rois_bundle(tmp_path):
 
 
 def test_missing_bundle_is_not_ready_without_fallback(tmp_path):
-    ready, r = analyze(DinoVisionBackend(tmp_path / "missing"))
-    assert ready.status_code == 503 and ready.json()["ready"] is False
-    assert r.status_code == 503 and "fixture" not in r.text
+    from common.api import ApiError
+
+    with pytest.raises(ApiError, match="Vision startup failed"):
+        analyze(DinoVisionBackend(tmp_path / "missing"))
 
 
 def test_bundle_path_from_settings(tmp_path):

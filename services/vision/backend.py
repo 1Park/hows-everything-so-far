@@ -33,6 +33,9 @@ class DinoVisionBackend:
         raw = str(bundle_path or settings.vision_model_path)
         self.path = (Path(raw) if Path(raw).is_absolute() else ROOT / raw) if raw else None
         self.runner_bin = runner_bin or (settings.vision_runner_bin if settings else "") or None
+        worker = settings.vision_worker_bin if settings else ""
+        self.worker_bin = str((ROOT / worker).resolve()) if worker else None
+        self.timeout = settings.inference_timeout if settings else 20
         self._runners = runners
         self.pipeline = None
         self.error = None
@@ -44,7 +47,8 @@ class DinoVisionBackend:
 
         if self.path is None:
             raise FileNotFoundError("VISION_MODEL_PATH 가 설정되지 않음")
-        return VisionPipeline(self.path, runner_bin=self.runner_bin, runners=self._runners)
+        return VisionPipeline(self.path, runner_bin=self.runner_bin, runners=self._runners,
+                              resident=True, worker_bin=self.worker_bin, timeout=self.timeout)
 
     async def _ensure(self):
         if self.pipeline is not None:
@@ -52,7 +56,7 @@ class DinoVisionBackend:
         if self._loading is None:
             self._loading = asyncio.get_running_loop().run_in_executor(self.pool, self._load)
         try:
-            self.pipeline = await self._loading
+            self.pipeline = await asyncio.shield(self._loading)
             self.error = None
             log.info("vision bundle loaded: %s", self.path)
             return True
@@ -62,8 +66,16 @@ class DinoVisionBackend:
             self._loading = None
             return False
 
+    @property
+    def status(self):
+        return self.pipeline.status if self.pipeline is not None else {}
+
+    async def startup(self):
+        if not await self._ensure():
+            raise ApiError("vision_not_ready", f"Vision startup failed ({self.error})", 503)
+
     async def ready(self):
-        return await self._ensure()
+        return self.pipeline is not None and self.pipeline.resident
 
     def _infer(self, data):
         img = Image.open(io.BytesIO(data))
@@ -77,13 +89,27 @@ class DinoVisionBackend:
         # scenario 는 fixture 전용 (external 은 무시)
         if not await self._ensure():
             raise ApiError("vision_not_ready", f"Vision model is not loaded ({self.error})", 503, True)
-        objects = await asyncio.get_running_loop().run_in_executor(self.pool, self._infer, data)
+        try:
+            objects = await asyncio.get_running_loop().run_in_executor(self.pool, self._infer, data)
+        except asyncio.CancelledError:
+            self.pipeline.abort()
+            raise
         return {"scene_id": scene_id, "source": self.source, "objects": objects}
 
     async def close(self):
-        if self.pipeline is not None:
-            await asyncio.get_running_loop().run_in_executor(self.pool, self.pipeline.close)
-        self.pool.shutdown(wait=False)
+        try:
+            if self.pipeline is not None:
+                self.pipeline.abort()
+                await asyncio.get_running_loop().run_in_executor(self.pool, self.pipeline.close)
+            elif self._loading is not None:
+                # Loading on the single model thread may outlive a cancelled startup.
+                try:
+                    pipeline = await asyncio.shield(self._loading)
+                    await asyncio.get_running_loop().run_in_executor(self.pool, pipeline.close)
+                except Exception:
+                    pass
+        finally:
+            self.pool.shutdown(wait=False, cancel_futures=True)
 
 
 def create_backend():

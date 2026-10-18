@@ -29,9 +29,11 @@ from services.vision.runners import make_runner
 
 
 class VisionPipeline:
-    def __init__(self, bundle_dir, runner_bin=None, runners=None):
+    def __init__(self, bundle_dir, runner_bin=None, runners=None, *, resident=False,
+                 worker_bin=None, timeout=20):
         """runners: 테스트용 주입 {"detector": obj, "dino": obj} (obj.run(list[np.ndarray]) -> list[np.ndarray])."""
         self.dir = Path(bundle_dir)
+        self.resident_mode, self.worker_bin, self.timeout = resident, worker_bin, timeout
         cfg_path = self.dir / "bundle.json"
         if not cfg_path.is_file():
             raise FileNotFoundError(f"bundle.json 없음: {cfg_path}")
@@ -43,22 +45,47 @@ class VisionPipeline:
         runners = runners or {}
         self.head = Head(self.dir / self.cfg["head"])
         dino = self.cfg["dino"]
-        self.dino = runners.get("dino") or self._runner(dino["runner"], dino["pte"], dino.get("out_shape", [1, 384]),
-                                                        runner_bin)
+        self.dino = None
         self.detector = None
-        if self.mode == "yolo":
-            b = self.boxes_cfg
-            self.detector = runners.get("detector") or self._runner(b.get("runner", "py"), b["pte"], [1, 84, 8400],
-                                                                    runner_bin)
+        try:
+            self.dino = runners.get("dino") or self._runner(
+                dino["runner"], dino["pte"], dino.get("out_shape", [1, 384]), runner_bin)
+            if self.mode == "yolo":
+                b = self.boxes_cfg
+                self.detector = runners.get("detector") or self._runner(
+                    b.get("runner", "py"), b["pte"], [1, 84, 8400], runner_bin)
+        except BaseException:
+            self.close()
+            raise
         self.timing = {}
 
     def _runner(self, kind, pte, out_shape, runner_bin):
         path = self.dir / pte
         if not path.is_file():
             raise FileNotFoundError(f".pte 없음: {path}")
+        if self.resident_mode and kind == "cli":
+            kind = "resident"
+        if kind == "resident":
+            return make_runner(kind, path, binary=self.worker_bin, out_shape=out_shape,
+                               timeout=self.timeout)
         if kind == "cli" and not runner_bin:
             raise ValueError("cli runner 는 VISION_RUNNER_BIN (예: qnn_executor_runner 경로) 이 필요")
         return make_runner(kind, path, binary=runner_bin, out_shape=out_shape)
+
+    @property
+    def resident(self):
+        return all(getattr(r, "resident", True) for r in (self.dino, self.detector) if r is not None)
+
+    @property
+    def status(self):
+        return {name: getattr(r, "status", {"resident": getattr(r, "resident", True),
+                                           "runner": getattr(r, "name", "injected")})
+                for name, r in (("dino", self.dino), ("detector", self.detector)) if r is not None}
+
+    def abort(self):
+        for r in (self.dino, self.detector):
+            if r is not None and hasattr(r, "abort"):
+                r.abort()
 
     def boxes(self, img):
         """→ [(정사각 crop (x, y, side), 컵 박스 xyxy 픽셀)], 왼쪽부터."""

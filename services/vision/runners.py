@@ -24,11 +24,19 @@ class PyRunner:
         from executorch.runtime import Runtime
 
         self.torch = torch
-        self.method = Runtime.get().load_program(Path(pte_path)).load_method("forward")
+        self.program = Runtime.get().load_program(Path(pte_path))
+        self.method = self.program.load_method("forward")
         self.name = f"py:{Path(pte_path).name}"
 
     def run(self, xs):
-        return [self.method.execute([self.torch.from_numpy(np.ascontiguousarray(x))])[0].numpy() for x in xs]
+        return [self.method.execute([self.torch.from_numpy(np.ascontiguousarray(x))])[0].numpy().copy() for x in xs]
+
+    @property
+    def resident(self):
+        return self.method is not None
+
+    def close(self):
+        self.method = self.program = None
 
 
 class CliRunner:
@@ -38,6 +46,8 @@ class CliRunner:
     out_dtype: 출력 dtype. 양자화 .pte 라도 보통 입출력은 float32 (QDQ가 그래프 안쪽).
     extra_args: 예) ["--warm_up", "0"]. 보드 runner 의 --help 로 플래그를 먼저 확인할 것.
     """
+
+    resident = False
 
     def __init__(self, binary, pte_path, out_shape, out_dtype="float32", workdir=None, extra_args=(), keep=False):
         # runner는 workdir에서 실행되므로 상대 경로 바이너리는 절대 경로로 (PATH의 이름이면 그대로)
@@ -88,6 +98,12 @@ class CliRunner:
 def make_runner(kind, pte, binary=None, out_shape=None, **kw):
     if kind == "py":
         return PyRunner(pte)
+    if kind == "resident":
+        from services.vision.resident import ResidentRunner
+
+        if not binary or not out_shape:
+            raise ValueError("Resident Vision requires VISION_WORKER_BIN and output shape")
+        return ResidentRunner(binary, pte, out_shape, **kw)
     if kind == "cli":
         if not binary or not out_shape:
             raise SystemExit("--runner cli 는 runner 바이너리 경로와 출력 shape 가 필요")

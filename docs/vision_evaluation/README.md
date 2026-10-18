@@ -4,6 +4,30 @@
 
 재현 코드: `ml/` ([ml/README.md](../../ml/README.md)), 런타임: `services/vision/`.
 
+## 보드 상주 실행 전후 지연 (2026-10-18 UTC)
+
+별도 `/tmp`의 로컬 코드 사본으로만 실험했으며 보드 레포·기존 Vision/Gemma 서비스는
+수정·재시작하지 않았다. 기존 Gemma4 worker PID 133141은 유지됐다. 아래 수치는
+HTTP/카메라/네트워크를 제외한 직접 Vision pipeline invoke 시간이다.
+
+| 항목 | 기존 CLI | DINO+YOLO 상주 |
+| --- | ---: | ---: |
+| 전체 invoke 중앙값 | 778.978 ms | 102.309 ms |
+| 전체 invoke p95 | 901.521 ms | 104.053 ms |
+| 검출 단계 중앙값 | 380.278 ms | 56.448 ms |
+| DINO 단계 중앙값 | 406.668 ms | 44.737 ms |
+| pipeline 초기 구성/로드 | 4.189 ms (Python wrapper만) | 515.092 ms (두 모델 로드 포함) |
+
+전체 반복 invoke 중앙값은 약 7.61배 빨라졌고 지연은 86.9% 감소했다. 같은 이미지와
+`dinov2-qnn-v3` bundle로 각각 워밍업 3회 + 측정 20회를 실행했다. 이미지의 검출 컵은
+3개이며 46회 모두 해석 출력이 일치했다. 상주 DINO/YOLO PID가 처음부터 끝까지
+동일함을 확인했고 종료 후 실험 worker는 모두 회수했다. 단일 이미지·순서대로 실행한
+측정이며 OS cold-cache나 모델 정확도·동시 부하 전체의 검증은 아니다.
+
+[측정 요약](resident-20261018.md), [전체 샘플·입력 hash·PID](resident-20261018.json),
+[SDK source hash·실제 빌드 명령](resident-build-20261018.json).
+정식 서비스에는 별도 push·worker 배포·Vision 재시작이 필요하다.
+
 ## 구성
 
 ```text

@@ -52,9 +52,13 @@ def create_sensory_app(kind: str, settings=None, backend=None):
 
     @asynccontextmanager
     async def lifespan(app):
-        yield
-        if hasattr(backend, "close"):
-            await backend.close()
+        try:
+            if hasattr(backend, "startup"):
+                await backend.startup()
+            yield
+        finally:
+            if hasattr(backend, "close"):
+                await backend.close()
 
     app = create_api(kind.upper(), lifespan)
 
@@ -68,7 +72,8 @@ def create_sensory_app(kind: str, settings=None, backend=None):
             ok = False
         return JSONResponse(
             status_code=200 if ok else 503,
-            content={"ready": ok, "source": source, "pending": gate.pending},
+            content={"ready": ok, "source": source, "pending": gate.pending,
+                     **({"runners": backend.status} if hasattr(backend, "status") else {})},
         )
 
     if kind == "vision":
