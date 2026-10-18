@@ -17,6 +17,14 @@
   .take-length{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px}
   .take-length select{width:auto;margin:0}
   .repeat-note{font-size:11px;color:var(--muted);margin:10px 0 0}
+  .per-model{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+  .model-card{flex:1;min-width:230px;background:var(--white);border:1px solid var(--line);
+    border-radius:10px;padding:12px 14px}
+  .model-card strong{font-size:13px}
+  .model-card p{margin:4px 0 0;font-size:12px;color:var(--muted)}
+  .model-tag{font:10px ui-monospace,monospace;letter-spacing:.5px;background:#edf1e7;
+    padding:3px 7px;border-radius:4px}
+  #sttHeard div{margin:8px 0}
   #sttHeard{font:19px/1.35 Georgia,serif;margin:10px 0 0}
   .verdict{display:inline-block;font-size:11px;letter-spacing:1px;padding:4px 9px;border-radius:5px;margin-left:8px}
   .verdict.hit{background:#e6f0d9;color:#3f6a2a}
@@ -54,6 +62,8 @@
     <p class="repeat-note">The sentence stays until you change it, so the same wording can be repeated.</p>
   </div>
 
+  <div id="sttPerModel" class="per-model"></div>
+
   <div class="summary">
     <div><strong id="sttCount">0</strong>attempts</div>
     <div><strong id="sttExact">—</strong>exact match</div>
@@ -67,7 +77,7 @@
     <button id="sttCopyTop" class="secondary">Copy as CSV</button>
   </div>
   <table>
-    <thead><tr><th>#</th><th>Expected</th><th>Heard</th><th>WER</th><th>Transcribe</th><th></th></tr></thead>
+    <thead><tr><th>Model</th><th>Expected</th><th>Heard</th><th>WER</th><th>Transcribe</th><th></th></tr></thead>
     <tbody id="sttRows"></tbody>
   </table>
 

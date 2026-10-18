@@ -60,6 +60,9 @@ class Settings(BaseModel):
     # Where accuracy-check takes are kept. Under docs/ because these numbers are
     # the evidence for the write-up; relative paths resolve against the repo root.
     stt_takes_file: str = "docs/stt_evaluation/takes.json"
+    # Extra whisper servers the accuracy check also transcribes with, as
+    # "label=url" pairs. Comparison only; the demo still uses stt_whisper_url.
+    stt_compare: str = ""
     camera_source: str = ""  # empty = explicit static fixture, no implicit /dev/video0
     # Capture faster than the stream so a streamed frame is never a stale one.
     # Tune on the board: the encode loop is the cost, not the network.
