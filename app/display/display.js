@@ -28,6 +28,10 @@ let policy = {low_fill_threshold: 0.35, min_confidence: 0.6};
 // a moment ago, not just the current line.
 let chat = [];
 let chatSession = null;
+// The last line recorded from each side. A transcript stays in the state after it
+// is read, so comparing against the end of the log re-added it as soon as the
+// assistant replied.
+let said = {assistant: null, customer: null};
 let shownSnapshot = null;
 let streaming = false;
 let retry = null;
@@ -184,11 +188,11 @@ function recordTurns() {
   if (chatSession !== state.session_id) {
     chatSession = state.session_id;
     chat = [];
+    said = {assistant: null, customer: null};
   }
   const add = (who, text, note) => {
-    if (!text) return;
-    const last = chat[chat.length - 1];
-    if (last && last.who === who && last.text === text) return;
+    if (!text || said[who] === text) return;
+    said[who] = text;
     chat.push({who, text, note});
   };
   add('assistant', state.speech);
