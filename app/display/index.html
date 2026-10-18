@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Refill Assist · Stage display</title>
+<link rel="stylesheet" href="/display/display.css">
+</head>
+<body>
+<header>
+  <h1>How's everything so far?</h1>
+  <div class="runtime" id="runtime"></div>
+  <span id="link" class="link">connecting…</span>
+</header>
+
+<main>
+  <section class="frame">
+    <div class="frame-head"><span id="frameLabel">Live view</span><span id="phaseTag" class="tag">IDLE</span></div>
+    <div class="stage-image">
+      <img id="sceneImage" alt="What the board is looking at">
+      <div id="boxes"></div>
+    </div>
+    <p id="speech" class="speech"></p>
+  </section>
+
+  <aside class="rail">
+    <ol class="steps" id="steps">
+      <li data-step="look"><b>Look</b><span>camera + DINOv2</span></li>
+      <li data-step="offer"><b>Offer</b><span>low fill found</span></li>
+      <li data-step="listen"><b>Listen</b><span>board microphone</span></li>
+      <li data-step="hear"><b>Transcribe</b><span>whisper</span></li>
+      <li data-step="understand"><b>Understand</b><span>Gemma</span></li>
+      <li data-step="act"><b>Act</b><span>MCU over Bridge</span></li>
+    </ol>
+
+    <div class="panel" id="scenePanel">
+      <h2>Seen on the table</h2>
+      <div id="objects" class="objects"></div>
+    </div>
+
+    <div class="panel" id="heardPanel" hidden>
+      <h2>Heard</h2>
+      <p id="transcript" class="quote"></p>
+    </div>
+
+    <div class="panel" id="requestPanel" hidden>
+      <h2>Understood as</h2>
+      <p id="request" class="request"></p>
+    </div>
+  </aside>
+</main>
+<script src="/display/display.js" defer></script>
+</body>
+</html>
