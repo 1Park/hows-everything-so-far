@@ -14,6 +14,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
     const errors = []; page.on('pageerror',e=>errors.push(e.message));
     await page.goto(url);
     await page.waitForFunction(()=>document.querySelector('#connection').textContent.includes('Connected'));
+    await page.locator('.dev-tools').evaluate(e=>e.open=true);
     const offered = async () => {
       await page.locator('#start').click();
       await page.waitForFunction(()=>document.querySelector('#phase').textContent==='OFFERED');

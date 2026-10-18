@@ -1,5 +1,7 @@
 # Vision 평가 기록 — DINOv2 + YOLO11n (로컬 / QNN 시뮬레이터)
 
+이하 수치·PID·배포 상태는 각 실행 당시의 기록이다. 현재 설정·상주 구조는 [Vision 서비스](../../services/vision/README.md)와 [보드 runbook](../BOARD_RUNBOOK.md)을 따른다.
+
 기준일: 2026-10-15 ~ 10-17. **Mac(M4)과 x86 Docker HTP 시뮬레이터 결과이며 보드 실측이 아니다.** 보드 수치는 별도로 기록한다. 합성 이미지는 실제 정확도 증거가 아니다.
 
 재현 코드: `ml/` ([ml/README.md](../../ml/README.md)), 런타임: `services/vision/`.

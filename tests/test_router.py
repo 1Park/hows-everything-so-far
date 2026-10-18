@@ -13,6 +13,10 @@ from app.hardware.io import BridgeHardware
 from app.hardware.router import RouterClient, RouterError
 from common.api import ApiError
 
+pytestmark = pytest.mark.skipif(
+    not hasattr(socket, "AF_UNIX"), reason="Router transport requires Unix-domain sockets"
+)
+
 
 class FakeRouterServer:
     """Accepts one connection at a time and replies with whatever the test supplies."""

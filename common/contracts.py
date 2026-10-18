@@ -161,6 +161,22 @@ class StateError(Contract):
     retryable: bool
 
 
+class CaptureModeInput(Contract):
+    mode: Literal["manual", "auto"]
+
+
+class CaptureStatus(Contract):
+    mode: Literal["manual", "auto"] = "manual"
+    status: Literal["manual", "scanning", "stabilizing", "paused", "waiting", "error"] = "manual"
+    revision: int = 0
+    stable_seconds: float = 0
+    required_seconds: float = 5
+    samples: int = 0
+    source: Literal["fixture", "external"] | None = None
+    overlap_area: float | None = None
+    error: str | None = None
+
+
 class StateSnapshot(Contract):
     instance_id: str
     session_id: str
@@ -180,6 +196,7 @@ class StateSnapshot(Contract):
     audio_input: Literal["disabled", "fixture", "alsa"] = "disabled"
     # How long board capture runs, so the page can show the time passing.
     audio_seconds: int = 6
+    capture: CaptureStatus | None = None
 
 
 class StateEvent(Contract):

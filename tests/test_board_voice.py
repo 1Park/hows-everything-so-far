@@ -120,7 +120,8 @@ async def test_cancel_discards_late_stt():
 
 
 def test_automatic_observation_updates_ui_state_without_click():
-    with TestClient(create_app(settings(observe_interval_seconds=0.2))) as client:
+    with TestClient(create_app(settings(observe_interval_seconds=0.2,
+                                        auto_capture_stable_seconds=0.2))) as client:
         import time
 
         for _ in range(100):

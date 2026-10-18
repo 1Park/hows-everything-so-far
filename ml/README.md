@@ -22,7 +22,7 @@ data/ 원본·라벨 → training → models/ checkpoint
                             services/에서 ExecuTorch로 추론
 ```
 
-우선 사용할 모델은 DINOv2와 Qwen3-0.6B다. 제공 `.pte`를 그대로 쓸 수 있으면 재학습·재export를 필수 작업으로 만들지 않는다. 검출 모델·DINO head/후처리·미세조정 범위는 미정이다. 새 모델 계열로 바꾸는 폴더가 아니라 필요한 조정·검증과 재현을 위한 공간이다.
+현재 Vision은 YOLO11n 검출과 DINOv2 특징·선형 head를 사용한다. 보드 LLM은 제공 Gemma4 bundle이며 이 폴더에서 학습하지 않는다.
 
 데이터는 `data/`, 가중치·산출물은 `models/`에 저장하고 Git에서 제외한다. 재현에 필요한 설정·획득 방법·모델 버전·데이터 split 정보는 코드와 함께 기록한다. 배포 bundle에는 모델·필요한 tokenizer 외에도 입력 shape/dtype/layout, 전처리·라벨, 출력 규격, 모델 출처, runtime·SDK 버전, target SoC·export 설정을 포함한다.
 
@@ -53,8 +53,8 @@ docker build --platform linux/amd64 -t refill-ml-export ml                      
 | CPU .pte | `python -m ml.export.export_xnnpack`, YOLO는 ultralytics `format="executorch"` | `models/local/vision/` |
 | NPU .pte | `ml/docker-run.sh python -m ml.export.export_qnn --model {yolo,dinov2} [--quant fp16] --soc_model QCS8275 --build_folder /tmp --compile_only` | `models/experiments/vision/qnn/<soc>_<quant>/` |
 | NPU 검증 | `ml/docker-run.sh python -m ml.evaluation.qnn_sim_check {yolo,dinov2} <pte>` | HTP 시뮬레이터 출력 vs fp32 |
-| 보드 export·NPU | 보드 ExecuTorch venv에서 `python -m ml.export.export_qnn ... --soc_model QCS8275`, `python -m ml.evaluation.board_npu_check {dinov2,yolo} --pte <pte> --images <dir>` | 보드 실측 (설치·환경변수는 [BOARD_RUNBOOK](../docs/BOARD_RUNBOOK.md#보드-executorch-설치-기록-2026-10-17-qcventuno002)) |
-| 보드 LLM | `scripts/board_llm.sh status / use gemma3\|gemma4\|auto / ask "..."` | 주최 측 Gemma `.pte` 전환 실행 |
+| 보드 export·NPU | 보드 ExecuTorch venv에서 `python -m ml.export.export_qnn ... --soc_model QCS8275`, `python -m ml.evaluation.board_npu_check {dinov2,yolo} --pte <pte> --images <dir>` | 보드 실측 (설치·환경변수는 [BOARD_RUNBOOK](../docs/board-installation-20261017.md)) |
+| 보드 LLM | `scripts/board_llm.sh status / use gemma4 / ask "..."` | 주최 측 Gemma `.pte` 전환 실행 |
 | 학습 crop | `python -m ml.training.make_crops --data data/real --bundle <bundle> --runner-bin <runner> --out data/crops` | YOLO 모드: 학습 사진 → 추론과 같은 pad crop (`data/crops/`, 옆 물체는 `data/crops_extra/`) |
 | 보드 카메라 수집 | `python -m ml.tools.board_collect --bundle <bundle> --runner-bin <runner> --labels water__low water__mid ...` | Controller `/api/frame`(실제 640×480) → 왼쪽부터 라벨 붙인 YOLO crop |
 | head 학습 | `python -m ml.training.make_head --data data/crops --dino-pte <pte> --runner {py,cli} --class-weight balanced` (**배포할 .pte로**) | head JSON |

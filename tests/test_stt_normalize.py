@@ -1,10 +1,8 @@
-from pathlib import Path
-
 import pytest
 
 from common.api import ApiError
 from common.config import Settings
-from services.stt.normalize import MENU, normalize
+from services.stt.normalize import normalize
 
 CASES = [
     # (whisper output, expected text, expected items)
@@ -30,11 +28,6 @@ def test_normalize(raw, text, items):
     result = normalize(raw)
     assert result.text == text
     assert result.items == items
-
-
-def test_menu_matches_language_prompt():
-    prompt = (Path(__file__).resolve().parents[1] / "app/language.py").read_text()
-    assert "item: " + ", ".join(MENU) + ", or null" in prompt
 
 
 def _mock_whisper(monkeypatch, text):

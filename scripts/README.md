@@ -10,6 +10,7 @@
 | diagnose.py | OS/arch/Python, 명시 runner/model/library, camera/Bridge/router read-only 진단 |
 | runner_smoke.py -- <실제 runner와 flags> | 단일 입력 실행·시간/출력/오류 logs 기록; CLI를 추측하지 않음 |
 | smoke.py | 실제 Controller HTTP를 통해 리필/수정/stale/duplicate/완료/STT/skip 검증 |
+| browser_auto_capture.cjs | 로컬 앱에서 5초 자동 시작·모드 전환·snapshot/bbox·모바일 화면 검사 (fixture 검증) |
 | evaluate_qwen.py --proxy | 실제 local proxy→Mac 음료 평가, temperature0, timestamp 신규 결과 |
 | evaluate_gemma.py | 보드 HTTP Gemma 평가: 원본20 + 합성 STT 왜곡20, 동일 제품 프롬프트, 케이스별 input/output/시간을 신규 JSON·Markdown에 기록 |
 | build_vision_worker.py | 주최 측 SDK를 수정하지 않고 별도 출력 경로에서 DINO/YOLO 상주 native worker 빌드 |
