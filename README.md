@@ -51,6 +51,6 @@ The board starts in Automatic by default and captures after a 3-second stability
 ## Docs and validation
 
 - [Structure and execution paths](docs/ARCHITECTURE.md), [API boundaries](docs/CONTRACTS.md)
-- [Board deployment and operation](docs/BOARD_RUNBOOK.md), [Tablet and voice flow](docs/TABLET_DEMO.md), [Model files](models/README.md)
+- [Board deployment and operation](docs/BOARD_RUNBOOK.md), [Tablet and voice flow](docs/TABLET_DEMO.md), [whisper.cpp server](docs/WHISPER_SERVER.md), [Model files](models/README.md)
 - [Validation commands and scope](docs/VALIDATION.md)
 - Past measurements: [Gemma](docs/gemma_evaluation/README.md), [Qwen](docs/qwen_evaluation/README.md), [Vision](docs/vision_evaluation/README.md), [STT](docs/stt_evaluation/README.md)
