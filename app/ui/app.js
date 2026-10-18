@@ -137,6 +137,21 @@ function modePill(label, source, ready = true) {
   const el = document.createElement('span'); el.className = 'source' + (ready ? '' : ' bad');
   el.textContent = `${label}: ${source}${ready ? '' : ' · unavailable'}`; return el;
 }
+function modelLabel(name, data, info) {
+  if (data.source === 'fixture') return 'Sample data';
+  const endpoint = info.model_endpoints?.[name] || data.endpoint;
+  let location = 'Model service';
+  if (endpoint) {
+    const host = new URL(endpoint).hostname;
+    location = ['127.0.0.1', 'localhost', '[::1]'].includes(host)
+      ? (info.location === 'board' ? 'Board' : 'This computer') : `Remote · ${host}`;
+  }
+  if (name === 'qwen' && data.model) {
+    const model = data.model.replace(/^gemma/, 'Gemma');
+    return `${model} · ${location}`;
+  }
+  return location;
+}
 async function checkConnection() {
   try {
     const mappingResponse = await fetch('/api/vision-categories');
@@ -148,7 +163,7 @@ async function checkConnection() {
     }
     const response = await fetch('/ready'); const info = await response.json(); if (info.policy) policy = info.policy;
     const sources = $('sources'); sources.replaceChildren();
-    for (const [name, data] of Object.entries(info.dependencies)) sources.append(modePill(name.toUpperCase(), data.source, data.ready));
+    for (const [name, data] of Object.entries(info.dependencies)) sources.append(modePill(name === 'qwen' ? 'LLM' : name.toUpperCase(), modelLabel(name, data, info), data.ready));
     if (info.tts) sources.append(modePill('TTS', info.tts.source, info.tts.ready || info.tts.source === 'disabled'));
     sources.append(modePill('Hardware', info.hardware, info.hardware_ready)); sources.append(modePill('Location', info.location));
     $('videoMode').textContent = state?.snapshot_url ? 'Analyzed frame · frozen' : info.video.mode === 'fixture-image' ? 'Sample image' : 'Live source';

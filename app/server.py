@@ -117,6 +117,10 @@ def create_app(settings=None, clients=None, hardware=None):
             content={
                 "ready": ok,
                 "dependencies": dependencies,
+                "model_endpoints": {
+                    name: str(getattr(settings, f"{name}_base_url"))
+                    for name in ("vision", "stt", "qwen")
+                },
                 "tts": tts,
                 "video": {"mode": video.mode, "error": video.error},
                 # UI가 리필 대상 박스를 Controller와 같은 기준으로 표시하도록
