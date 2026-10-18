@@ -262,3 +262,44 @@ def test_stop_only_reports_success_once_the_port_is_free():
         if supervisor.poll() is None:
             supervisor.kill()
             supervisor.wait(timeout=10)
+
+
+def test_a_lock_left_by_a_crash_does_not_block_the_restart():
+    # Crashes and power cuts never reach the cleanup, and the lock lives in the
+    # repository rather than on a tmpfs, so it survives a reboot. The restart meant
+    # to recover the supervisor was exactly what it prevented.
+    selected = port()
+    env = {**os.environ, "CONTROLLER_PORT": str(selected)}
+    lock = ROOT / f"tmp/dev-{selected}.lock"
+    lock.parent.mkdir(exist_ok=True)
+    lock.write_text("999999")  # a PID that is not running
+
+    supervisor = subprocess.Popen(
+        [sys.executable, "scripts/dev.py", "--mode", "offline"],
+        cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    try:
+        end = time.monotonic() + 25
+        while time.monotonic() < end:
+            assert supervisor.poll() is None, "the stale lock stopped the supervisor"
+            try:
+                with httpx.Client(
+                    base_url=f"http://127.0.0.1:{selected}", trust_env=False, timeout=1
+                ) as client:
+                    if client.get("/health").status_code == 200:
+                        break
+            except httpx.HTTPError:
+                pass
+            time.sleep(0.1)
+        else:
+            raise AssertionError("Supervisor failed to start over a stale lock")
+        assert lock.read_text().strip() == str(supervisor.pid)
+    finally:
+        subprocess.run(
+            [sys.executable, "scripts/dev.py", "--mode", "offline", "--stop"],
+            cwd=ROOT, env=env, timeout=60,
+        )
+        if supervisor.poll() is None:
+            supervisor.kill()
+        supervisor.wait(timeout=10)
+        lock.unlink(missing_ok=True)

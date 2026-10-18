@@ -48,6 +48,14 @@ def wait_for_ports(ports, timeout):
         time.sleep(0.2)
 
 
+def read_pid(path):
+    """The PID a lock file claims, or None when it holds anything else."""
+    try:
+        return int(path.read_text().strip())
+    except (OSError, ValueError):
+        return None
+
+
 def alive(pid):
     try:
         os.kill(pid, 0)
@@ -179,12 +187,23 @@ def supervise(args):
         / "tmp"
         / ("board.lock" if args.mode == "board" else f"dev-{settings.controller_port}.lock")
     )
-    try:
-        lock = os.open(lockfile, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
-    except FileExistsError:
-        raise RuntimeError(
-            f"Supervisor lock exists: {lockfile}. Check the recorded PID before removing a stale lock"
-        ) from None
+    for attempt in (1, 2):
+        try:
+            lock = os.open(lockfile, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
+            break
+        except FileExistsError:
+            # A crash or a power cut never reaches the cleanup below, and the lock
+            # lives in the repository rather than on a tmpfs, so it outlives even a
+            # reboot. Left as is, the restart that is supposed to recover the
+            # supervisor is the one thing the stale lock prevents.
+            owner = read_pid(lockfile)
+            if attempt == 2 or (owner and alive(owner) and is_our_supervisor(owner)):
+                raise RuntimeError(
+                    f"Supervisor lock exists: {lockfile}. Check the recorded PID "
+                    "before removing a stale lock"
+                ) from None
+            print(f"Removing stale lock {lockfile} (PID {owner or 'unknown'} is gone)", flush=True)
+            lockfile.unlink(missing_ok=True)
     os.write(lock, str(os.getpid()).encode())
     os.close(lock)
     processes, logs = [], []
