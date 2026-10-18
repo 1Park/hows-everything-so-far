@@ -45,6 +45,7 @@ async def close(self): ...  # 선택
 | `GET /api/vision-categories` | 고정 groups/member 매핑, editable=false; 수정 API 없음 |
 | `POST /api/demo-features` | `{untrained_categories: boolean}` → 전체 상태. 기본 false; 진행 중 변경은 409 |
 | `GET/POST /api/capture` | 자동/수동 모드·진행 상태, POST `{mode}` |
+| `POST /api/capture/restart-timer` | `{enabled,seconds}`로 응대 종료 후 자동 재시작 설정 |
 | `POST /api/observe` | multipart 선택 이미지·scenario로 관찰 시작 |
 | `POST /api/utterance` | scene_id/object_id/utterance로 요청 해석 |
 | `POST /api/voice/listen` | 안내 종료 ACK: session_id/scene_id/object_id/sequence |

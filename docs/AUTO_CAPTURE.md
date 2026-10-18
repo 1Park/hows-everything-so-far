@@ -10,14 +10,16 @@ UI의 **Demo tools & diagnostics → Capture mode → Automatic**을 선택한�
 2. **객체 수와 종류별 개수**가 3초간 같아야 한다. 예: water 1 / coffee 2 / unknown 1. object_id·검출 순서·박스 좌표·잔량은 종류 안정성 기준이 아니다. 물체 추적/위치 고정 판정은 구현하지 않는다.
 3. 객체가 없거나 개수/종류/source가 바뀌거나 호출/카메라 오류가 발생하면 안정성 구간을 다시 시작한다. 정상 간격의 3배(최소 1초)보다 큰 관측 공백도 구간을 리셋한다.
 4. 3초 구간에서 **둘 이상 bbox가 겹치는 영역의 합집합 면적**이 가장 작은 이미지를 선택한다. 면적은 원본 대비 normalized 면적이며 세 박스가 겹쳐도 같은 영역을 중복 계산하지 않는다. 동률이면 최신 이미지를 선택한다.
-5. 선택 이미지와 그 이미지의 정확한 VisionResult를 함께 freeze한다. 추가 Vision 호출 없이 기존 Controller 정책→안내→보드 녹음→STT→LLM→요청 카드 흐름으로 이어진다. **Confirm 전 하드웨어 동작은 승인하지 않는다.** 충분한 잔량/낮은 신뢰도/unknown만 있는 장면은 기존 정책대로 skip한다.
+5. 선택 이미지와 그 이미지의 정확한 VisionResult를 함께 freeze한다. 추가 Vision 호출 없이 기존 Controller 정책→안내→보드 녹음→STT→LLM→요청 접수 흐름으로 이어진다. Confirm 사용 여부는 `REQUIRE_CONFIRMATION` 설정을 따른다. 충분한 잔량/낮은 신뢰도/unknown만 있는 장면은 기존 정책대로 skip한다.
 
 **Manual**은 기존 Start demo / Inspect again 버튼으로 즉시 캡처한다. 자동 모드에서 Start 위치의 **Restart auto capture**는 안정성 구간을 새로 시작하며 즉시 freeze하지 않는다. 자동 모드에서도 이미지 업로드로 시작하려면 Manual로 전환한다. 주기적 스캔은 항상 카메라/서버 영상 입력과 normal 시나리오를 사용한다.
 
 ## 재시작·취소·중복
 
 - 고객 응대·LLM 처리·카드·mock 시퀀스 중에는 스캔을 중단한다. 진행 중 mode 변경은 기존 요청/카드를 취소하거나 새로 승인하지 않는다.
-- 한 번 시작한 구성은 계속 그대로 있어도 재안내하지 않는다. 객체 구성 변경/빈 장면 관측 후 다시 3초간 안정되거나 Restart auto capture(또는 mode 재선택)로 다시 시작한다. 동일 종류/개수의 다른 테이블은 자동 구분할 수 없으므로 명시적으로 재시작한다.
+- 기본은 완료·거절·취소·skip·오류 후 **10초 대기 → 자동 재시작 → 새 3초 안정성 판정**이다. 대기 중에는 영상만 live로 표시하고 Vision 검사는 쉬며, 같은 종류·개수 구성도 재시작 후 다시 검사한다. 첫 시작과 응대 진행 중에는 타이머가 동작하지 않는다.
+- Restart auto capture 옆에서 남은 시간을 확인한다. Demo tools의 자동 재시작 체크박스로 끄거나 대기 시간을 1–300초로 바꿀 수 있다. 대기 중 시간 변경은 변경 시점부터 다시 센다. 수동 재시작은 즉시 대기를 해제하고, Manual 전환은 타이머를 취소한다.
+- 타이머를 끄면 같은 구성은 재안내하지 않는다. 객체 구성 변경/빈 장면 관측 후 다시 안정되거나 Restart auto capture로 시작한다.
 - Manual 전환·취소·수동 시작 후 도착한 옛 Vision 결과는 mode epoch와 Controller token으로 폐기한다.
 - UI 모드는 Controller 프로세스에서 관리하므로 새 탭/새로고침에도 유지된다. 서버 재시작 시 환경 설정 기본값을 다시 적용한다.
 
@@ -33,6 +35,8 @@ UI의 **Demo tools & diagnostics → Capture mode → Automatic**을 선택한�
 CAPTURE_MODE=manual
 AUTO_CAPTURE_INTERVAL_SECONDS=0.5
 AUTO_CAPTURE_STABLE_SECONDS=3
+AUTO_CAPTURE_RESTART_ENABLED=true
+AUTO_CAPTURE_RESTART_SECONDS=10
 OBSERVE_INTERVAL_SECONDS=0
 ```
 
@@ -40,9 +44,10 @@ OBSERVE_INTERVAL_SECONDS=0
 
 - `GET /api/capture` → CaptureStatus
 - `POST /api/capture`, JSON `{"mode":"auto"}` 또는 `{"mode":"manual"}` → CaptureStatus. auto→auto는 명시적 재시작.
+- `POST /api/capture/restart-timer`, JSON `{"enabled":true,"seconds":10}` → CaptureStatus. 설정과 카운트다운은 Controller가 관리하며 새로고침·여러 탭에서도 공유한다. 서버 재시작 시 env 기본값을 적용한다.
 - `/api/state` 및 기존 WS state에 `capture` 포함.
 - 별도 WS 이벤트: `{"type":"capture","instance_id":"…","capture":{…}}`. capture.revision으로 늦은 응답을 무시한다. 진행도는 Controller sequence를 올리지 않아서 안내 종료 ACK/Confirm을 무효화하지 않는다.
-- 상태: manual / scanning / stabilizing / paused / waiting / error. source=fixture는 실제 추론이 아니며 UI에도 FIXTURE로 표시한다.
+- 상태: manual / scanning / stabilizing / paused / waiting / cooldown / error. `restart_remaining_seconds`는 대기 중에만 값이 있다. source=fixture는 실제 추론이 아니다.
 
 ## 로컬 검증
 

@@ -119,7 +119,7 @@ async def test_scan_selects_analyzed_frame_once_pauses_and_latches():
             clock[0] = t*.5
             await capture.scan_once()
         assert controller.phase == "cancelled" and controller.token == token+1
-        assert controller.capture_status["status"] == "waiting"
+        assert controller.capture_status["status"] == "cooldown"
     finally:
         await controller.close()
 
@@ -246,3 +246,88 @@ async def test_rearming_auto_capture_clears_the_finished_run():
         assert state["phase"] == "idle", state["phase"]
         assert state["card"] is None and state["scene"] is None
         assert state["transcript"] is None
+
+
+@pytest.mark.parametrize("phase", ["done", "cancelled", "declined", "skipped", "expired", "error"])
+async def test_restart_timer_rearms_same_scene_after_ten_seconds(phase):
+    settings = Settings(qwen_backend="fixture", capture_mode="auto")
+    clients = ModelClients(settings)
+    controller = Controller(settings, clients)
+    clock, calls = [0], []
+
+    async def vision(data, mime, scene_id, scenario):
+        calls.append(scene_id)
+        return scene(obj(), identity=scene_id)
+
+    clients.vision = vision
+    capture = AutoCapture(controller, Camera(), clock=lambda: clock[0])
+    controller.phase = phase
+    controller.scene = scene(obj())
+    previous_session = controller.session_id
+    try:
+        await capture.scan_once()
+        assert controller.capture_status["restart_remaining_seconds"] == 10
+        clock[0] = 9.9
+        await capture.scan_once()
+        assert not calls and controller.session_id == previous_session
+        clock[0] = 10
+        await capture.scan_once()
+        assert controller.phase == "idle" and controller.session_id != previous_session
+        assert capture.blocked is None and not calls
+        for now in (10.5, 11, 11.5, 12, 12.5, 13):
+            clock[0] = now
+            await capture.scan_once()
+            assert controller.phase == "idle"
+        clock[0] = 13.5
+        await capture.scan_once()
+        assert controller.phase == "offered" and len(calls) == 7
+        assert controller.capture_status["restart_remaining_seconds"] is None
+    finally:
+        await controller.close()
+
+
+async def test_timer_setting_changes_disable_and_manual_mode_cancel_countdown():
+    settings = Settings(qwen_backend="fixture", capture_mode="auto")
+    controller = Controller(settings, ModelClients(settings))
+    clock = [0]
+    capture = AutoCapture(controller, Camera(), clock=lambda: clock[0])
+    controller.phase = "done"
+    original_session = controller.session_id
+    try:
+        await capture.scan_once()
+        clock[0] = 2
+        capture.configure_restart(True, 20)
+        await capture.scan_once()
+        assert controller.capture_status["restart_remaining_seconds"] == 20
+        capture.configure_restart(False, 20)
+        clock[0] = 30
+        # No fake model calls: use a blocked fixture signature to keep the same scene waiting.
+        capture.blocked = ("fixture", (("coffee", 1), ("coke", 1), ("water", 1)))
+        await capture.scan_once()
+        assert controller.session_id == original_session
+        assert controller.capture_status["restart_remaining_seconds"] is None
+        capture.configure_restart(True, 1)
+        await capture.scan_once()
+        assert controller.capture_status["restart_remaining_seconds"] == 1
+        capture.set_mode("manual")
+        clock[0] = 40
+        await capture.scan_once()
+        assert controller.session_id == original_session and controller.phase == "done"
+        assert controller.capture_status["restart_remaining_seconds"] is None
+    finally:
+        await controller.close()
+
+
+def test_restart_timer_http_settings_are_shared_and_strict():
+    with TestClient(create_app(Settings(qwen_backend="fixture"))) as client:
+        url = "/api/capture/restart-timer"
+        for invalid in ({"enabled": "false", "seconds": 10},
+                        {"enabled": True, "seconds": 0},
+                        {"enabled": True, "seconds": 301},
+                        {"enabled": True, "seconds": 1.5}):
+            assert client.post(url, json=invalid).status_code == 422
+        changed = client.post(url, json={"enabled": False, "seconds": 7})
+        changed.raise_for_status()
+        status = client.get("/api/capture").json()
+        assert status["restart_enabled"] is False and status["restart_seconds"] == 7
+        assert client.get("/api/state").json()["capture"] == status

@@ -45,7 +45,7 @@ const url = process.env.REFILL_URL || 'http://127.0.0.1:8088';
     // Returning to auto clears the old window and cannot instantly reuse it.
     await page.locator('#captureMode').selectOption('auto');
     await page.waitForTimeout(700);
-    assert.equal(await page.locator('#phase').textContent(), 'CANCELLED');
+    assert.equal(await page.locator('#phase').textContent(), 'IDLE');
     await page.locator('#captureMode').selectOption('manual');
     for (const width of [1440,390]) {
       await page.setViewportSize({width,height:1000});

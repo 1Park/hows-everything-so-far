@@ -107,12 +107,20 @@ class AutoCapture:
         self.epoch = self.revision = 0
         self.blocked = None
         self.last_token = controller.token
+        self.restart_enabled = settings.auto_capture_restart_enabled
+        self.restart_seconds = settings.auto_capture_restart_seconds
+        self.restart_deadline = self.restart_session = None
         self.publish("scanning" if self.mode == "auto" else "manual")
 
     def publish(self, status, **kwargs):
         self.revision += 1
         state = CaptureStatus(mode=self.mode, status=status, revision=self.revision,
-                              required_seconds=self.window.seconds, **kwargs).model_dump()
+                              required_seconds=self.window.seconds,
+                              restart_enabled=self.restart_enabled,
+                              restart_seconds=self.restart_seconds,
+                              restart_remaining_seconds=(max(0, self.restart_deadline-self.clock())
+                                                         if self.restart_deadline is not None else None),
+                              **kwargs).model_dump()
         self.controller.capture_status = state
         # A separate event avoids invalidating an offer's sequence/voice ACK.
         for queue in self.controller.subscribers:
@@ -127,24 +135,48 @@ class AutoCapture:
         self.epoch += 1  # Invalidate in-flight inference even on auto -> auto rearm.
         self.window.reset()
         self.blocked = None
+        self.restart_deadline = self.restart_session = None
         return self.publish("scanning" if mode == "auto" else "manual")
+
+    def configure_restart(self, enabled, seconds):
+        self.epoch += 1
+        self.window.reset()
+        self.restart_enabled, self.restart_seconds = enabled, seconds
+        self.restart_session = None
+        self.restart_deadline = None
+        status = self.controller.capture_status["status"]
+        return self.publish("scanning" if status == "cooldown" else status)
 
     async def scan_once(self):
         c = self.controller
         if self.mode != "auto":
             return
         if c.phase not in TERMINAL:
+            self.restart_deadline = self.restart_session = None
             self.window.reset()
             if c.scene:
                 self.blocked = signature(c.scene)
             if c.capture_status["status"] != "paused":
                 self.publish("paused")
             return
+        now = self.clock()
+        if self.restart_enabled and c.phase != "idle":
+            if self.restart_session != c.session_id:
+                self.restart_session = c.session_id
+                self.restart_deadline = now+self.restart_seconds
+            if now < self.restart_deadline:
+                self.window.reset()
+                self.publish("cooldown")
+                return
+            # Same operation as Restart auto capture, with no browser click or microphone action.
+            self.set_mode("auto")
+            await c.restart_session()
+            self.last_token = c.token
+            return
         if self.last_token != c.token:
             self.window.reset()
             self.last_token = c.token
         epoch, token = self.epoch, c.token
-        now = self.clock()
         try:
             data, mime = self.video.frame()
             validate_image(data, mime)

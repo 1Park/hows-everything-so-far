@@ -16,7 +16,7 @@
       <section class="panel capture-panel">
         <div class="panel-heading"><h2>Capture</h2><div class="heading-right"><span class="pill" id="videoMode">Sample image</span><span id="phase" class="phase">IDLE</span></div></div>
         <div class="scene" id="scene"><img id="sceneImage" src="/api/frame" alt="Cups on the table"><div id="boxes"></div><span class="image-credit" id="imageCredit">AI-generated sample · illustrative fixture</span></div>
-        <div class="scene-footer"><div><strong id="sceneTitle">Ready when you are</strong><p id="sceneSubtitle">Inspect a scene to see the cups and their fill levels.</p></div><div class="scene-actions"><button id="backToLive" class="secondary" hidden>↺ Back to live</button><button id="start" class="primary">Start demo <span>↗</span></button></div></div>
+        <div class="scene-footer"><div><strong id="sceneTitle">Ready when you are</strong><p id="sceneSubtitle">Inspect a scene to see the cups and their fill levels.</p></div><div class="scene-actions"><button id="backToLive" class="secondary" hidden>↺ Back to live</button><span id="captureRestartTimer" class="pill" role="timer" hidden></span><button id="start" class="primary">Start demo <span>↗</span></button></div></div>
         <div id="objects" class="objects"></div>
       </section>
 
@@ -61,6 +61,10 @@
     <p class="confirmation-note">Variants are selected from customer input, not identified by Vision. Changing this option clears the request card.</p>
     <p id="mediaSupport" class="confirmation-note">Microphone &amp; speaker: this browser</p>
     <p id="captureStatus" role="status">Manual capture · Press Start demo to inspect a scene.</p>
+    <div class="restart-settings">
+      <label><input id="autoRestartEnabled" type="checkbox" checked> Automatically restart capture after each request</label>
+      <label>Restart delay (seconds)<input id="autoRestartSeconds" type="number" min="1" max="300" step="1" value="10"></label>
+    </div>
     <div class="options-row">
       <label>Capture mode<select id="captureMode" aria-describedby="captureStatus"><option value="manual">Manual</option><option value="auto">Automatic</option></select></label>
       <label>Scenario<select id="scenario"><option value="normal">Low water · normal</option><option value="enough">Enough remaining · skip</option><option value="uncertain">Low confidence · skip</option></select></label>

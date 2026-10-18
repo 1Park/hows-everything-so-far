@@ -168,13 +168,18 @@ class CaptureModeInput(Contract):
     mode: Literal["manual", "auto"]
 
 
+class CaptureRestartInput(Contract):
+    enabled: bool = Field(strict=True)
+    seconds: int = Field(ge=1, le=300, strict=True)
+
+
 class DemoFeaturesInput(Contract):
     untrained_categories: bool = Field(strict=True)
 
 
 class CaptureStatus(Contract):
     mode: Literal["manual", "auto"] = "manual"
-    status: Literal["manual", "scanning", "stabilizing", "paused", "waiting", "error"] = "manual"
+    status: Literal["manual", "scanning", "stabilizing", "paused", "waiting", "cooldown", "error"] = "manual"
     revision: int = 0
     stable_seconds: float = 0
     required_seconds: float = 3
@@ -182,6 +187,9 @@ class CaptureStatus(Contract):
     source: Literal["fixture", "external"] | None = None
     overlap_area: float | None = None
     error: str | None = None
+    restart_enabled: bool = True
+    restart_seconds: int = 10
+    restart_remaining_seconds: float | None = None
 
 
 class SpeechRequest(Contract):

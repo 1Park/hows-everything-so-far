@@ -10,6 +10,7 @@ let micPending = false, transcribing = false, pendingAction = null;
 let audioVersion = 0;
 let policy = {min_confidence: 0.7, low_fill_threshold: 0.3};  // /ready 값으로 덮어씀
 let captureState = null;
+let restartDisplayRevision = -1, restartDisplayDeadline = null;
 const captureTerminal = ['idle','done','cancelled','declined','skipped','expired','error'];
 function autoScanning() {
   return captureState?.mode === 'auto' && captureTerminal.includes(state?.phase)
@@ -17,6 +18,15 @@ function autoScanning() {
 }
 function paintCapture() {
   if (!captureState) return;
+  if (restartDisplayRevision !== captureState.revision) {
+    restartDisplayRevision = captureState.revision;
+    restartDisplayDeadline = captureState.restart_remaining_seconds == null ? null
+      : performance.now() + captureState.restart_remaining_seconds * 1000;
+  }
+  $('autoRestartEnabled').checked = captureState.restart_enabled;
+  if (document.activeElement !== $('autoRestartSeconds')) $('autoRestartSeconds').value = captureState.restart_seconds;
+  $('autoRestartSeconds').disabled = !captureState.restart_enabled;
+  paintRestartTimer();
   $('captureMode').value = captureState.mode;
   const seconds = Math.min(captureState.stable_seconds, captureState.required_seconds).toFixed(1);
   const labels = {
@@ -25,12 +35,22 @@ function paintCapture() {
     stabilizing: `Automatic capture · Stable types ${seconds} / ${captureState.required_seconds}s · ${captureState.samples} frames`,
     paused: 'Automatic capture paused during the current interaction.',
     waiting: 'Automatic capture · This scene was already inspected. Change the cups or restart capture.',
+    cooldown: 'Request finished · Waiting to restart automatic capture.',
     error: captureState.error || 'Automatic capture unavailable. Retrying.'
   };
   $('captureStatus').textContent = labels[captureState.status]
     + (captureState.source ? ` · ${captureState.source.toUpperCase()} Vision` : '')
     + (captureState.overlap_area !== null ? ` · overlap ${(captureState.overlap_area*100).toFixed(2)}%` : '');
 }
+function paintRestartTimer() {
+  const timer = $('captureRestartTimer');
+  timer.hidden = captureState?.mode !== 'auto';
+  if (timer.hidden) return;
+  timer.textContent = !captureState.restart_enabled ? 'Auto restart off'
+    : restartDisplayDeadline === null ? `After request: ${captureState.restart_seconds}s`
+    : `Restart in ${Math.max(0, Math.ceil((restartDisplayDeadline-performance.now())/1000))}s`;
+}
+setInterval(paintRestartTimer, 250);
 function updateCapture(next) {
   if (captureState && next.revision < captureState.revision) return;
   captureState = next;
@@ -188,7 +208,7 @@ async function checkConnection() {
 function render(next, authoritative = false) {
   if (state && state.instance_id === next.instance_id && next.sequence < state.sequence) return;
   if (state && state.instance_id !== next.instance_id && !authoritative) return;
-  if (state && state.instance_id !== next.instance_id) captureState = null;
+  if (state && state.instance_id !== next.instance_id) {captureState = null; restartDisplayRevision = -1;}
   if (next.capture && (!captureState || next.capture.revision >= captureState.revision)) captureState = next.capture;
   if (!state || state.session_id !== next.session_id || state.instance_id !== next.instance_id) {
     stopRecording(true); transcriptionVersion++; draftVersion++;
@@ -439,6 +459,17 @@ $('captureMode').onchange = async () => {
   catch {paintCapture();}
   finally {$('captureMode').disabled = false;}
 };
+async function configureRestartTimer() {
+  const input = $('autoRestartSeconds');
+  if (!input.reportValidity()) return;
+  try {
+    updateCapture(await post('/api/capture/restart-timer', {
+      enabled:$('autoRestartEnabled').checked, seconds:Number(input.value)
+    }));
+  } catch {paintCapture();}
+}
+$('autoRestartEnabled').onchange = configureRestartTimer;
+$('autoRestartSeconds').onchange = configureRestartTimer;
 $('untrainedCategories').onchange = async () => {
   const enabled = $('untrainedCategories').checked;
   $('untrainedCategories').disabled = true;

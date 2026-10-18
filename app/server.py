@@ -28,6 +28,7 @@ from common.contracts import (
     ListenInput,
     SttTake,
     CaptureModeInput,
+    CaptureRestartInput,
     CaptureStatus,
     DemoFeaturesInput,
 )
@@ -163,6 +164,10 @@ def create_app(settings=None, clients=None, hardware=None):
             # one should not still be on screen.
             await controller.restart_session()
         return status
+
+    @app.post("/api/capture/restart-timer", response_model=CaptureStatus)
+    async def capture_restart_timer(body: CaptureRestartInput):
+        return capture.configure_restart(body.enabled, body.seconds)
 
     @app.post("/api/observe", status_code=202, response_model=StateSnapshot)
     async def observe(
