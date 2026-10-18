@@ -29,7 +29,7 @@ def test_speech_lines_name_the_drink_and_cover_each_outcome():
     assert speech_for("offered", obj("unknown"), None, 0.8) == "How is everything? Can I get you a refill?"
     assert speech_for("card", obj("water"), card("coffee"), 0.8).startswith("One more coffee")
     assert "call me if you need anything" in speech_for("declined", None, None, 0.8)
-    assert "didn't catch that" in speech_for("not_understood", None, None, 0.8)
+    assert speech_for("not_understood", None, None, 0.8, ["coke", "coffee"]) == "Sorry, I didn't catch that. Could you say that again?"
     assert speech_for("done", obj("water"), card("coke"), 0.8) == "Your coke refill is on its way."
     assert speech_for("offered", obj("orange_juice"), None, 0.8) == "How is everything? Can I get you some more orange juice?"
     assert speech_for("card", None, card("orange_juice"), 0.8).startswith("One more orange juice")

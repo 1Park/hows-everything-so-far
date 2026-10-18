@@ -405,8 +405,7 @@ class Controller:
                     self.arm_deadline()
                     self.emit(
                         "not_understood",
-                        "I couldn't understand your request. Please choose "
-                        + ", ".join(d.replace("_", " ") for d in current.allowed_items) + " from the observed scene.",
+                        "Sorry, I didn't catch that. Could you say that again?",
                     )
                 else:
                     self.card = RequestCard(

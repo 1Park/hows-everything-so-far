@@ -25,9 +25,7 @@ def speech_for(phase, target, card, item_confirm_threshold, allowed_items=None):
     if phase == "card" and card is not None:
         return f"One more {say(card.item)}, got it. Please press Confirm."
     if phase == "not_understood":
-        if allowed_items is not None:
-            return "Sorry, I didn't catch that. Please choose " + ", ".join(say(d) for d in allowed_items) + "."
-        return "Sorry, I didn't catch that. Water, coke, coffee, or orange juice?"
+        return "Sorry, I didn't catch that. Could you say that again?"
     if phase == "declined":
         return "No problem. Just call me if you need anything."
     if phase == "cancelled":
