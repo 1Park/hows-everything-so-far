@@ -1,15 +1,16 @@
-"""보드 카메라(Controller /api/frame)로 학습 crop 수집 — 실제 추론과 같은 640x480 프레임 + 같은 YOLO pad crop.
+"""Collect training crops from the board camera (Controller /api/frame) — same 640x480 frames and
+same YOLO pad crop as real inference.
 
-카메라는 Controller가 열고 있으므로 직접 열지 않고 /api/frame 을 받는다.
-잔을 왼쪽부터 놓은 순서대로 --labels 를 준다. YOLO 박스를 왼쪽부터 정렬해 라벨을 붙이고,
-박스 수가 라벨 수와 다르면 그 프레임은 저장하지 않고 건너뛴다 (frames/ 에 미리보기만 남김).
+The Controller holds the camera open, so we fetch /api/frame instead of opening it directly.
+Pass --labels in the left-to-right order the glasses are placed. YOLO boxes are sorted left to right and labeled;
+if the box count differs from the label count, the frame is skipped (only a preview is kept in frames/).
 
   python -m ml.tools.board_collect --bundle models/board/vision/<bundle> --runner-bin $QNN_RUNNER \
       --labels water__low water__mid water__full --shots 10 --interval 2 --out ~/ml-work/data/board_crops
-  → <out>/<label>/<session>_<shot>_<i>.jpg   (make_head --data 에 바로 쓰는 crop)
-    <out>_frames/<session>_<shot>.jpg         (박스·라벨 그린 미리보기)
+  → <out>/<label>/<session>_<shot>_<i>.jpg   (crops ready for make_head --data)
+    <out>_frames/<session>_<shot>.jpg         (preview with boxes and labels drawn)
 
-찍는 동안 잔 위치·각도를 조금씩 바꾸되 왼쪽→오른쪽 순서는 유지한다.
+While shooting, vary glass position/angle a little but keep the left-to-right order.
 """
 
 import argparse
@@ -32,14 +33,14 @@ def grab(url):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument(
-        "--bundle", required=True, help="YOLO .pte와 det_conf/crop_scale을 읽을 Vision bundle"
+        "--bundle", required=True, help="Vision bundle to read the YOLO .pte and det_conf/crop_scale from"
     )
     ap.add_argument("--runner-bin")
     ap.add_argument(
         "--labels",
         nargs="+",
         required=True,
-        help="왼쪽부터 놓은 잔의 클래스 (예: water__low water__mid)",
+        help="classes of the glasses from left to right (e.g. water__low water__mid)",
     )
     ap.add_argument("--shots", type=int, default=10)
     ap.add_argument("--interval", type=float, default=2.0)
@@ -49,7 +50,7 @@ def main():
 
     pipe = VisionPipeline(args.bundle, args.runner_bin)
     if pipe.mode != "yolo":
-        raise SystemExit("bundle boxes.mode 가 yolo 여야 함")
+        raise SystemExit("bundle boxes.mode must be yolo")
     margin = pipe.boxes_cfg.get("crop_scale", 1.15)
     out, frames = Path(args.out), Path(args.out + "_frames")
     frames.mkdir(parents=True, exist_ok=True)
@@ -70,7 +71,7 @@ def main():
         if not ok:
             skipped += 1
             print(
-                f"shot {shot}: 박스 {len(boxes)}개 ≠ 라벨 {len(args.labels)}개 → 건너뜀", flush=True
+                f"shot {shot}: {len(boxes)} boxes ≠ {len(args.labels)} labels → skipped", flush=True
             )
             continue
         for i, (label, b) in enumerate(zip(args.labels, boxes)):
@@ -83,7 +84,7 @@ def main():
             flush=True,
         )
     pipe.close()
-    print(f"session {session}: crop {saved}장 저장, 프레임 {skipped}개 건너뜀 → {out}")
+    print(f"session {session}: saved {saved} crops, skipped {skipped} frames → {out}")
 
 
 if __name__ == "__main__":

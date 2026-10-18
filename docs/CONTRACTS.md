@@ -1,63 +1,63 @@
-# API 경계
+# API boundaries
 
-스키마는 [`common/contracts.py`](../common/contracts.py), 설정은 [`common/config.py`](../common/config.py)가 기준이다. 상세 필드·제한·오류 응답은 실행 중 각 서비스 `/docs`와 `/openapi.json`을 확인한다.
+The schema in [`common/contracts.py`](../common/contracts.py) and the settings in [`common/config.py`](../common/config.py) are the source of truth. For detailed fields, limits, and error responses, check each running service's `/docs` and `/openapi.json`.
 
-## 식별자·이미지·요청
+## Identifiers, images, and requests
 
-- `scene_id`는 분석 이미지 하나, `object_id`는 그 장면 안의 객체다. 장면 사이 추적 ID가 아니다. `session_id`는 고객 응대, 카드 `request_id/revision`은 요청과 수정 버전이다.
-- bbox는 **원본 전체 이미지 기준 normalized xyxy [0,1]**, 좌상단 원점이다. Controller가 원본을 보관하고 Vision이 같은 좌표계로 반환한다.
-- 관찰 item은 water/coke/coffee/unknown, 요청 item은 water/coke/coffee다. `fill_ratio`, `item_confidence`는 null일 수 있다. `confidence`와 `item_confidence`는 각각 종합·음료 종류 확신도다.
-- DINO backend는 coffee/coke 확률을 합쳐 대표 관찰 item `coke`로 반환한다. 이때 `item_confidence`는 그룹 확신도다. fixture·별도 adapter는 기존 관찰 enum을 사용할 수 있다.
-- 상태의 `allowed_items`는 frozen scene 전체의 관찰 그룹을 펼친 요청 메뉴다. coke 그룹은 coke/coffee를 허용하며 unknown은 메뉴를 추가하지 않는다. LLM 입력에는 `current_request`, `allowed_items`, `utterance`를 전달하고 Controller도 목록 밖 refill을 차단한다.
-- 요청·카드·LLM 출력에는 분량이 없다. 관찰 음료와 다른 음료로 요청을 수정해도 대상 객체는 유지한다.
-- 한 번에 한 대상·요청만 처리한다. Confirm은 현재 카드의 scene/object/request/revision이 모두 일치해야 한다. 제안·STT·LLM 결과만으로 하드웨어를 승인하지 않는다.
+- `scene_id` is one analyzed image, and `object_id` is an object within that scene. It is not a tracking ID across scenes. `session_id` is one customer interaction, and the card's `request_id/revision` is the request and its edit version.
+- Bboxes are **normalized xyxy [0,1] relative to the full original image**, with the origin at the top left. The Controller keeps the original, and Vision returns results in the same coordinate system.
+- Observed items are water/coke/coffee/unknown; request items are water/coke/coffee. `fill_ratio` and `item_confidence` may be null. `confidence` and `item_confidence` are the overall confidence and the drink-class confidence, respectively.
+- The DINO backend sums the coffee/coke probabilities and returns the representative observed item `coke`. In this case `item_confidence` is the group confidence. Fixtures and separate adapters may use the existing observation enum.
+- `allowed_items` in the state is the request menu expanded from the observation groups across the whole frozen scene. The coke group allows coke/coffee, and unknown adds no menu items. The LLM input carries `current_request`, `allowed_items`, and `utterance`, and the Controller also blocks refills outside the list.
+- Requests, cards, and LLM output have no quantity. If a request is changed to a drink different from the observed one, the target object stays the same.
+- Only one target and one request are handled at a time. Confirm requires the current card's scene/object/request/revision to all match. Proposals, STT, or LLM results alone never approve hardware actions.
 
-## 서비스 API
+## Service APIs
 
-| 서비스 | 입력 | 출력 |
+| Service | Input | Output |
 | --- | --- | --- |
-| Vision `POST /v1/analyze` | multipart `file` JPEG/PNG, `scene_id`, `scenario`(fixture용) | `VisionResult`: scene_id/source/objects |
+| Vision `POST /v1/analyze` | multipart `file` JPEG/PNG, `scene_id`, `scenario` (for fixtures) | `VisionResult`: scene_id/source/objects |
 | STT `POST /v1/transcribe` | multipart audio `file` | text/language/source |
-| LLM `POST /v1/chat/completions` | `Generation`: model/messages/생성 옵션 | choices[0].message.content/source, 보드 runner 통계 |
+| LLM `POST /v1/chat/completions` | `Generation`: model/messages/generation options | choices[0].message.content/source, board runner stats |
 
-Vision/STT 모델 서버는 카메라·마이크를 열지 않는다. Controller가 이미지·오디오 bytes를 전달한다. 지원 MIME·크기 검사는 [`common/media.py`](../common/media.py), 실제 전처리는 서비스 backend에 있다.
+The Vision/STT model servers do not open the camera or microphone. The Controller passes image and audio bytes. Supported MIME and size checks are in [`common/media.py`](../common/media.py); the actual preprocessing is in each service backend.
 
-LLM 제품 프롬프트·파서는 [`app/language.py`](../app/language.py)에 있다. 출력은 `{"intent":"refill","item":"water"}` 형태이며 intent는 refill/decline/cancel/not_understood다. refill은 유효 item 필수, 나머지는 item=null이다. 단일 JSON Markdown fence는 허용하지만 prose 추출·추가 필드·중복 키·필드 보정은 허용하지 않는다.
+The LLM product prompt and parser are in [`app/language.py`](../app/language.py). Output has the form `{"intent":"refill","item":"water"}`, where intent is refill/decline/cancel/not_understood. refill requires a valid item; the others have item=null. A single JSON Markdown fence is allowed, but prose extraction, extra fields, duplicate keys, and field correction are not.
 
-외부 Vision/STT plugin은 `*_MODEL_BACKEND=external`, `*_ADAPTER=package:create_backend`로 선택한다. 인자 없는 factory를 한 번 호출하며 backend는 다음 async 메서드를 제공한다. 반환값은 공통 타입 또는 같은 shape dict다.
+External Vision/STT plugins are selected with `*_MODEL_BACKEND=external` and `*_ADAPTER=package:create_backend`. The no-argument factory is called once, and the backend provides the following async methods. Return values are the common types or dicts of the same shape.
 
 ```python
 async def ready(self) -> bool: ...
 async def infer(self, data, content_type, scene_id, scenario): ...  # Vision
 async def infer(self, data, content_type): ...  # STT
-async def close(self): ...  # 선택
+async def close(self): ...  # optional
 ```
 
-별도 HTTP 서버 연결은 Controller의 `VISION_BACKEND=http`/`VISION_BASE_URL`과 STT 대응 설정을 사용한다. `source=fixture|external`을 실제 backend와 일치시킨다. LLM은 mlx/fixture/executorch source를 사용한다. 자동 fixture 전환은 없다.
+Connecting to a separate HTTP server uses the Controller's `VISION_BACKEND=http`/`VISION_BASE_URL` and the corresponding STT settings. `source=fixture|external` must match the actual backend. The LLM uses the mlx/fixture/executorch sources. There is no automatic switch to fixtures.
 
-`/health`는 프로세스 생존, `/ready`는 backend 준비 상태(미준비503)다. 준비 상태가 생성 정확도를 보장하지는 않는다. 추론은 bounded queue와 timeout을 적용하며 기본값은 Settings를 따른다. 공통 오류는 `{error: {code,message,request_id,retryable}}`이고 `X-Request-ID`는 카드 ID와 별도의 호출 추적 ID다.
+`/health` is process liveness, and `/ready` is backend readiness (503 when not ready). Readiness does not guarantee generation accuracy. Inference uses a bounded queue and timeout, with defaults from Settings. The common error is `{error: {code,message,request_id,retryable}}`, and `X-Request-ID` is a call tracing ID separate from the card ID.
 
 ## Controller
 
-| 경로 | 용도 |
+| Route | Purpose |
 | --- | --- |
-| `GET /api/state` | 전체 `StateSnapshot` |
-| `GET /api/vision-categories` | 고정 groups/member 매핑, editable=false; 수정 API 없음 |
-| `POST /api/demo-features` | `{untrained_categories: boolean}` → 전체 상태. 기본 false; 진행 중 변경은 409 |
-| `GET/POST /api/capture` | 자동/수동 모드·진행 상태, POST `{mode}` |
-| `POST /api/capture/restart-timer` | `{enabled,seconds}`로 응대 종료 후 자동 재시작 설정 |
-| `POST /api/observe` | multipart 선택 이미지·scenario로 관찰 시작 |
-| `POST /api/utterance` | scene_id/object_id/utterance로 요청 해석 |
-| `POST /api/voice/listen` | 안내 종료 ACK: session_id/scene_id/object_id/sequence |
-| `POST /api/transcribe` | 업로드 오디오 전사만 수행 |
-| `POST /api/confirm` | scene_id/object_id/request_id/revision으로 현재 카드 확인 |
-| `POST /api/cancel` | session_id로 현재 작업 취소 |
-| `GET /api/frame`, `/api/video` | 최신 이미지·설정 FPS의 MJPEG |
-| `GET /api/snapshot/{session_id}` | 분석에 사용한 고정 이미지 |
-| `GET /api/hardware`, `/api/events` | 하드웨어 상태·대시보드 이력 |
-| `/api/stt/*` | `/stt` 정확도 측정·결과 저장 도구; 상세는 OpenAPI |
-| `WS /ws` | 초기 전체 상태·변경 이벤트·heartbeat·capture 이벤트 |
+| `GET /api/state` | Full `StateSnapshot` |
+| `GET /api/vision-categories` | Fixed groups/member mapping, editable=false; no edit API |
+| `POST /api/demo-features` | `{untrained_categories: boolean}` → full state. Default false; 409 when changed mid-flow |
+| `GET/POST /api/capture` | Automatic/manual mode and progress, POST `{mode}` |
+| `POST /api/capture/restart-timer` | `{enabled,seconds}` sets automatic restart after serving ends |
+| `POST /api/observe` | Starts observation with an optional multipart image and scenario |
+| `POST /api/utterance` | Interprets a request from scene_id/object_id/utterance |
+| `POST /api/voice/listen` | Prompt-done ACK: session_id/scene_id/object_id/sequence |
+| `POST /api/transcribe` | Transcribes uploaded audio only |
+| `POST /api/confirm` | Confirms the current card with scene_id/object_id/request_id/revision |
+| `POST /api/cancel` | Cancels the current work by session_id |
+| `GET /api/frame`, `/api/video` | Latest image, MJPEG at the configured FPS |
+| `GET /api/snapshot/{session_id}` | Frozen image used for analysis |
+| `GET /api/hardware`, `/api/events` | Hardware state and dashboard history |
+| `/api/stt/*` | `/stt` accuracy measurement and result-saving tool; see OpenAPI for details |
+| `WS /ws` | Initial full state, change events, heartbeat, capture events |
 
-state 이벤트는 `{type:"state",version:1,sequence,state}`이며 서버 실행별 `state.instance_id`와 단조 증가 sequence로 오래된 REST/WS 응답을 무시한다. 재연결은 전체 snapshot으로 복구한다. capture 이벤트는 `{type:"capture",instance_id,capture}`와 별도 `capture.revision`을 사용한다. [자동 캡처](AUTO_CAPTURE.md).
+The state event is `{type:"state",version:1,sequence,state}`; stale REST/WS responses are ignored using the per-server-run `state.instance_id` and the monotonically increasing sequence. Reconnects recover from the full snapshot. The capture event uses `{type:"capture",instance_id,capture}` and a separate `capture.revision`. [Auto capture](AUTO_CAPTURE.md).
 
-phase 전체 목록은 코드의 `Phase` 타입, 허용 전이는 Controller 메서드를 따른다. 보드 음성 흐름은 offered → listening → transcribing → interpreting → card이며, not_understood는 재입력을 기다린다. [음성 흐름](TABLET_DEMO.md).
+The full phase list follows the `Phase` type in code, and allowed transitions follow the Controller methods. The board voice flow is offered → listening → transcribing → interpreting → card, and not_understood waits for new input. [Voice flow](TABLET_DEMO.md).

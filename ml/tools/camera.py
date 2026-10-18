@@ -1,19 +1,19 @@
-"""맥북(또는 USB) 카메라로 실사 데이터 수집 / 실시간 추론 + 지연시간 측정.
+"""Collect real photos / run live inference + measure latency with the MacBook (or USB) camera.
 
-화면 가운데 정사각형 박스 = ROI (스펙의 primary ROI). 잔을 박스 안에 두고 찍는다.
+The square box in the center of the screen = ROI (the spec's primary ROI). Place the glass inside the box and shoot.
 
-1) 수집:  python -m ml.tools.camera collect --drinks water coke coffee
-          python -m ml.tools.camera collect --classes other   (컵이 아닌 물체: 캔·병)
-   키: 1~9,0 클래스 선택 (10번째 = 0) | space 저장 | q 종료   → data/real/<class>/NNNN.jpg
-2) 정확도: python -m ml.evaluation.eval_fewshot --data data/real --shots 1 3 5
-3) 실시간: python -m ml.tools.camera live --train data/real            (가운데 ROI 1개)
-          python -m ml.tools.camera live --train data/real --detect   (YOLO로 잔 여러 개 찾아서 잔마다 분류)
-          python -m ml.tools.camera rois                              (잔 놓을 자리를 마우스로 지정 → rois.json)
-          python -m ml.tools.camera live --train data/real --rois rois.json   (고정 ROI 여러 개, 검출기 없음)
-   키: q 종료   → models/experiments/vision/live_latency_*.json (프레임별 단계 ms 통계)
+1) Collect:  python -m ml.tools.camera collect --drinks water coke coffee
+          python -m ml.tools.camera collect --classes other   (non-cup objects: cans, bottles)
+   keys: 1-9,0 select class (10th = 0) | space save | q quit   → data/real/<class>/NNNN.jpg
+2) Accuracy: python -m ml.evaluation.eval_fewshot --data data/real --shots 1 3 5
+3) Live: python -m ml.tools.camera live --train data/real            (one center ROI)
+          python -m ml.tools.camera live --train data/real --detect   (YOLO finds several glasses, classify each)
+          python -m ml.tools.camera rois                              (mark glass spots with the mouse → rois.json)
+          python -m ml.tools.camera live --train data/real --rois rois.json   (several fixed ROIs, no detector)
+   keys: q quit   → models/experiments/vision/live_latency_*.json (per-frame stage ms stats)
 
-macOS: iTerm/터미널.app에서 실행해야 권한 팝업이 뜬다 (Claude 앱 터미널 패널 X).
-카메라 여러 대면: python -m ml.tools.camera probe
+macOS: run from iTerm/Terminal.app so the permission popup appears (not the Claude app terminal panel).
+With several cameras: python -m ml.tools.camera probe
 """
 
 import argparse
@@ -38,7 +38,7 @@ from services.vision.preprocess import square_crop_box as _square_crop_box
 
 
 def roi_box(frame, frac=0.7):
-    """cv2 프레임 → 가운데 정사각형 (x, y, side). 서비스의 center_box 와 같은 규칙."""
+    """cv2 frame -> center square (x, y, side). Same rule as the service's center_box."""
     return center_box((frame.shape[1], frame.shape[0]), frac)
 
 
@@ -47,7 +47,7 @@ def square_crop_box(xyxy, frame, scale):
 
 
 def load_rois(path):
-    """rois.json: {"rois": [[x, y, w, h], ...]} 프레임 대비 비율(0~1)."""
+    """rois.json: {"rois": [[x, y, w, h], ...]} as fractions of the frame (0-1)."""
     return json.loads(Path(path).read_text())["rois"]
 
 
@@ -60,8 +60,8 @@ def iou(a, b):
 
 
 class Tracks:
-    """live 화면용: 프레임 간 같은 컵을 IoU로 짝지어 확률을 지수이동평균 → 라벨 깜빡임 방지.
-    (Vision 서비스는 장면 단위라 추적하지 않는다)"""
+    """For the live view: match the same cup across frames by IoU and EMA its probabilities -> no label flicker.
+    (The Vision service works per scene, so it does not track)"""
 
     def __init__(self, alpha=0.4, iou_min=0.3, max_miss=5):
         self.alpha, self.iou_min, self.max_miss = alpha, iou_min, max_miss
@@ -93,8 +93,8 @@ class Tracks:
 
 
 LEVELS = ["full", "mid", "low"]
-KEYS = "1234567890"  # 클래스 선택 키 (최대 10클래스 = 3 drinks × 3 levels + empty)
-GLASS_LIKE = {"cup", "wine glass", "bottle", "bowl", "vase"}  # COCO에서 잔으로 인정할 클래스
+KEYS = "1234567890"  # class select keys (up to 10 classes = 3 drinks × 3 levels + empty)
+GLASS_LIKE = {"cup", "wine glass", "bottle", "bowl", "vase"}  # COCO classes accepted as a glass
 
 
 def crop_roi(frame):
@@ -107,22 +107,22 @@ def put(img, text, y, color=(255, 255, 255), scale=0.7, x=12):
     cv2.putText(img, text, (x, y), cv2.FONT_HERSHEY_SIMPLEX, scale, color, 2, cv2.LINE_AA)
 
 
-CAM_HELP = """카메라를 열 수 없음.
-  1) 터미널.app/iTerm에서 실행했는지 확인 (Claude 앱 터미널 패널에서는 macOS 권한 팝업이 안 뜸)
-     → Finder에서 collect.command 더블클릭하면 터미널.app으로 실행됨
-  2) 시스템 설정 > 개인정보 보호 및 보안 > 카메라 에서 터미널 켜기 → 터미널 재시작
-  3) 카메라 여러 대(아이폰 연속성 카메라 등)면: python -m ml.tools.camera probe 로 인덱스 확인 후 --cam N"""
+CAM_HELP = """Cannot open the camera.
+  1) Make sure you ran it from Terminal.app/iTerm (the Claude app terminal panel does not show the macOS permission popup)
+     → double-clicking collect.command in Finder runs it in Terminal.app
+  2) System Settings > Privacy & Security > Camera: enable Terminal → restart Terminal
+  3) With several cameras (e.g. iPhone Continuity Camera): find the index with python -m ml.tools.camera probe, then --cam N"""
 
 
 def open_cam(idx, retries=10):
-    # macOS: 첫 실행 시 권한 요청이 비동기라 첫 open은 실패한다 → 팝업 허용을 기다리며 재시도
+    # macOS: the permission request on first run is async, so the first open fails -> retry while waiting for the user to allow it
     for i in range(retries):
         cap = cv2.VideoCapture(idx, cv2.CAP_AVFOUNDATION)
         if cap.isOpened() and cap.read()[0]:
             return cap
         cap.release()
         if i == 0:
-            print("카메라 대기 중... 권한 팝업이 뜨면 '허용'을 누르세요")
+            print("Waiting for camera... click 'Allow' when the permission popup appears")
         time.sleep(1)
     raise SystemExit(CAM_HELP)
 
@@ -131,24 +131,24 @@ def probe(args):
     for idx in range(4):
         cap = cv2.VideoCapture(idx, cv2.CAP_AVFOUNDATION)
         ok, frame = cap.read() if cap.isOpened() else (False, None)
-        print(f"--cam {idx}: " + (f"OK {frame.shape[1]}x{frame.shape[0]}" if ok else "없음"))
+        print(f"--cam {idx}: " + (f"OK {frame.shape[1]}x{frame.shape[0]}" if ok else "none"))
         if ok:
             cv2.imwrite(f"models/experiments/vision/probe_cam{idx}.jpg", frame)
         cap.release()
-    print("models/experiments/vision/probe_cam*.jpg 로 어떤 카메라인지 확인")
+    print("check models/experiments/vision/probe_cam*.jpg to see which camera is which")
 
 
 def setup_rois(args):
-    """카메라 한 프레임에서 잔 자리마다 박스를 드래그 → Enter/Space로 확정, 다 그렸으면 Esc."""
+    """On one camera frame, drag a box per glass spot -> Enter/Space to confirm, Esc when done."""
     cap = open_cam(args.cam)
-    for _ in range(10):  # 노출 안정화
+    for _ in range(10):  # let exposure settle
         ok, frame = cap.read()
     cap.release()
-    print("잔 자리마다 드래그 → Enter. 끝나면 Esc")
+    print("Drag over each glass spot → Enter. Esc when done")
     boxes = cv2.selectROIs("rois: drag + Enter, Esc to finish", frame, showCrosshair=False)
     cv2.destroyAllWindows()
     if len(boxes) == 0:
-        raise SystemExit("ROI가 없음")
+        raise SystemExit("no ROIs")
     h, w = frame.shape[:2]
     rois = [[float(x) / w, float(y) / h, float(bw) / w, float(bh) / h] for x, y, bw, bh in boxes]
     Path(args.out).write_text(json.dumps({"frame_size": [w, h], "rois": rois}, indent=2))
@@ -161,7 +161,8 @@ def setup_rois(args):
 
 
 def next_index(d):
-    """다음 저장 번호 = 숫자 이름 중 최댓값 + 1. 개수로 정하면 사진을 다른 폴더로 옮긴 뒤 기존 파일을 덮어쓴다."""
+    """Next save number = max numeric name + 1. Using the file count would overwrite existing files
+    after photos are moved to another folder."""
     nums = [int(p.stem) for p in d.glob("*.jpg") if p.stem.isdigit()]
     return max(nums) + 1 if nums else 0
 
@@ -169,7 +170,7 @@ def next_index(d):
 def collect(args):
     classes = args.classes or [f"{d}__{lv}" for d in args.drinks for lv in LEVELS] + ["empty"]
     if len(classes) > len(KEYS):
-        raise SystemExit("drink는 최대 3종")
+        raise SystemExit("at most 3 drinks")
     out = Path(args.out)
     for c in classes:
         (out / c).mkdir(parents=True, exist_ok=True)
@@ -194,7 +195,7 @@ def collect(args):
             break
         if chr(k) in KEYS[: len(classes)]:
             cur = KEYS.index(chr(k))
-        if k == ord(" ") and time.time() - last_save > 0.4:  # 스페이스 누르고 있을 때 키 반복으로 연속 저장 방지
+        if k == ord(" ") and time.time() - last_save > 0.4:  # avoid repeated saves from key repeat while space is held
             last_save = time.time()
             d = out / classes[cur]
             n = next_index(d)
@@ -205,8 +206,8 @@ def collect(args):
 
 
 def save_head(clf, classes, path: Path):
-    """학습된 head를 sklearn 없이 쓸 수 있는 JSON으로 저장 (보드: z=(x-mean)/scale → logits=z@W.T+b → softmax).
-    2클래스면 sklearn이 W 1행만 두므로 [-w, w] 형태로 펼쳐 저장한다."""
+    """Save the trained head as JSON usable without sklearn (board: z=(x-mean)/scale -> logits=z@W.T+b -> softmax).
+    With 2 classes sklearn keeps only one row of W, so expand it to [-w, w] before saving."""
     sc, lr = clf.named_steps["standardscaler"], clf.named_steps["logisticregression"]
     W, b = lr.coef_, lr.intercept_
     if len(classes) == 2:
@@ -218,12 +219,12 @@ def save_head(clf, classes, path: Path):
 
 
 class Pipeline:
-    """프레임 → 잔 박스들 → 잔마다 정사각 crop → DINOv2 (한 번에 batch) → head 확률."""
+    """Frame -> glass boxes -> square crop per glass -> DINOv2 (one batch) -> head probabilities."""
 
     def __init__(self, args):
         paths, y, self.classes = load_dataset(args.train)
         if len(paths) == 0:
-            raise SystemExit(f"{args.train} 에 학습 이미지가 없음 — 먼저 collect")
+            raise SystemExit(f"no training images in {args.train} — run collect first")
         tag = f"{Path(args.train).name}_{args.model}_cls"
         X = embed_all(paths, args.model, "cls", args.device, Path("models/experiments/vision") / f"emb_{tag}.npz")
         self.clf = make_pipeline(StandardScaler(), LogisticRegression(max_iter=3000, C=0.1)).fit(X, y)
@@ -243,7 +244,7 @@ class Pipeline:
 
     def boxes(self, frame):
         """returns [(crop_box xywh-square, det_xyxy, det_name, det_conf)]"""
-        if self.rois is not None:  # 고정 ROI: 박스 = 잔 자리, crop = 그 박스를 정사각형으로 (detect와 같은 규칙)
+        if self.rois is not None:  # fixed ROIs: box = glass spot, crop = that box squared (same rule as detect)
             h, w = frame.shape[:2]
             out = []
             for rx, ry, rw, rh in self.rois:
@@ -261,7 +262,7 @@ class Pipeline:
                 continue
             xyxy = b.xyxy[0].tolist()
             out.append((square_crop_box(xyxy, frame, self.args.crop_scale), xyxy, name, float(b.conf)))
-        out.sort(key=lambda d: d[1][0])  # 왼쪽부터
+        out.sort(key=lambda d: d[1][0])  # left to right
         return out[: self.args.max_glasses]
 
     @torch.no_grad()
@@ -274,7 +275,7 @@ class Pipeline:
             crops = [cv2.cvtColor(frame[y : y + s, x : x + s], cv2.COLOR_BGR2RGB) for (x, y, s), *_ in dets]
             xb = torch.from_numpy(np.concatenate([preprocess(Image.fromarray(c)) for c in crops])).to(self.device)
             t2 = time.perf_counter()
-            emb = self.head(xb).cpu().numpy()  # .cpu() 가 MPS 동기화 역할
+            emb = self.head(xb).cpu().numpy()  # .cpu() doubles as the MPS sync
             t3 = time.perf_counter()
             probs = self.clf.predict_proba(emb)
         else:
@@ -311,7 +312,7 @@ def live(args):
             color = (0, 255, 0) if ok_gate else (255, 0, 255)
             x0, y0, x1, y1 = map(int, t["box"])
             cv2.rectangle(view, (x0, y0), (x1, y1), color, 2)
-            if args.detect or args.rois:  # DINOv2에 실제로 들어간 정사각 crop 영역
+            if args.detect or args.rois:  # square crop region actually fed to DINOv2
                 cv2.rectangle(view, (cx, cy), (cx + s, cy + s), (200, 200, 200), 1)
             put(view, f"#{t['id']} {classes[ci]} {conf:.2f}", max(20, y0 - 8), color, 0.6, x0)
         mode = "yolo+dinov2" if args.detect else ("fixed-rois+dinov2" if args.rois else "roi+dinov2")
@@ -326,7 +327,7 @@ def live(args):
 
     stats = {"mean_glasses": float(np.mean(n_glasses)) if n_glasses else 0.0}
     for k, v in log.items():
-        v = sorted(v[5:]) or sorted(v)  # 처음 몇 프레임은 워밍업으로 제외
+        v = sorted(v[5:]) or sorted(v)  # drop the first few frames as warmup
         if v:
             stats[k] = dict(mean=statistics.mean(v), p50=v[len(v) // 2], p90=v[int(len(v) * 0.9)], n=len(v))
     tag = "detect" if args.detect else ("rois" if args.rois else "roi")
@@ -344,7 +345,7 @@ def main():
     c = sub.add_parser("collect")
     c.add_argument("--drinks", nargs="+", default=["water", "coke", "coffee"])
     c.add_argument("--classes", nargs="+",
-                   help="직접 클래스 지정 (예: other — 캔·병처럼 YOLO가 cup으로 잘못 잡는 물체). --drinks 무시")
+                   help="set classes directly (e.g. other — objects like cans/bottles that YOLO mistakes for cups). ignores --drinks")
     c.add_argument("--out", default="data/real")
     c.add_argument("--cam", type=int, default=0)
     lv = sub.add_parser("live")
@@ -353,13 +354,13 @@ def main():
     lv.add_argument("--device", default="mps" if torch.backends.mps.is_available() else "cpu")
     lv.add_argument("--conf-min", type=float, default=0.70)
     lv.add_argument("--cam", type=int, default=0)
-    lv.add_argument("--detect", action="store_true", help="YOLO로 잔 여러 개 검출 후 잔마다 분류")
+    lv.add_argument("--detect", action="store_true", help="detect several glasses with YOLO, then classify each")
     lv.add_argument("--weights", default="models/local/vision/yolo11n.pt")
     lv.add_argument("--det-conf", type=float, default=0.25)
     lv.add_argument("--crop-scale", type=float, default=1.35,
-                   help="검출 박스 대비 DINOv2 crop 크기. 학습 crop에서 잰 값 1.34 (detect 테스트)")
+                   help="DINOv2 crop size relative to the detection box. 1.34 measured on training crops (detect test)")
     lv.add_argument("--max-glasses", type=int, default=4)
-    lv.add_argument("--rois", help="camera.py rois 로 만든 rois.json — 고정 자리 여러 개 (검출기 없이)")
+    lv.add_argument("--rois", help="rois.json made with camera.py rois — several fixed spots (no detector)")
     r = sub.add_parser("rois")
     r.add_argument("--out", default="rois.json")
     r.add_argument("--cam", type=int, default=0)
@@ -367,7 +368,7 @@ def main():
     args = ap.parse_args()
     Path("models/experiments/vision").mkdir(parents=True, exist_ok=True)
     if args.mode == "live" and args.detect and args.rois:
-        raise SystemExit("--detect 와 --rois 중 하나만")
+        raise SystemExit("use only one of --detect and --rois")
     {"collect": collect, "live": live, "probe": probe, "rois": setup_rois}[args.mode](args)
 
 

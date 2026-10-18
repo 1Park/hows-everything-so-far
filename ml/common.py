@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-# 전처리는 보드 Vision 서비스와 공유 (services/vision/preprocess.py)
+# Preprocessing is shared with the board Vision service (services/vision/preprocess.py)
 from services.vision.preprocess import DINO_SIZE as IMG_SIZE, MEAN, STD  # noqa: F401
 from services.vision.preprocess import dino_input as preprocess  # noqa: F401
 
@@ -21,7 +21,7 @@ def load_dataset(root: str):
         for d in Path(root).iterdir()
         if d.is_dir()
     }
-    classes = sorted(c for c, fs in files.items() if fs)  # 빈 폴더(아직 안 찍은 클래스)는 제외
+    classes = sorted(c for c, fs in files.items() if fs)  # skip empty folders (classes not photographed yet)
     paths, labels = [], []
     for ci, c in enumerate(classes):
         paths += files[c]
@@ -37,9 +37,9 @@ def load_model(name: str, device: str):
 
 
 class EmbeddingHead(torch.nn.Module):
-    """백본 → 임베딩. ONNX/ExecuTorch export에도 이 래퍼를 쓴다.
+    """Backbone -> embedding. ONNX/ExecuTorch export uses this wrapper too.
 
-    pool="cls": CLS 토큰 (D)  — 합성 데이터 실험에서 가장 좋았음
+    pool="cls": CLS token (D)  — best in the synthetic-data experiments
     pool="cls_mean": [CLS ; mean(patch)] (2D)
     """
 
@@ -49,7 +49,7 @@ class EmbeddingHead(torch.nn.Module):
         self.pool = pool
 
     def forward(self, pixel_values):
-        h = self.backbone(pixel_values=pixel_values).last_hidden_state  # (B, 1+N, D), layernorm 적용됨
+        h = self.backbone(pixel_values=pixel_values).last_hidden_state  # (B, 1+N, D), layernorm already applied
         if self.pool == "cls":
             return h[:, 0]
         return torch.cat([h[:, 0], h[:, 1:].mean(1)], dim=-1)

@@ -1,21 +1,22 @@
-"""Vision 전처리 — numpy + Pillow만 사용 (보드 서비스에 torch/OpenCV 불필요).
+"""Vision preprocessing — numpy + Pillow only (the board service needs no torch/OpenCV).
 
-ml/ 의 export·calibration·평가 코드도 이 함수를 그대로 import 한다 → 학습/양자화/보드 추론 전처리가 항상 같다.
+Export, calibration and evaluation code under ml/ imports these same functions, so training,
+quantization and board inference always share one preprocessing.
 """
 
 import numpy as np
 from PIL import Image
 
-# DINOv2: 짧은 변 256 bicubic → 224 center crop → ImageNet mean/std, NCHW float32
+# DINOv2: short side 256 bicubic → 224 center crop → ImageNet mean/std, NCHW float32
 MEAN = np.array([0.485, 0.456, 0.406], np.float32)
 STD = np.array([0.229, 0.224, 0.225], np.float32)
 DINO_SIZE = 224
-# YOLO11n export 입력 (ultralytics letterbox와 같은 규칙: 비율 유지 + 회색 114 패딩, RGB 0~1)
+# YOLO11n export input (same rule as ultralytics letterbox: keep aspect + gray 114 padding, RGB 0~1)
 YOLO_SIZE = 640
 
 
 def dino_input(img: Image.Image) -> np.ndarray:
-    """PIL → (1,3,224,224) float32, 연속 메모리 (stride 0이면 ExecuTorch export/raw 파일이 깨진다)."""
+    """PIL → (1,3,224,224) float32, contiguous (stride 0 breaks ExecuTorch export/raw files)."""
     img = img.convert("RGB")
     w, h = img.size
     s = 256 / min(w, h)
@@ -28,7 +29,7 @@ def dino_input(img: Image.Image) -> np.ndarray:
 
 
 def letterbox(img: Image.Image, size: int = YOLO_SIZE):
-    """PIL → (1,3,640,640) float32 RGB 0~1, 그리고 원본 좌표 복원용 (scale, pad_x, pad_y)."""
+    """PIL → (1,3,640,640) float32 RGB 0~1, plus (scale, pad_x, pad_y) to map back to original coordinates."""
     img = img.convert("RGB")
     w, h = img.size
     s = min(size / h, size / w)
@@ -41,18 +42,20 @@ def letterbox(img: Image.Image, size: int = YOLO_SIZE):
 
 
 def center_box(size_wh, frac=0.7):
-    """가운데 정사각형 (x, y, side) — ml/tools/camera.py collect 의 학습 crop 규칙."""
+    """Center square (x, y, side) — the training crop rule from ml/tools/camera.py collect."""
     w, h = size_wh
     s = int(min(h, w) * frac)
     return (w - s) // 2, (h - s) // 2, s
 
 
 def pad_crop(img: Image.Image, xyxy, margin=1.15, fill=(114, 114, 114)) -> Image.Image:
-    """박스를 margin배만 넓혀 자르고, 정사각형의 남는 부분은 회색으로 채운다 (YOLO 모드 기본).
+    """Crop the box widened by margin only, and fill the rest of the square with gray (YOLO mode
+    default).
 
-    정사각형으로 넓혀 자르면 세로로 긴 캔·병이나 화면 가장자리 물체에서 옆 컵이 crop에 같이 들어가
-    분류가 옆 물체를 따라간다 (실측: 캔 옆 커피잔 → 캔을 coffee로). 패딩은 옆 물체 대신 회색을 넣고,
-    박스 중심을 정사각형 중심에 고정해 가장자리에서도 밀리지 않는다.
+    Widening to a square pulls neighboring cups into the crop for tall cans/bottles or objects at the
+    frame edge, and classification follows the neighbor (measured: coffee cup next to a can → can
+    classified as coffee). Padding puts gray there instead, and pinning the box center to the
+    square's center keeps it from shifting at the edges too.
     """
     x0, y0, x1, y1 = xyxy
     W, H = img.size
@@ -67,9 +70,10 @@ def pad_crop(img: Image.Image, xyxy, margin=1.15, fill=(114, 114, 114)) -> Image
 
 
 def square_crop_box(xyxy, size_wh, scale):
-    """박스 → 중심이 같은 정사각형으로 scale배 확장 (x, y, side). 학습 crop처럼 컵 주변 여백을 남긴다.
+    """Box → concentric square scaled by scale (x, y, side). Leaves a margin around the cup, like
+    the training crops.
 
-    scale 1.35 = 학습 crop 크기 / 컵 검출 박스 크기의 중앙값 (실사 jar 사진에서 측정).
+    scale 1.35 = median of training crop size / detected cup box size (measured on real jar photos).
     """
     x0, y0, x1, y1 = xyxy
     w, h = size_wh

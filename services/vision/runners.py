@@ -1,12 +1,13 @@
-""".pte 실행기 — Python 바인딩 / CLI runner 를 같은 인터페이스로 갈아끼운다.
+""".pte runners — Python bindings and CLI runners behind the same interface.
 
   runner.run([x1, x2, ...]) -> [y1, y2, ...]
-    각 x 는 입력 1개짜리 샘플 (예: (1,3,224,224) float32), y 는 첫 번째 출력 (np.ndarray).
-    .pte 는 batch 1 고정 export 이므로 잔 N개 = 샘플 N개.
+    each x is a single-input sample (e.g. (1,3,224,224) float32), y is the first output (np.ndarray).
+    The .pte is exported with batch fixed at 1, so N cups = N samples.
 
-PyRunner : executorch.runtime 으로 모델을 한 번 로드해 두고 반복 호출 (가장 빠름).
-CliRunner: qnn_executor_runner 같은 CLI 를 호출. input_list.txt 한 줄 = 추론 1회라서
-           잔 N개를 runner 1번 실행으로 묶는다 (모델 로딩 비용 1회). 출력은 outputs/output_{i}_0.raw.
+PyRunner : loads the model once via executorch.runtime and calls it repeatedly (fastest).
+CliRunner: calls a CLI such as qnn_executor_runner. One input_list.txt line = one inference, so
+           N cups go into a single runner run (model load cost paid once). Outputs are
+           outputs/output_{i}_0.raw.
 """
 
 import shutil
@@ -20,7 +21,7 @@ import numpy as np
 
 class PyRunner:
     def __init__(self, pte_path):
-        import torch  # executorch.runtime 입출력이 torch.Tensor
+        import torch  # executorch.runtime inputs/outputs are torch.Tensor
         from executorch.runtime import Runtime
 
         self.torch = torch
@@ -40,17 +41,18 @@ class PyRunner:
 
 
 class CliRunner:
-    """qnn_executor_runner 호환 CLI.
+    """qnn_executor_runner-compatible CLI.
 
-    out_shape: 출력 텐서 shape (raw 파일엔 shape 정보가 없음). 예: (1,384), (1,1000), (1,84,8400)
-    out_dtype: 출력 dtype. 양자화 .pte 라도 보통 입출력은 float32 (QDQ가 그래프 안쪽).
-    extra_args: 예) ["--warm_up", "0"]. 보드 runner 의 --help 로 플래그를 먼저 확인할 것.
+    out_shape: output tensor shape (raw files carry no shape). e.g. (1,384), (1,1000), (1,84,8400)
+    out_dtype: output dtype. Even quantized .pte files usually take/return float32 (QDQ is inside
+               the graph).
+    extra_args: e.g. ["--warm_up", "0"]. Check the flags with the board runner's --help first.
     """
 
     resident = False
 
     def __init__(self, binary, pte_path, out_shape, out_dtype="float32", workdir=None, extra_args=(), keep=False):
-        # runner는 workdir에서 실행되므로 상대 경로 바이너리는 절대 경로로 (PATH의 이름이면 그대로)
+        # the runner runs in workdir, so make a relative binary path absolute (bare PATH names stay)
         self.binary = str(Path(binary).resolve()) if Path(binary).exists() else str(binary)
         self.pte = str(Path(pte_path).resolve())
         self.out_shape = tuple(out_shape)
@@ -73,19 +75,19 @@ class CliRunner:
         for i, x in enumerate(xs):
             f = d / f"input_{i}_0.raw"
             np.ascontiguousarray(x, dtype=np.float32).tofile(f)
-            lines.append(str(f))  # 입력이 여러 개인 모델이면 한 줄에 공백으로 이어 붙인다
+            lines.append(str(f))  # models with several inputs list them on one line, space-separated
         (d / "input_list.txt").write_text("\n".join(lines) + "\n")
         cmd = [self.binary, "--model_path", self.pte, "--input_list_path", str(d / "input_list.txt"),
                "--output_folder_path", str(out_dir), *self.extra_args]
         r = subprocess.run(cmd, cwd=d, capture_output=True, text=True)
         self.last_stdout = r.stdout + r.stderr
         if r.returncode != 0:
-            raise RuntimeError(f"runner 실패 (exit {r.returncode}): {' '.join(cmd)}\n{self.last_stdout[-2000:]}")
+            raise RuntimeError(f"runner failed (exit {r.returncode}): {' '.join(cmd)}\n{self.last_stdout[-2000:]}")
         outs = []
         for i in range(len(xs)):
             f = out_dir / f"output_{i}_0.raw"
             if not f.exists():
-                raise RuntimeError(f"{f} 없음 — runner가 기본 입력으로 돌았을 수 있음 (input_list 경로 확인)\n"
+                raise RuntimeError(f"{f} not found — the runner may have used its default input (check the input_list path)\n"
                                    f"{self.last_stdout[-2000:]}")
             outs.append(np.fromfile(f, dtype=self.out_dtype).reshape(self.out_shape))
         return outs
@@ -106,7 +108,7 @@ def make_runner(kind, pte, binary=None, out_shape=None, **kw):
         return ResidentRunner(binary, pte, out_shape, **kw)
     if kind == "cli":
         if not binary or not out_shape:
-            raise SystemExit("--runner cli 는 runner 바이너리 경로와 출력 shape 가 필요")
+            raise SystemExit("--runner cli requires the runner binary path and the output shape")
         return CliRunner(binary, pte, out_shape, **kw)
     raise SystemExit(f"unknown runner {kind}")
 

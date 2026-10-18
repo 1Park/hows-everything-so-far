@@ -1,11 +1,11 @@
-"""보드(VENTUNO Q)에서 QNN .pte를 qnn_executor_runner(NPU)로 돌려 fp32 PyTorch와 비교 + 지연시간.
+"""Runs a QNN .pte on the board (VENTUNO Q) with qnn_executor_runner (NPU), compares it with fp32 PyTorch, and reports latency.
 
-보드의 주최 측 ExecuTorch venv에서 레포 루트 기준으로 실행 (docs/BOARD_RUNBOOK.md "보드 ExecuTorch 설치 기록"):
+Run from the repo root inside the organizers' ExecuTorch venv on the board (docs/board-installation-20261017.md "Board ExecuTorch installation record"):
   source ~/git/executorch/.venv/bin/activate
   PYTHONPATH=$HOME/git:$PWD python -m ml.evaluation.board_npu_check dinov2 --pte ~/model_output/vision/dinov2_small_cls_qnn.pte --images data/calib
   PYTHONPATH=$HOME/git:$PWD python -m ml.evaluation.board_npu_check yolo   --pte ~/model_output/vision/yolo11n_qnn.pte --images data/calib/scenes
 
-2026-10-17 실측: DINOv2 fp16 5.8 ms, fp32 대비 cosine 0.9994 / YOLO11n 16a8w 16.3 ms, fp32 박스 19/21 일치(IoU>0.8).
+Measured 2026-10-17: DINOv2 fp16 5.8 ms, cosine 0.9994 vs fp32 / YOLO11n 16a8w 16.3 ms, 19/21 fp32 boxes matched (IoU>0.8).
 """
 
 import argparse
@@ -27,7 +27,7 @@ RUNNER = Path(os.environ.get("QNN_EXECUTOR_RUNNER", ET / "build-x86/examples/qua
 
 
 def run_npu(pte, xs, work):
-    """xs(list of NCHW float32) → runner 1회 실행(input_list 한 줄 = 1회 추론) → 출력 list, 로그."""
+    """xs (list of NCHW float32) -> one runner call (one input_list line = one inference) -> output list, log."""
     work.mkdir(parents=True, exist_ok=True)
     out = work / "outputs"
     out.mkdir(exist_ok=True)
@@ -44,7 +44,7 @@ def run_npu(pte, xs, work):
                         "--output_folder_path", str(out)], cwd=work, env=env, capture_output=True, text=True)
     log = r.stdout + r.stderr
     if r.returncode != 0:
-        raise SystemExit(f"runner 실패 (exit {r.returncode})\n{log[-2000:]}")
+        raise SystemExit(f"runner failed (exit {r.returncode})\n{log[-2000:]}")
     total = [m.group(0) for m in re.finditer(r"Total \d+ inference took [\d.]+ ms, avg [\d.]+ ms", log)]
     return [np.fromfile(out / f"output_{i}_0.raw", np.float32) for i in range(len(xs))], (total[-1] if total else "")
 

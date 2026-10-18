@@ -1,7 +1,7 @@
-# MCU 준비 — 실기 미검증
+# MCU prep — not verified on hardware
 
-`refill_mock/refill_mock.ino`: Arduino_RouterBridge 기반 LED mock 시퀀스 초안. 별도 Arduino toolchain/core로 빌드·업로드한다. 실제 모터/그리퍼 없음. 제공 board core 설치 전 컴파일/실기 성공을 주장하지 않는다.
+`refill_mock/refill_mock.ino`: draft LED mock sequence based on Arduino_RouterBridge. Build and upload it with a separate Arduino toolchain/core. No real motor/gripper. No claim of successful compilation or on-hardware run is made before the provided board core is installed.
 
-provide_safe, 짧은 handler, nested RPC/logging 금지, millis 기반 nonblocking 상태, command_id 중복 거부, 취소, polling 단절5초 watchdog. [Python RPC 계약](../app/hardware/README.md). LED_BUILTIN active-low는 가이드 예시를 따른 초안이며 보드 pin/polarity 확인 필요. 버튼/occupied는 확보 센서 미정이므로 false인 simulator 값이다. 실제 pin을 임의 지정하지 않았다.
+provide_safe, short handlers, no nested RPC/logging, millis-based nonblocking state, duplicate command_id rejection, cancellation, 5-second watchdog on polling loss. [Python RPC contract](../app/hardware/README.md). LED_BUILTIN active-low is a draft that follows the guide example; the board pin/polarity needs to be checked. Button/occupied are simulator values that are false, because the sensors to use have not been decided. No real pins have been assigned arbitrarily.
 
-호스트 arduino-router는 별도 서비스다. 설치/제약은 [대회 IoT 가이드](../qc-executorch-guide/IoT/README.md).
+The host arduino-router is a separate service. For installation and constraints, see the [competition IoT guide](../qc-executorch-guide/IoT/README.md).

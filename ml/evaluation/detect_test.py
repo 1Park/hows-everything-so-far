@@ -1,10 +1,10 @@
-"""COCO 사전학습 YOLO가 (파인튜닝 없이) 우리 잔을 잡는지 확인.
+"""Check whether COCO-pretrained YOLO (no fine-tuning) detects our glasses.
 
-  1) 단일 잔 실사 (data/real/*): 잔을 찾았나, 어떤 COCO 클래스로 봤나
-  2) 여러 잔 합성 프레임: 실사 crop 2~3장을 가로로 이어 붙여 잔 개수만큼 박스가 나오는지
-결과 이미지: models/experiments/vision/detect/
+  1) Single-glass real photos (data/real/*): was the glass found, and as which COCO class
+  2) Multi-glass composite frames: 2-3 real crops joined side by side; one box per glass?
+Output images: models/experiments/vision/detect/
 
-사용 예:
+Usage:
   python -m ml.evaluation.detect_test --conf 0.15
 """
 
@@ -19,12 +19,12 @@ from ultralytics import YOLO
 
 from ml.common import load_dataset
 
-# 잔으로 볼 수 있는 COCO 클래스
+# COCO classes that can count as a glass
 GLASS_LIKE = {"cup", "wine glass", "bottle", "bowl", "vase"}
 
 
 def detect(model, img, conf):
-    # agnostic_nms: 같은 잔에 cup+vase처럼 클래스만 다른 박스가 겹치면 하나만 남김
+    # agnostic_nms: when boxes on the same glass differ only by class (e.g. cup+vase), keep one
     r = model.predict(img, conf=conf, agnostic_nms=True, verbose=False)[0]
     out = []
     for b in r.boxes:
@@ -46,7 +46,7 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     paths, y, classes = load_dataset(args.data)
 
-    # 1) 단일 잔
+    # 1) Single glass
     print(f"== single-glass photos ({len(paths)}) conf>={args.conf}")
     found, top_names, confs = 0, Counter(), []
     for i, p in enumerate(paths):
@@ -65,7 +65,7 @@ def main():
           + (f" | best conf mean {np.mean(confs):.2f}, min {np.min(confs):.2f}" if confs else ""))
     print("top class per image:", dict(top_names.most_common()))
 
-    # 2) 여러 잔: 서로 다른 실사 crop 2~3장을 가로로 이어 붙임
+    # 2) Multiple glasses: join 2-3 different real crops side by side
     print(f"\n== multi-glass composites ({args.n_composite})")
     rng = random.Random(0)
     exact = 0

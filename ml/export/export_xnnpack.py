@@ -1,11 +1,11 @@
-"""B단계/CPU 기준선: DINOv2 CLS 임베딩을 XNNPACK(CPU) .pte로 export + PyTorch와 출력 비교.
+"""Stage B / CPU baseline: export the DINOv2 CLS embedding to an XNNPACK (CPU) .pte + compare outputs with PyTorch.
 
-YOLO는 ultralytics 내장 export 사용:  (cd models && ../python -c "from ultralytics import YOLO; YOLO('yolo11n.pt').export(format='executorch')")
+YOLO uses ultralytics' built-in export:  (cd models && ../python -c "from ultralytics import YOLO; YOLO('yolo11n.pt').export(format='executorch')")
 DINOv2:                              python -m ml.export.export_xnnpack
-  → models/local/vision/dinov2_small_cls_xnnpack.pte  (입력 (1,3,224,224) common.preprocess, 출력 (1,384), fp32)
+  → models/local/vision/dinov2_small_cls_xnnpack.pte  (input (1,3,224,224) common.preprocess, output (1,384), fp32)
 
-Mac에서 만든 XNNPACK .pte는 보드(Linux aarch64)에서도 그대로 쓸 수 있다. 단 보드 runner가 XNNPACK 백엔드를
-포함해 빌드돼 있어야 한다 (qnn_executor_runner엔 없을 수 있음 → executor_runner 또는 Python 바인딩 확인).
+An XNNPACK .pte built on the Mac also works as-is on the board (Linux aarch64), but the board runner must be built with
+the XNNPACK backend (qnn_executor_runner may lack it -> check executor_runner or the Python binding).
 """
 
 import argparse

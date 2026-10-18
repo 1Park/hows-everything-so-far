@@ -1,12 +1,15 @@
 """Vision external backend — `VISION_MODEL_BACKEND=external`, `VISION_ADAPTER=services.vision.backend:create_backend`.
 
-설정 (common.config.Settings — 선택한 env 파일 + 프로세스 환경변수 우선, models/README.md 규칙):
-  VISION_MODEL_PATH  bundle 디렉터리 (bundle.json 포함). 상대 경로는 레포 루트 기준.
-                     예) models/local/vision/<name> (Mac, XNNPACK .pte) / models/board/vision/<name> (보드, QNN .pte)
-  VISION_RUNNER_BIN  bundle이 cli runner를 쓸 때만: qnn_executor_runner 등 실행 파일 경로
+Settings (common.config.Settings — the selected env file, process env vars take precedence;
+see models/README.md):
+  VISION_MODEL_PATH  bundle directory (contains bundle.json). Relative paths are from the repo root.
+                     e.g. models/local/vision/<name> (Mac, XNNPACK .pte) /
+                     models/board/vision/<name> (board, QNN .pte)
+  VISION_RUNNER_BIN  only when the bundle uses the cli runner: path to qnn_executor_runner or similar
 
-모델·runner를 한 번 로드해 재사용하고, 추론은 전용 스레드 1개에서 직렬로 돌려 event loop를 막지 않는다.
-bundle이 없거나 로드에 실패하면 ready=False + 명시적 오류. fixture/원격 자동 전환 없음.
+Models and runners are loaded once and reused; inference runs serially on one dedicated thread so it
+never blocks the event loop. A missing or unloadable bundle gives ready=False with an explicit error.
+No automatic fixture/remote fallback.
 """
 
 import asyncio
@@ -27,7 +30,8 @@ class DinoVisionBackend:
     source = "external"
 
     def __init__(self, bundle_path=None, runner_bin=None, runners=None, settings=None):
-        # .env.board 값은 REFILL_ENV_FILE → Settings 로만 전달되고 os.environ 엔 없으므로 Settings 에서 읽는다
+        # .env.board values reach Settings only through REFILL_ENV_FILE and never land in os.environ,
+        # so read them from Settings
         if bundle_path is None or runner_bin is None:
             settings = settings or load_settings()
         raw = str(bundle_path or settings.vision_model_path)
@@ -46,7 +50,7 @@ class DinoVisionBackend:
         from services.vision.pipeline import VisionPipeline
 
         if self.path is None:
-            raise FileNotFoundError("VISION_MODEL_PATH 가 설정되지 않음")
+            raise FileNotFoundError("VISION_MODEL_PATH is not set")
         return VisionPipeline(self.path, runner_bin=self.runner_bin, runners=self._runners,
                               resident=True, worker_bin=self.worker_bin, timeout=self.timeout)
 
@@ -60,7 +64,7 @@ class DinoVisionBackend:
             self.error = None
             log.info("vision bundle loaded: %s", self.path)
             return True
-        except Exception as e:  # 다음 호출에서 다시 시도
+        except Exception as e:  # retry on the next call
             self.error = f"{type(e).__name__}: {e}"
             log.error("vision bundle load failed: %s", self.error)
             self._loading = None
@@ -86,7 +90,7 @@ class DinoVisionBackend:
         return objects
 
     async def infer(self, data: bytes, content_type: str, scene_id: str, scenario: str):
-        # scenario 는 fixture 전용 (external 은 무시)
+        # scenario is fixture-only (ignored by external)
         if not await self._ensure():
             raise ApiError("vision_not_ready", f"Vision model is not loaded ({self.error})", 503, True)
         try:

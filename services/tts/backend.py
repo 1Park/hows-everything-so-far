@@ -1,12 +1,15 @@
-"""Piper TTS: 앞부분(발음·길이 예측·flow)은 CPU onnxruntime, 디코더(HiFi-GAN)는 보드 NPU.
+"""Piper TTS: front end (phonemes, duration prediction, flow) on CPU onnxruntime, HiFi-GAN decoder
+on the board NPU.
 
-voice .onnx 하나를 두 그래프로 나눈다: <voice>.front.onnx (입력 길이마다 출력 길이가 바뀜 → CPU)
-와 <voice>.dec.onnx (Conv/ConvTranspose만 → NPU). NPU 디코더는 길이를 고정해 export해야 하므로
-<voice>.dec_f{N}.pte 를 길이별로 두고, 한 줄의 latent 길이 n 이상인 가장 작은 N을 골라 0으로 채운 뒤
-결과를 n*256 샘플로 자른다. 가장 긴 N보다 길면 문장별로 나누고, 그래도 맞는 게 없으면 CPU 디코더로 만든다.
+One voice .onnx is split into two graphs: <voice>.front.onnx (output length depends on input → CPU)
+and <voice>.dec.onnx (Conv/ConvTranspose only → NPU). The NPU decoder has to be exported at a fixed
+length, so there is one <voice>.dec_f{N}.pte per length: pick the smallest N ≥ the line's latent
+length n, zero-pad to N, and trim the output to n*256 samples. Lines longer than the largest N are
+split into sentences; anything that still does not fit goes through the CPU decoder.
 
-보드 실측 (2026-10-18, 데모 문장 7개): HTTP 왕복 중앙값 CPU 495 ms / NPU 디코더 373 ms,
-디코더만 CPU 274 ms / NPU fp16 185 ms(384 고정), CPU 대비 cosine 0.9999. export: ml/export/export_piper_decoder.py.
+Measured on the board (2026-10-18, 7 demo sentences): median HTTP round trip CPU 495 ms / NPU
+decoder 373 ms; decoder alone CPU 274 ms / NPU fp16 185 ms (fixed 384), cosine 0.9999 vs CPU.
+export: ml/export/export_piper_decoder.py.
 """
 
 import io
@@ -19,15 +22,15 @@ import numpy as np
 
 from common.config import ROOT
 
-HOP = 256  # Piper medium: latent 1프레임 = 256 샘플
-# 데모용 말투: 기본보다 12% 빠르게, 억양 변화 크게 (기본 0.667 / 1.0 / 0.8)
+HOP = 256  # Piper medium: 1 latent frame = 256 samples
+# Demo voice: 12% faster than default, livelier intonation (defaults 0.667 / 1.0 / 0.8)
 NOISE_SCALE, LENGTH_SCALE, NOISE_W = 0.8, 0.88, 0.9
-SENTENCE_GAP = 0.15  # 문장 사이 무음(초)
+SENTENCE_GAP = 0.15  # silence between sentences (seconds)
 PEAK = 0.89  # -1 dBFS
 
 
 def split_voice(voice_path):
-    """voice .onnx → (front.onnx, dec.onnx). 이미 있으면 그대로 쓴다."""
+    """voice .onnx → (front.onnx, dec.onnx). Reuses the files if they already exist."""
     import onnx
     from onnx.utils import extract_model
 
@@ -104,8 +107,8 @@ class PiperTTS:
         return z.astype(np.float32)
 
     def synthesize(self, text):
-        """text → WAV bytes. 한 줄 전체를 디코더 1번으로 만들고(NPU 길이에 들어가면 NPU),
-        가장 긴 NPU 길이를 넘으면 문장별로 나눠 각각 만든다."""
+        """text → WAV bytes. Decodes the whole line in one pass (on the NPU if it fits an NPU
+        length); lines longer than the largest NPU length are split and decoded per sentence."""
         with self.lock:
             t0 = time.perf_counter()
             sentences = [ids for ids in (self.voice.phonemes_to_ids(p) for p in self.voice.phonemize(text)) if ids]

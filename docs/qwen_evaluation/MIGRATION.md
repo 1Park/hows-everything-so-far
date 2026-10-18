@@ -1,8 +1,8 @@
-# 아카이브 출처
+# Archive provenance
 
-`iot-hackathon-brainstorm/evaluation/`에서 이전한 원본 목록과 이전 전 SHA-256이다. 코드·결과는 Markdown 블록에 보존했으며 현재 제품 실행 지침과 구분한다.
+List of original files moved from `iot-hackathon-brainstorm/evaluation/`, with their SHA-256 before the move. Code and results are preserved in Markdown blocks and are kept separate from the current product run instructions.
 
-| 원본 | 이전 파일 | 원본 SHA-256 |
+| Original | Moved file | Original SHA-256 |
 |---|---|---|
 | `evaluation/analyze_qwen.py` | [analyze_qwen.py.md](analyze_qwen.py.md) | `a3d75e6e7e1cbf522df3bec027a1ea1d7302efee72edb0323227e4fd1a350024` |
 | `evaluation/analyze_stt.py` | [analyze_stt.py.md](analyze_stt.py.md) | `93e10272af8a5242af69a66a4e3d94a53abe45a9cdc9cd436ecb9510ac8cd0f0` |

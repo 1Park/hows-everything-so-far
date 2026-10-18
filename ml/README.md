@@ -1,71 +1,71 @@
 # ML — training, evaluation, export
 
-모델을 **만드는 환경**을 둔다. 보드에서 모델을 **실행하는 서버**는 `services/`에 있다. 앱의 Docker 없는 배포와 별개로, 주최 측이 요구하는 Linux Docker 학습·QNN export 환경은 이 폴더에서 관리한다.
+Holds the environment for **building** models. The servers that **run** models on the board are in `services/`. Separate from the app's Docker-free deployment, the Linux Docker training and QNN export environment required by the organizers is managed in this folder.
 
-| 위치 | 넣을 내용 |
+| Location | Contents |
 | --- | --- |
-| [`Dockerfile`](Dockerfile), [`docker-run.sh`](docker-run.sh) | x86-64 QNN export·HTP 시뮬레이터 환경 (Mac은 Rosetta). 주최 측 checkout/SDK로 교체 가능 |
-| [`requirements.txt`](requirements.txt) | 앱과 분리한 학습·평가·export 의존성 (Mac, Python 3.13) |
-| [tools/](tools/) | 카메라 수집·live 확인 (`camera.py`), CLI runner 테스트용 가짜 runner |
-| [configs/](configs/README.md) | 모델·데이터·학습·전처리·양자화·export 설정 |
-| [training/](training/README.md) | 모델 head·학습·fine-tuning·checkpoint 생성 |
-| [evaluation/](evaluation/README.md) | 이미지 모델 오프라인 평가·변환 전후 비교 |
-| [export/](export/README.md) | 보드용 `.pte` 변환·검증·bundle metadata 생성 |
+| [`Dockerfile`](Dockerfile), [`docker-run.sh`](docker-run.sh) | x86-64 QNN export and HTP simulator environment (Rosetta on Mac). Can be replaced with the organizers' checkout/SDK |
+| [`requirements.txt`](requirements.txt) | Training, evaluation and export dependencies kept separate from the app (Mac, Python 3.13) |
+| [tools/](tools/) | Camera collection and live check (`camera.py`), fake runner for CLI runner tests |
+| [configs/](configs/README.md) | Model, data, training, preprocessing, quantization and export settings |
+| [training/](training/README.md) | Model heads, training, fine-tuning, checkpoint creation |
+| [evaluation/](evaluation/README.md) | Offline image model evaluation, comparison before and after conversion |
+| [export/](export/README.md) | `.pte` conversion for the board, validation, bundle metadata creation |
 
-학습과 export의 지원 환경은 서로 다를 수 있고, Docker만 설치했다고 Linux x86-64 도구와 ARM 호스트가 자동으로 호환되는 것은 아니다.
+The supported environments for training and export may differ, and installing Docker does not automatically make Linux x86-64 tools compatible with an ARM host.
 
 ```text
-data/ 원본·라벨 → training → models/ checkpoint
-                          → evaluation
-                          → export / 양자화 → models/ 배포 bundle
-                                                ↓
-                            services/에서 ExecuTorch로 추론
+data/ raw, labels → training → models/ checkpoint
+                             → evaluation
+                             → export / quantization → models/ deployment bundle
+                                                        ↓
+                                     inference with ExecuTorch in services/
 ```
 
-현재 Vision은 YOLO11n 검출과 DINOv2 특징·선형 head를 사용한다. 보드 LLM은 제공 Gemma4 bundle이며 이 폴더에서 학습하지 않는다.
+Vision currently uses YOLO11n detection plus DINOv2 features and a linear head. The board LLM is the provided Gemma4 bundle and is not trained in this folder.
 
-데이터는 `data/`, 가중치·산출물은 `models/`에 저장하고 Git에서 제외한다. 재현에 필요한 설정·획득 방법·모델 버전·데이터 split 정보는 코드와 함께 기록한다. 배포 bundle에는 모델·필요한 tokenizer 외에도 입력 shape/dtype/layout, 전처리·라벨, 출력 규격, 모델 출처, runtime·SDK 버전, target SoC·export 설정을 포함한다.
+Data is stored in `data/` and weights and outputs in `models/`, both excluded from Git. Record the settings, collection methods, model versions and data split information needed for reproduction alongside the code. Besides the model and any required tokenizer, a deployment bundle includes the input shape/dtype/layout, preprocessing and labels, output spec, model source, runtime and SDK versions, and target SoC and export settings.
 
-보드 서버는 이 폴더의 학습 환경을 import하거나 학습용 Docker를 실행하지 않는다. 기존 Qwen 발화 평가 기록은 `docs/qwen_evaluation/`에 보존하며 음료 평가를 추가할 때는 기존 결과와 구분한다.
+The board server does not import this folder's training environment or run the training Docker. The existing Qwen utterance evaluation records are kept in `docs/qwen_evaluation/`; when adding drink evaluations, keep them separate from the existing results.
 
-## 현재 구현 — DINOv2 Vision (2026-10-17)
+## Current implementation — DINOv2 Vision (2026-10-17)
 
-결과 기록: [docs/vision_evaluation](../docs/vision_evaluation/README.md). 런타임은 [services/vision](../services/vision/README.md).
+Result records: [docs/vision_evaluation](../docs/vision_evaluation/README.md). The runtime is in [services/vision](../services/vision/README.md).
 
-### 환경
+### Environment
 
 ```sh
-python3.13 -m venv ml/.venv && ml/.venv/bin/pip install -r ml/requirements.txt   # Mac 학습·평가·XNNPACK export
-docker build --platform linux/amd64 -t refill-ml-export ml                          # x86 QNN export·시뮬레이터
+python3.13 -m venv ml/.venv && ml/.venv/bin/pip install -r ml/requirements.txt   # Mac training, evaluation, XNNPACK export
+docker build --platform linux/amd64 -t refill-ml-export ml                          # x86 QNN export and simulator
 ```
 
-모든 명령은 레포 루트에서 `python -m ml.<폴더>.<스크립트>`로 실행한다 (`ml/.venv/bin/python`). Docker는 `ml/docker-run.sh python -m ...`.
-첫 Docker export 때 ExecuTorch가 QAIRT SDK 2.37(~3GB)과 libc++(~5GB)를 volume `refill-qnn-cache`에 받는다.
+Run all commands from the repo root as `python -m ml.<folder>.<script>` (`ml/.venv/bin/python`). For Docker, use `ml/docker-run.sh python -m ...`.
+On the first Docker export, ExecuTorch downloads QAIRT SDK 2.37 (~3GB) and libc++ (~5GB) into the volume `refill-qnn-cache`.
 
-### 흐름
+### Flow
 
-| 단계 | 명령 | 산출물 |
+| Step | Command | Output |
 |---|---|---|
-| 데이터 수집 | `python -m ml.tools.camera collect --drinks water coke coffee` (iTerm/터미널.app — 카메라 권한). 캔·병은 `--classes other` | `data/real/<drink>__<level>/`, `data/real/other/` |
-| 합성 데이터 | `python -m ml.training.gen_synthetic` | `data/synthetic/` (파이프라인 검증용) |
-| 정확도 | `python -m ml.evaluation.eval_fewshot --data data/real --shots 3 5 10` | `models/experiments/vision/fewshot_*.json` |
-| 컵 검출 | `python -m ml.evaluation.detect_test` | COCO YOLO가 컵을 잡는지 |
-| CPU .pte | `python -m ml.export.export_xnnpack`, YOLO는 ultralytics `format="executorch"` | `models/local/vision/` |
+| Data collection | `python -m ml.tools.camera collect --drinks water coke coffee` (iTerm/Terminal.app — camera permission). For cans and bottles, `--classes other` | `data/real/<drink>__<level>/`, `data/real/other/` |
+| Synthetic data | `python -m ml.training.gen_synthetic` | `data/synthetic/` (for pipeline validation) |
+| Accuracy | `python -m ml.evaluation.eval_fewshot --data data/real --shots 3 5 10` | `models/experiments/vision/fewshot_*.json` |
+| Cup detection | `python -m ml.evaluation.detect_test` | Whether COCO YOLO detects the cups |
+| CPU .pte | `python -m ml.export.export_xnnpack`; for YOLO, ultralytics `format="executorch"` | `models/local/vision/` |
 | NPU .pte | `ml/docker-run.sh python -m ml.export.export_qnn --model {yolo,dinov2} [--quant fp16] --soc_model QCS8275 --build_folder /tmp --compile_only` | `models/experiments/vision/qnn/<soc>_<quant>/` |
-| NPU 검증 | `ml/docker-run.sh python -m ml.evaluation.qnn_sim_check {yolo,dinov2} <pte>` | HTP 시뮬레이터 출력 vs fp32 |
-| 보드 export·NPU | 보드 ExecuTorch venv에서 `python -m ml.export.export_qnn ... --soc_model QCS8275`, `python -m ml.evaluation.board_npu_check {dinov2,yolo} --pte <pte> --images <dir>` | 보드 실측 (설치·환경변수는 [BOARD_RUNBOOK](../docs/board-installation-20261017.md)) |
-| 보드 LLM | `scripts/board_llm.sh status / use gemma4 / ask "..."` | 주최 측 Gemma `.pte` 전환 실행 |
-| 학습 crop | `python -m ml.training.make_crops --data data/real --bundle <bundle> --runner-bin <runner> --out data/crops` | YOLO 모드: 학습 사진 → 추론과 같은 pad crop (`data/crops/`, 옆 물체는 `data/crops_extra/`) |
-| 보드 카메라 수집 | `python -m ml.tools.board_collect --bundle <bundle> --runner-bin <runner> --labels water__low water__mid ...` | Controller `/api/frame`(실제 640×480) → 왼쪽부터 라벨 붙인 YOLO crop |
-| head 학습 | `python -m ml.training.make_head --data data/crops --dino-pte <pte> --runner {py,cli} --class-weight balanced` (**배포할 .pte로**) | head JSON |
+| NPU validation | `ml/docker-run.sh python -m ml.evaluation.qnn_sim_check {yolo,dinov2} <pte>` | HTP simulator output vs fp32 |
+| Board export and NPU | In the board ExecuTorch venv, `python -m ml.export.export_qnn ... --soc_model QCS8275`, `python -m ml.evaluation.board_npu_check {dinov2,yolo} --pte <pte> --images <dir>` | Board measurements (installation and env vars: [BOARD_RUNBOOK](../docs/board-installation-20261017.md)) |
+| Board LLM | `scripts/board_llm.sh status / use gemma4 / ask "..."` | Switches to and runs the organizers' Gemma `.pte` |
+| Training crops | `python -m ml.training.make_crops --data data/real --bundle <bundle> --runner-bin <runner> --out data/crops` | YOLO mode: training photos → the same pad crops as inference (`data/crops/`, neighboring objects in `data/crops_extra/`) |
+| Board camera collection | `python -m ml.tools.board_collect --bundle <bundle> --runner-bin <runner> --labels water__low water__mid ...` | Controller `/api/frame` (real 640×480) → YOLO crops labeled from left to right |
+| Head training | `python -m ml.training.make_head --data data/crops --dino-pte <pte> --runner {py,cli} --class-weight balanced` (**with the .pte that will be deployed**) | head JSON |
 | bundle | `python -m ml.export.make_bundle --out models/{local,board}/vision/<name> ...` | `bundle.json` + .pte + head |
 
-### 꼭 지킬 것
+### Rules
 
-- **YOLO 모드면 head도 YOLO crop으로 학습한다** (`make_crops`). 사진 전체로 학습하면 배경 물체를 같이 배운다: coke__full 사진 절반에 콜라캔이 옆에 있어 캔 crop이 coke로 나왔다. 가장자리에서 잘린 옆 물체 crop을 other로 넣으면 화면 끝에 걸린 진짜 잔까지 버린다 → 넣지 않는다
-- **head는 보드에서 실제로 돌릴 .pte가 낸 특징으로 학습한다.** fp32 head를 양자화 모델에 쓰면 크게 떨어진다 (int8 근사 88.8%→68.2%, QNN 16a8w 24%).
-- DINOv2 QNN은 **fp16 우선** (fp32 대비 cosine 0.9992). 16a8w는 0.58, 16a16w는 망가짐.
-- 일반 ExecuTorch 1.5.1엔 QCS8275 타깃이 없다. 주최 측 checkout/SDK로 export하고, SM8650(같은 HTP v75) 산출물은 리허설용으로만 쓴다.
-- 보드 SDK 버전과 export SDK 버전을 맞춘다 (`QNN_SDK_ROOT_HOST=<qairt> ml/docker-run.sh ...`).
-- 입력 텐서는 연속 메모리여야 한다 (stride 0이면 export·raw 입력 실패) — `services/vision/preprocess.py`가 보장.
-- HF DINOv2는 그대로 export 안 됨 (위치 임베딩 bicubic 보간, 그래프 안 attention mask expand) → `export_qnn.build_dinov2` 래퍼 사용. YOLO는 640 입력으로 1회 실행해 앵커를 상수화 (`build_yolo`).
+- **In YOLO mode, train the head on YOLO crops too** (`make_crops`). Training on whole photos also learns the background objects: half of the coke__full photos had a cola can next to the cup, and can crops came out as coke. Adding crops of neighboring objects cut off at the edges as other would also discard real glasses at the edge of the frame → do not add them
+- **Train the head on features produced by the .pte that will actually run on the board.** Using an fp32 head on a quantized model drops accuracy sharply (int8 approximation 88.8%→68.2%, QNN 16a8w 24%).
+- For DINOv2 QNN, **prefer fp16** (cosine 0.9992 vs fp32). 16a8w gives 0.58, and 16a16w is broken.
+- Stock ExecuTorch 1.5.1 has no QCS8275 target. Export with the organizers' checkout/SDK, and use SM8650 (same HTP v75) outputs only for rehearsal.
+- Match the board SDK version and the export SDK version (`QNN_SDK_ROOT_HOST=<qairt> ml/docker-run.sh ...`).
+- Input tensors must be contiguous in memory (with stride 0, export and raw input fail) — guaranteed by `services/vision/preprocess.py`.
+- HF DINOv2 does not export as is (bicubic interpolation of position embeddings, attention mask expand inside the graph) → use the `export_qnn.build_dinov2` wrapper. YOLO is run once with a 640 input to turn the anchors into constants (`build_yolo`).

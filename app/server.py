@@ -124,7 +124,7 @@ def create_app(settings=None, clients=None, hardware=None):
                 },
                 "tts": tts,
                 "video": {"mode": video.mode, "error": video.error},
-                # UI가 리필 대상 박스를 Controller와 같은 기준으로 표시하도록
+                # Lets the UI mark refill-target boxes with the same thresholds as the Controller
                 "policy": {
                     "min_confidence": settings.min_confidence,
                     "low_fill_threshold": settings.low_fill_threshold,

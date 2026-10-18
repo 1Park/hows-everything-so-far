@@ -1,10 +1,11 @@
 #!/bin/zsh
-# x86-64 QNN export/시뮬레이터 컨테이너 실행 (Apple Silicon Mac: Rosetta 에뮬레이션). 레포 루트를 /work 로 마운트.
+# Runs the x86-64 QNN export/simulator container (Apple Silicon Mac: Rosetta emulation). Mounts the repo root at /work.
 #   docker build --platform linux/amd64 -t refill-ml-export ml
 #   ml/docker-run.sh python -m ml.export.export_qnn --model yolo --soc_model SM8650 --build_folder /tmp --compile_only
-# 첫 실행 때 ExecuTorch가 QAIRT SDK(~3GB)와 libc++(~5GB)를 받아 named volume 에 캐시한다 (QNN_CACHE_VOLUME, 기본 refill-qnn-cache).
-# 다운로더는 라이브러리 경로를 자기 프로세스 안에서만 잡아서 libQnnHtp.so 가 libc++.so.1 을 못 찾음 → 여기서 고정.
-# 주최 측 SDK를 쓰려면: QNN_SDK_ROOT_HOST=/path/to/qairt ml/docker-run.sh ...  (/qairt 로 마운트)
+# On the first run ExecuTorch downloads the QAIRT SDK (~3GB) and libc++ (~5GB) and caches them in a named volume
+# (QNN_CACHE_VOLUME, default refill-qnn-cache).
+# The downloader sets the library path only inside its own process, so libQnnHtp.so cannot find libc++.so.1 -> pin it here.
+# To use the organizers' SDK: QNN_SDK_ROOT_HOST=/path/to/qairt ml/docker-run.sh ...  (mounted at /qairt)
 cd "$(dirname "$0")/.."
 CACHE=/root/.cache/executorch/qnn
 SDK=${QNN_SDK_ROOT_HOST:+/qairt}

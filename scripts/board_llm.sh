@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# 보드 LLM 전환 스크립트 — 주최 측 Gemma 번들(QCS8275 .pte)을 qnn_llama_runner(NPU)로 실행한다.
-# 번들 위치: ~/model_output/gemma3_1b, ~/model_output/gemma4_e2b (주최 측 Drive "ExecuTorch/Ventuno Q", docs/BOARD_RUNBOOK.md)
+# Board LLM switcher — runs the organizer's Gemma bundles (QCS8275 .pte) with qnn_llama_runner (NPU).
+# Bundles: ~/model_output/gemma3_1b, ~/model_output/gemma4_e2b (organizer Drive "ExecuTorch/Ventuno Q",
+# docs/BOARD_RUNBOOK.md)
 #
-#   llm.sh status                     선택된 모델, 남은 메모리, 모델별 필요 메모리
-#   llm.sh use gemma3|gemma4|auto     쓸 모델 고정 (auto = 실행할 때마다 남은 메모리로 고름)
-#   llm.sh ask [-m 모델] [-s 시스템] [-n seq_len] [--raw] "질문"
-#                                     선택된 모델로 1회 생성. 답만 stdout, 속도/메모리는 stderr
+#   llm.sh status                     selected model, available memory, memory needed per model
+#   llm.sh use gemma3|gemma4|auto     pin the model (auto = pick by available memory on every run)
+#   llm.sh ask [-m model] [-s system] [-n seq_len] [--raw] "prompt"
+#                                     one generation with the selected model. Answer only on stdout, speed/memory on stderr
 #
-# auto 규칙: MemAvailable ≥ gemma4 최대 메모리 + 여유(AUTO_MARGIN_MB)면 gemma4, 아니면 gemma3.
-# 필요 메모리(peak_mb)는 보드에서 /usr/bin/time -v 로 잰 최대 RSS(hybrid 모드).
+# auto rule: gemma4 if MemAvailable ≥ gemma4 peak memory + margin (AUTO_MARGIN_MB), otherwise gemma3.
+# Required memory (peak_mb) is the peak RSS measured on the board with /usr/bin/time -v (hybrid mode).
 set -euo pipefail
 
 ET="${EXECUTORCH_ROOT:-$HOME/git/executorch}"
@@ -18,7 +19,7 @@ export ADSP_LIBRARY_PATH="${ADSP_LIBRARY_PATH:-/usr/lib}"
 STATE="${LLM_STATE_FILE:-$HOME/model_output/llm_selected}"
 AUTO_MARGIN_MB="${AUTO_MARGIN_MB:-1500}"
 
-# 이름 | 폴더 | .pte | runner decoder_model_version | 컨텍스트 | 최대 RSS(MB, hybrid 실측)
+# name | folder | .pte | runner decoder_model_version | context | peak RSS (MB, measured in hybrid mode)
 MODELS="gemma3|$HOME/model_output/gemma3_1b|gemma3-1b_qcs8275_ctxt-5000.pte|gemma3|5000|1400
 gemma4|$HOME/model_output/gemma4_e2b|gemma4_e2b_QCS8275_ctxt_2000.pte|gemma4|2000|2200"
 
@@ -26,7 +27,7 @@ field() { echo "$MODELS" | awk -F'|' -v n="$1" -v i="$2" '$1==n {print $i}'; }
 avail_mb() { awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo; }
 selected() { [ -f "$STATE" ] && cat "$STATE" || echo gemma4; }
 
-resolve() {  # auto → 실제 모델 이름
+resolve() {  # auto → concrete model name
   local sel="$1"
   if [ "$sel" != auto ]; then echo "$sel"; return; fi
   local need4; need4=$(( $(field gemma4 6) + AUTO_MARGIN_MB ))
@@ -73,27 +74,29 @@ cmd_ask() {
   local name; name=$(resolve "${model:-$(selected)}")
   local dir pte ver ctx peak; dir=$(field "$name" 2); pte=$(field "$name" 3); ver=$(field "$name" 4); ctx=$(field "$name" 5); peak=$(field "$name" 6)
   [ -n "$dir" ] || { echo "unknown model: $name" >&2; exit 2; }
-  [ -f "$dir/$pte" ] || { echo "$name: $dir/$pte 없음" >&2; exit 3; }
+  [ -f "$dir/$pte" ] || { echo "$name: $dir/$pte not found" >&2; exit 3; }
   local avail; avail=$(avail_mb)
-  if [ "$avail" -lt $(( peak + 300 )) ]; then echo "$name: 메모리 부족 (available ${avail}MB < need ~$(( peak + 300 ))MB)" >&2; exit 4; fi
+  if [ "$avail" -lt $(( peak + 300 )) ]; then echo "$name: not enough memory (available ${avail}MB < need ~$(( peak + 300 ))MB)" >&2; exit 4; fi
   seq="${seq:-$ctx}"
   local args=(--decoder_model_version "$ver" --model_path "$dir/$pte" --tokenizer_path "$dir/tokenizer.json"
               --eval_mode 1 --seq_len "$seq" --temperature 0)
   if [ -n "$system" ]; then
-    # gemma3: runner가 system을 model 차례 뒤에 붙임 → Gemma3 형식대로 첫 user 메시지 앞에 합친다
+    # gemma3: the runner puts system after the model turn → prepend it to the first user message,
+    # as the Gemma3 format expects
     if [ "$ver" = gemma3 ]; then prompt="$system"$'\n\n'"$prompt"; else args+=(--system_prompt "$system"); fi
   fi
   local tmp attempt; tmp=$(mktemp -d)
   for attempt in 1 2 3; do
     ( cd "$tmp" && "$RUNNER" "${args[@]}" --prompt "$prompt" --output_path "$tmp/out.txt" > "$tmp/log" 2>&1 ) && break
-    # 직전 LLM 실행이 끝난 직후엔 NPU(HTP) 메모리 반환이 늦어 context 생성이 실패한다 → 잠깐 기다렸다 재시도
+    # Right after a previous LLM run, NPU (HTP) memory is released late and context creation fails
+    # → wait briefly and retry
     if [ "$attempt" -lt 3 ] && grep -qE "Failed to find available PD|Can't create context from binary" "$tmp/log"; then
-      echo "[$name] NPU 메모리가 아직 해제되지 않음 — ${attempt}회째 재시도 (5초 대기)" >&2; sleep 5; continue
+      echo "[$name] NPU memory not released yet — attempt ${attempt} failed, retrying in 5s" >&2; sleep 5; continue
     fi
-    echo "$name: runner 실패" >&2; grep -E "ERROR|Error|error" "$tmp/log" | tail -8 >&2; rm -rf "$tmp"; exit 5
+    echo "$name: runner failed" >&2; grep -E "ERROR|Error|error" "$tmp/log" | tail -8 >&2; rm -rf "$tmp"; exit 5
   done
   if [ "$raw" = 1 ]; then cat "$tmp/out.txt"; else
-    # 마지막 model 차례 이후 텍스트에서 종료 토큰 제거
+    # Keep the text after the last model turn and strip end-of-turn tokens
     python3 - "$tmp/out.txt" <<'PY'
 import re, sys
 t = open(sys.argv[1], encoding="utf-8", errors="replace").read()

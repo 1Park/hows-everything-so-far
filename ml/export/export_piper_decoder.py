@@ -1,17 +1,18 @@
-"""Piper TTS 디코더(HiFi-GAN)를 길이 고정 ExecuTorch QNN(fp16) .pte로 export — 보드 ExecuTorch venv에서 실행.
+"""Export the Piper TTS decoder (HiFi-GAN) to a fixed-length ExecuTorch QNN (fp16) .pte — run in the board ExecuTorch venv.
 
-Piper voice .onnx 는 앞부분(발음·길이 예측·flow, 입력마다 출력 길이가 바뀜)과 디코더(Conv/ConvTranspose만)로
-나눈다 (services/tts/backend.split_voice). 디코더만 latent 길이 N 프레임으로 고정해 NPU용으로 export하고,
-서비스는 문장마다 n ≤ N 인 가장 작은 .pte를 골라 0으로 채워 돌린 뒤 n*256 샘플로 자른다.
+The Piper voice .onnx is split into a front part (phonemes, duration prediction, flow; output length varies
+per input) and the decoder (Conv/ConvTranspose only) (services/tts/backend.split_voice). Only the decoder is
+exported for the NPU, with the latent length fixed at N frames. Per sentence the service picks the smallest
+.pte with n <= N, zero-pads, runs it, and trims the output to n*256 samples.
 
   source ~/git/executorch/.venv/bin/activate   # + pip install onnx2torch piper-tts
   export PYTHONPATH=$HOME/git:$PWD FLATC_EXECUTABLE=... QNN_SDK_ROOT=~/qnn_sdk_root   (BOARD_RUNBOOK)
   python -m ml.export.export_piper_decoder --voice models/board/tts/en_US-hfc_female-medium.onnx \
       --frames 384 --soc_model QCS8275 --build_folder ~/git/executorch/build-x86 --compile_only
-  → models/board/tts/en_US-hfc_female-medium.dec_f384.pte  (11 MB, 2분 35초, NPU 미지원 연산 0)
+  → models/board/tts/en_US-hfc_female-medium.dec_f384.pte  (11 MB, 2 min 35 s, 0 ops unsupported on NPU)
 
-2026-10-18 보드: 데모 한 줄의 latent는 150~335 프레임 → 384 하나로 처리. 128·256 프레임 export는 QNN
-"VTCM Allocation" 단계에서 15분 넘게 멈춰 중단했다 (384는 같은 단계 2.3초).
+2026-10-18 board: a demo line's latent is 150-335 frames -> a single 384 covers it. The 128/256-frame exports hung at the QNN
+"VTCM Allocation" step for over 15 min and were aborted (384 takes 2.3 s at the same step).
 """
 
 import numpy as np
@@ -27,7 +28,7 @@ SAMPLES = ["Your water is running low.", "Would you like a refill?", "Is that co
 
 
 def sample_latents(voice_path, front_path, frames):
-    """앞부분 그래프로 실제 문장 latent를 만들어 export 입력 예시로 쓴다 (fp16이라 보정용 아님)."""
+    """Build real sentence latents with the front graph to use as export sample inputs (fp16, so not for calibration)."""
     import onnxruntime as ort
     from piper import PiperVoice
 
@@ -48,8 +49,8 @@ def sample_latents(voice_path, front_path, frames):
 
 def main():
     ap = setup_common_args_and_variables()
-    ap.add_argument("--voice", required=True, help="Piper voice .onnx (같은 폴더에 .onnx.json)")
-    ap.add_argument("--frames", type=int, required=True, help="고정 latent 길이 (1프레임 = 256 샘플)")
+    ap.add_argument("--voice", required=True, help="Piper voice .onnx (.onnx.json in the same folder)")
+    ap.add_argument("--frames", type=int, required=True, help="fixed latent length (1 frame = 256 samples)")
     args = ap.parse_args()
     front, dec = split_voice(args.voice)
     m = onnx.load(str(dec))

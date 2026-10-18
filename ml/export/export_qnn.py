@@ -1,20 +1,20 @@
-"""YOLO11n / DINOv2(CLS 임베딩) → QCS8275 QNN HTP .pte (A단계, NPU).
+"""YOLO11n / DINOv2 (CLS embedding) -> QCS8275 QNN HTP .pte (stage A, NPU).
 
-QNN Python 바인딩(PyQnnManagerAdaptor)이 x86-64 전용 → Mac에선 Docker linux/amd64 컨테이너에서 실행한다.
-컨테이너 안 ExecuTorch 1.5.1 이 QAIRT SDK를 자동으로 받는다 (ml/Dockerfile, ml/docker-run.sh).
+The QNN Python binding (PyQnnManagerAdaptor) is x86-64 only -> on the Mac, run in a Docker linux/amd64 container.
+ExecuTorch 1.5.1 inside the container downloads the QAIRT SDK automatically (ml/Dockerfile, ml/docker-run.sh).
 
   ml/docker-run.sh python -m ml.export.export_qnn --model yolo   --soc_model QCS8275 --build_folder /tmp --compile_only
   ml/docker-run.sh python -m ml.export.export_qnn --model dinov2 --quant fp16 --soc_model QCS8275 --build_folder /tmp --compile_only
-  → models/experiments/vision/qnn/<soc>_<quant>/{yolo11n,dinov2_small_cls}_qnn.pte (+ *_io.json 입출력 규격)
+  → models/experiments/vision/qnn/<soc>_<quant>/{yolo11n,dinov2_small_cls}_qnn.pte (+ *_io.json I/O spec)
 
-- 일반 ExecuTorch 1.5.1 에는 QCS8275 타깃이 없다 → 주최 측 보드 checkout/SDK 로 실행해야 한다 (ml/export/README.md).
-  같은 HTP v75 인 SM8650 으로 export 하면 파이프라인 리허설만 된다 (보드 배포용 아님).
-- 양자화: YOLO 16a8w 기본. DINOv2 는 16a8w에서 fp32 대비 cosine 0.58 → fp16 우선 (cosine 0.9992), 16a16w 는 망가짐.
-- 만든 .pte 는 컨테이너의 HTP 시뮬레이터로 보드 없이 검증: python -m ml.evaluation.qnn_sim_check
-- 가이드 DINOv2 예제(examples/qualcomm/oss_scripts/dino_v2.py)와 같은 build_executorch_binary 경로.
-  예제는 Dinov2ForImageClassification(ImageNet 1000 logits), 여기선 CLS 임베딩(384) 출력.
+- Stock ExecuTorch 1.5.1 has no QCS8275 target -> run with the organizers' board checkout/SDK (ml/export/README.md).
+  Exporting for SM8650 (same HTP v75) only rehearses the pipeline (not for board deployment).
+- Quantization: YOLO defaults to 16a8w. DINOv2 at 16a8w gets cosine 0.58 vs fp32 -> prefer fp16 (cosine 0.9992); 16a16w breaks it.
+- Check the resulting .pte without the board on the container's HTP simulator: python -m ml.evaluation.qnn_sim_check
+- Same build_executorch_binary path as the guide's DINOv2 example (examples/qualcomm/oss_scripts/dino_v2.py).
+  The example uses Dinov2ForImageClassification (ImageNet 1000 logits); here we output the CLS embedding (384).
 
-Mac 네이티브(Docker 없이)는 --dry-run 만: torch.export 캡처 + XNNPACK int8 근사로 양자화 민감도 확인.
+Native Mac (no Docker) supports --dry-run only: torch.export capture + XNNPACK int8 approximation to gauge quantization sensitivity.
   python -m ml.export.export_qnn --model dinov2 --dry-run
 """
 
@@ -33,7 +33,7 @@ QUANT = ["16a8w", "16a16w", "8a8w", "fp16"]
 
 
 def build_yolo(weights):
-    """ultralytics Exporter와 같은 준비: fuse + Detect.export=True → 출력 (1,84,8400) 단일 텐서."""
+    """Same prep as the ultralytics Exporter: fuse + Detect.export=True -> single (1,84,8400) output tensor."""
     from ultralytics import YOLO
     from ultralytics.nn.modules import Detect
 
@@ -41,8 +41,9 @@ def build_yolo(weights):
     for m in model.modules():
         if isinstance(m, Detect):
             m.export, m.dynamic, m.format = True, False, "executorch"
-    # 640 고정 입력으로 한 번 실행 → Detect가 anchors/strides를 캐시(self.shape 일치)해서 export 그래프엔 상수로만 남는다.
-    # 안 하면 make_anchors의 torch.full(fill_value=stride Node)이 그래프에 남아 QNN partitioner가 실패.
+    # Run once with a fixed 640 input -> Detect caches anchors/strides (self.shape matches),
+    # so they stay constants in the export graph. Otherwise make_anchors' torch.full
+    # (fill_value=stride Node) stays in the graph and the QNN partitioner fails.
     with torch.no_grad():
         model(torch.zeros(1, 3, 640, 640))
 
@@ -59,10 +60,11 @@ def build_yolo(weights):
 
 
 class FixedEmbeddings(torch.nn.Module):
-    """HF Dinov2Embeddings를 224 고정 입력용으로 바꾼 것 (export 전용, 출력은 원본과 동일).
+    """HF Dinov2Embeddings adapted for a fixed 224 input (export only, output identical to the original).
 
-    - 위치 임베딩 bicubic 보간(37x37 → 16x16)을 미리 계산해 상수로 → 그래프에서 interpolate 제거 (HTP 미지원 가능)
-    - cls_token.expand → repeat : expand는 stride 0 텐서라 ExecuTorch가 거부함
+    - Precompute the bicubic position-embedding interpolation (37x37 -> 16x16) as a constant
+      -> no interpolate in the graph (HTP may not support it)
+    - cls_token.expand -> repeat: expand yields a stride-0 tensor, which ExecuTorch rejects
     """
 
     def __init__(self, emb, size=224):
@@ -81,10 +83,10 @@ class FixedEmbeddings(torch.nn.Module):
 
 
 class Dinov2CLS(torch.nn.Module):
-    """export용 DINOv2: embeddings → 레이어 12개 → layernorm → CLS.
+    """DINOv2 for export: embeddings -> 12 layers -> layernorm -> CLS.
 
-    Dinov2Model.forward를 거치지 않는 이유: transformers 5는 마스크가 없어도 그래프 안에서
-    (1,1,257,257) 어텐션 마스크를 expand(stride 0)로 만들고, ExecuTorch가 이를 거부한다.
+    Why we skip Dinov2Model.forward: even without a mask, transformers 5 builds a (1,1,257,257)
+    attention mask with expand (stride 0) inside the graph, and ExecuTorch rejects it.
     """
 
     def __init__(self, backbone):
@@ -96,7 +98,8 @@ class Dinov2CLS(torch.nn.Module):
     def forward(self, pixel_values):
         h = self.embeddings(pixel_values)
         for layer in self.layers:
-            # transformers 5.15(보드)는 forward(hidden_states)만, 5.20(Mac)은 attention_mask 선택 인자 — 위치 인자 1개로 호출
+            # transformers 5.15 (board) takes forward(hidden_states) only, 5.20 (Mac) adds an optional
+            # attention_mask — call with one positional arg
             out = layer(h)
             h = out[0] if isinstance(out, tuple) else out
         return self.layernorm(h)[:, 0]
@@ -110,12 +113,13 @@ def build_dinov2(name):
     model = Dinov2CLS(backbone).eval()
     with torch.no_grad():
         diff = (model(x) - EmbeddingHead(backbone)(x)).abs().max().item()
-    assert diff < 1e-4, f"export용 DINOv2 출력이 원본과 다름: {diff}"
+    assert diff < 1e-4, f"export DINOv2 output differs from the original: {diff}"
     return model
 
 
 def calib_inputs(model_kind, dirs, n, seed=0):
-    """양자화 calibration용 실제 입력. 데모 환경과 비슷한 사진일수록 좋다 (평가용과 분리 권장)."""
+    """Real inputs for quantization calibration. Photos closer to the demo setting work better
+    (keep them separate from eval data)."""
     from services.vision.preprocess import letterbox
 
     paths = [p for d in dirs for p in sorted(Path(d).glob("*/*")) if p.suffix.lower() in {".jpg", ".png", ".jpeg"}]
@@ -128,12 +132,12 @@ def calib_inputs(model_kind, dirs, n, seed=0):
             x = preprocess(Image.open(p))
         out.append((torch.from_numpy(x),))
     if not out:
-        raise SystemExit(f"calibration 이미지 없음: {dirs}")
+        raise SystemExit(f"no calibration images: {dirs}")
     return out
 
 
 def dry_run(model, data, kind):
-    """Mac: torch.export 캡처 확인 + XNNPACK int8 PTQ로 양자화 민감도 근사 (QNN 8a8w와 같지는 않음)."""
+    """Mac: check torch.export capture + approximate quantization sensitivity with XNNPACK int8 PTQ (not the same as QNN 8a8w)."""
     from executorch.backends.xnnpack.quantizer.xnnpack_quantizer import (
         XNNPACKQuantizer,
         get_symmetric_quantization_config,
@@ -159,7 +163,7 @@ def dry_run(model, data, kind):
         box_err = (ref[:, :4] - got[:, :4]).abs().mean().item()
         score_err = (ref[:, 4:] - got[:, 4:]).abs().max().item()
         print(f"[dry-run] int8 sim: box coord mean|diff| {box_err:.2f}px, class score max|diff| {score_err:.3f}")
-        print("          (박스 좌표 0~640과 점수 0~1이 한 텐서라 8bit에선 점수 해상도가 떨어짐 → 16a8w 권장)")
+        print("          (box coords 0-640 and scores 0-1 share one tensor, so 8-bit loses score resolution -> use 16a8w)")
     return m
 
 
@@ -177,12 +181,12 @@ def main():
         ap = argparse.ArgumentParser()
     ap.add_argument("--model", choices=["yolo", "dinov2"], required=True)
     ap.add_argument("--quant", choices=QUANT, default="16a8w",
-                    help="16a8w(기본) / 16a16w(정확도 우선) / 8a8w(가장 빠름) / fp16(SoC가 지원할 때만)")
+                    help="16a8w (default) / 16a16w (accuracy first) / 8a8w (fastest) / fp16 (only if the SoC supports it)")
     ap.add_argument("--weights", default="models/local/vision/yolo11n.pt")
     ap.add_argument("--dinov2", default="facebook/dinov2-small")
     ap.add_argument("--calib", nargs="+", default=["data/real", "data/synthetic"])
     ap.add_argument("--n-calib", type=int, default=64)
-    ap.add_argument("--artifact", help="기본: models/experiments/vision/qnn/<soc>_<quant>")
+    ap.add_argument("--artifact", help="default: models/experiments/vision/qnn/<soc>_<quant>")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
@@ -206,13 +210,13 @@ def main():
     from executorch.backends.qualcomm.utils.utils import get_soc_to_chipset_map
 
     if args.soc_model not in get_soc_to_chipset_map():
-        raise SystemExit(f"이 checkout에 {args.soc_model} 타깃이 없음 — 보드 지원 checkout/SDK를 써야 함 (가이드 Troubleshooting)")
+        raise SystemExit(f"no {args.soc_model} target in this checkout — use a checkout/SDK with board support (guide Troubleshooting)")
     Path(args.artifact).mkdir(parents=True, exist_ok=True)
     quant_dtype = {"16a8w": QuantDtype.use_16a8w, "16a16w": QuantDtype.use_16a16w, "8a8w": QuantDtype.use_8a8w,
                    "fp16": None}[args.quant]
     qnn_config = QnnConfig.load_config(args.config_file if args.config_file else args)
     Path(args.artifact, f"{name}_io.json").write_text(json.dumps(io, indent=2, ensure_ascii=False))
-    # compile_only면 build_executorch_binary 안에서 .pte 저장 후 sys.exit(0)
+    # with compile_only, build_executorch_binary saves the .pte and calls sys.exit(0)
     build_executorch_binary(
         model=model,
         qnn_config=qnn_config,
