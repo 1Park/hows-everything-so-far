@@ -6,7 +6,7 @@
 
 UI의 **Demo tools & diagnostics → Capture mode → Automatic**을 선택한다. 카메라는 계속 live로 보이고 종류 안정성 진행 시간을 표시한다. 처음 선택할 때 브라우저 스피커도 활성화한다. 이후 페이지를 새로고침하면 브라우저 정책상 Enable sound를 다시 눌러야 할 수 있다.
 
-1. 기본 0.25초 간격으로 최신 원본 이미지를 Vision에 전달한다. 동시에 여러 추론을 요청하지 않으며 느린 호출은 기다린다.
+1. 기본 0.5초 간격(초당 2회)으로 최신 원본 이미지를 Vision에 전달한다. 동시에 여러 추론을 요청하지 않으며 느린 호출은 기다린다.
 2. **객체 수와 종류별 개수**가 5초간 같아야 한다. 예: water 1 / coffee 2 / unknown 1. object_id·검출 순서·박스 좌표·잔량은 종류 안정성 기준이 아니다. 물체 추적/위치 고정 판정은 구현하지 않는다.
 3. 객체가 없거나 개수/종류/source가 바뀌거나 호출/카메라 오류가 발생하면 안정성 구간을 다시 시작한다. 정상 간격의 3배(최소 1초)보다 큰 관측 공백도 구간을 리셋한다.
 4. 5초 구간에서 **둘 이상 bbox가 겹치는 영역의 합집합 면적**이 가장 작은 이미지를 선택한다. 면적은 원본 대비 normalized 면적이며 세 박스가 겹쳐도 같은 영역을 중복 계산하지 않는다. 동률이면 최신 이미지를 선택한다.
@@ -31,7 +31,7 @@ UI의 **Demo tools & diagnostics → Capture mode → Automatic**을 선택한�
 
 ```dotenv
 CAPTURE_MODE=manual
-AUTO_CAPTURE_INTERVAL_SECONDS=0.25
+AUTO_CAPTURE_INTERVAL_SECONDS=0.5
 AUTO_CAPTURE_STABLE_SECONDS=5
 OBSERVE_INTERVAL_SECONDS=0
 ```

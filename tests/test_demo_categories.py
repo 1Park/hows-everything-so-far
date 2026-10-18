@@ -36,7 +36,7 @@ async def test_opt_in_menu_and_disable_invalidates_card(controller, group, varia
     assert c.phase == "not_understood" and c.card is None
     await c.set_demo_features(True)
     assert c.allowed_items() == variants
-    assert c.state()["speech"] == c.message  # New board TTS names the same choices as the screen.
+    assert c.state()["speech"] == c.message == f"How is everything? Can I get you some more {group}?"
     await say(c, phrase)
     assert c.phase == "card" and c.card.item == variants[1]
     old = confirmation(c)

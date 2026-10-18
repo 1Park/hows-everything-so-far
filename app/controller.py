@@ -5,10 +5,10 @@ from collections import deque
 from app.hardware.io import BridgeHardware, MockHardware
 from app.audio import BoardMicrophone
 from app.events import EventLog
-from app.speech import speech_for
+from app.speech import refill_offer, speech_for
 from common.api import ApiError, log
 from common.contracts import CurrentRequest, RequestCard, StateEvent, uid
-from common.vision_categories import available_drinks, VISION_CATEGORY_MAP, VISION_CATEGORY_GROUPS
+from common.vision_categories import available_drinks
 
 # What the board shows for each controller phase. Linux owns this mapping so a new
 # state needs no firmware change; the MCU only applies the colour it is given.
@@ -100,10 +100,8 @@ class Controller:
             "transcript": self.transcript,
             "stt_source": self.stt_source,
             "capture": self.capture_status,
-            "speech": (self.offer_message(self.target) if self.phase == "offered" and self.target
-                       and (self.untrained_categories or self.target.item in ("coke", "coffee"))
-                       else speech_for(self.phase, self.target, self.card,
-                                       self.settings.item_confirm_threshold, self.allowed_items())),
+            "speech": speech_for(self.phase, self.target, self.card,
+                                 self.settings.item_confirm_threshold, self.allowed_items()),
         }
 
     def show_phase_led(self, phase):
@@ -272,14 +270,8 @@ class Controller:
             return self.state()
 
     def offer_message(self, target):
-        """A grouped observation always asks for the member, regardless of confidence."""
-        grouped = len(VISION_CATEGORY_GROUPS.get(VISION_CATEGORY_MAP.get(target.item), ())) > 1
-        if self.untrained_categories:
-            options = available_drinks([target.item], demo=True)
-            return "Would you like a refill? Please choose " + ", ".join(d.replace("_", " ") for d in options) + "."
-        if grouped:
-            return "Would you like a refill? Is that coke or coffee?"
-        return f"Would you like a refill of {target.item}?"
+        """Offer the observed category; the customer's reply selects its member."""
+        return refill_offer(target.item)
 
     def check_target(self, body):
         if (

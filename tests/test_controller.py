@@ -195,20 +195,18 @@ def scene(item, item_confidence, fill=0.15):
 
 
 @pytest.mark.parametrize(
-    ("item", "item_confidence", "asks"),
-    [("coke", 0.6, True), ("coffee", 0.79, True), ("coke", 0.95, True),
-     ("coke", None, True), ("water", 0.5, False)],
+    ("item", "item_confidence", "category"),
+    [("coke", 0.6, "coke"), ("coffee", 0.79, "coke"), ("coke", 0.95, "coke"),
+     ("coke", None, "coke"), ("water", 0.5, "water")],
 )
-async def test_offer_asks_drink_when_coke_coffee_uncertain(controller, item, item_confidence, asks):
+async def test_offer_names_category_and_reply_selects_drink(controller, item, item_confidence, category):
     c = controller
     c.clients.vision = scene(item, item_confidence)
     await observe(c)
     assert c.phase == "offered"
     message = c.state()["message"]
-    if asks:
-        assert "coke or coffee" in message
-    else:
-        assert message == f"Would you like a refill of {item}?"
+    assert message == f"How is everything? Can I get you some more {category}?"
+    assert c.state()["speech"] == message
     await say(c, "Coffee, please")
     if item == "water":
         assert c.phase == "not_understood" and c.card is None

@@ -4,20 +4,24 @@ Short, friendly English lines. The screen keeps its own longer message; speech s
 board microphone can start recording soon after the offer. None means stay silent.
 """
 
+from common.vision_categories import VISION_CATEGORY_MAP
+
 
 def say(item):
     return item.replace("_", " ")  # orange_juice -> "orange juice"
 
 
+def refill_offer(item):
+    category = VISION_CATEGORY_MAP.get(item, item)
+    if category == "unknown":
+        return "How is everything? Can I get you a refill?"
+    return f"How is everything? Can I get you some more {say(category)}?"
+
+
 def speech_for(phase, target, card, item_confirm_threshold, allowed_items=None):
     item = card.item if card else (target.item if target else None)
     if phase == "offered" and target is not None:
-        if target.item == "unknown":
-            return "Your glass is empty. Would you like water, coke, coffee, or orange juice?"
-        if (target.item in ("coke", "coffee") and target.item_confidence is not None
-                and target.item_confidence < item_confirm_threshold):
-            return "Would you like a refill? Is that coke or coffee?"
-        return f"Your {say(target.item)} is running low. Would you like a refill?"
+        return refill_offer(target.item)
     if phase == "card" and card is not None:
         return f"One more {say(card.item)}, got it. Please press Confirm."
     if phase == "not_understood":

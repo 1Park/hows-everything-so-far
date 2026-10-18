@@ -24,14 +24,14 @@ def card(item):
 
 
 def test_speech_lines_name_the_drink_and_cover_each_outcome():
-    assert speech_for("offered", obj("water"), None, 0.8) == "Your water is running low. Would you like a refill?"
-    assert "coke or coffee" in speech_for("offered", obj("coke", 0.6), None, 0.8)
-    assert "empty" in speech_for("offered", obj("unknown"), None, 0.8)
+    assert speech_for("offered", obj("water"), None, 0.8) == "How is everything? Can I get you some more water?"
+    assert speech_for("offered", obj("coke", 0.6), None, 0.8) == "How is everything? Can I get you some more coke?"
+    assert speech_for("offered", obj("unknown"), None, 0.8) == "How is everything? Can I get you a refill?"
     assert speech_for("card", obj("water"), card("coffee"), 0.8).startswith("One more coffee")
     assert "call me if you need anything" in speech_for("declined", None, None, 0.8)
     assert "didn't catch that" in speech_for("not_understood", None, None, 0.8)
     assert speech_for("done", obj("water"), card("coke"), 0.8) == "Your coke refill is on its way."
-    assert speech_for("offered", obj("orange_juice"), None, 0.8).startswith("Your orange juice is running low")
+    assert speech_for("offered", obj("orange_juice"), None, 0.8) == "How is everything? Can I get you some more orange juice?"
     assert speech_for("card", None, card("orange_juice"), 0.8).startswith("One more orange juice")
     assert speech_for("observing", None, None, 0.8) is None and speech_for("skipped", None, None, 0.8) is None
 
@@ -103,7 +103,7 @@ def test_controller_serves_the_current_state_line(monkeypatch):
             c.post("/api/observe").raise_for_status()
             ws.receive_json()
             s = ws.receive_json()["state"]
-        assert s["phase"] == "offered" and s["speech"].startswith("Your water is running low")
+        assert s["phase"] == "offered" and s["speech"] == "How is everything? Can I get you some more water?"
         r = c.get(f"/api/speech/{s['session_id']}/{s['sequence']}")
         assert r.status_code == 200 and r.headers["content-type"] == "audio/wav"
         assert spoken == [s["speech"]]
