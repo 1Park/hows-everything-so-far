@@ -196,6 +196,28 @@ At the demo spot, when a red snack bag overlapped in front of or behind an orang
 
 Remaining limits: checked only on the one problem scene and sessions from the same day. During the demo, it is safer to keep bags and cans from overlapping the glasses.
 
+## Head classifier benchmark and LDA head (2026-10-18, board bundle v6)
+
+Question: would a different classifier on top of the frozen DINOv2 features, or data augmentation, beat the logistic-regression head?
+
+- Data: the v5e training set rebuilt from `data/real` (476 YOLO pad crops + 35 bag/can/bottle crops beside the orange juice glasses as `other`), plus the board-camera sessions (snack bag, cans, bottles, orange juice glasses; not augmented, always in training). Features are from the **board NPU** DINOv2 fp16 `.pte` (Mac fp32 features gave the same ranking; mean cosine 0.9994).
+- Augmentation (training folds only, ×4 per crop): flip, 85–100% shift/scale, brightness/contrast/saturation ±20%, and with 70% probability a board-quality degradation (downscale to 30–60%, JPEG 55–85, light blur). Hue is untouched because it separates the drinks.
+- Evaluation: 5-fold grouped CV (5 consecutive shots per group), 5 seeds; refill decision with the board policy (fill ≤ 0.35, confidence ≥ 0.6). Drink accuracy uses the visual categories (coffee and coke are one `coke` category since 871ad85).
+
+| Head (board features) | Aug | Refill decision | Low/empty caught | Full/mid false refill | Cups dropped | Drink |
+|---|:-:|---:|---:|---:|---:|---:|
+| Logistic C=0.1 (v5e) | - | 95.9 ± 0.2% | 127/144 | 2.2/310 | 2.0 | 99.0% |
+| Logistic C=0.1 | ✓ | 96.9 ± 0.2% | 132/144 | 2.2/310 | 2.0 | 98.7% |
+| **LDA shrinkage (v6)** | **✓** | **98.4 ± 0.4%** | **139/144** | 2.4/310 | 1.0 | 99.1% |
+| LDA shrinkage | - | 97.5 ± 0.4% | 136/144 | 3.0/310 | 1.4 | 99.0% |
+
+Single-seed screening of other heads with augmentation: linear SVM 95.8%, RBF SVM 95.3% (drops 2 of 3 real glasses cut off at the frame bottom), kNN k=7 93.6% (6/310 false refills), MLP 256 94.7%. Test-time augmentation (averaging flipped/shifted crops) did not help (LDA 98.4% → 98.2%, logistic 96.9% → 96.4%). A zero-shot CLIP ViT-B/32 check on the same crops was also below the head (drinks 96.5%; 90.6% on the boxes where the head is unsure) and was not adopted.
+
+Before deploying, v5e and v6 were run end to end on five saved board scenes (snack bag scene, an older frame with cut-off glasses and cans, and three real demo captures): the same boxes were refill targets in all five, the snack bag stayed dropped, and the orange juice glass beside it moved from 0.42 to 0.50 fill (about 60% in reality). One nearly empty glass with a red can behind it changed from `coke` to `water`, which matches the clear remnant in it.
+
+- Trade-off: LDA posteriors are sharp, so v6 confidence is usually 0.9–1.0 and the 0.6 confidence floor filters less. CV false refills did not increase, but watch this in the rehearsal.
+- v6 was trained with an ad hoc script on the board features (StandardScaler → `LinearDiscriminantAnalysis(solver="lsqr", shrinkage="auto")`, exported as `W = coef_`, `b = intercept_`); `make_head` does not have an LDA or augmentation option yet.
+
 ## Board NPU measurements (2026-10-17, VENTUNO Q / QCS8275, organizer ExecuTorch + QNN 2.49)
 
 | Model | Format | Latency | Accuracy |
