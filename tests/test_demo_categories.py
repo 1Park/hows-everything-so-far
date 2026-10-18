@@ -36,6 +36,7 @@ async def test_opt_in_menu_and_disable_invalidates_card(controller, group, varia
     assert c.phase == "not_understood" and c.card is None
     await c.set_demo_features(True)
     assert c.allowed_items() == variants
+    assert c.state()["speech"] == c.message  # New board TTS names the same choices as the screen.
     await say(c, phrase)
     assert c.phase == "card" and c.card.item == variants[1]
     old = confirmation(c)
@@ -86,3 +87,18 @@ def test_demo_does_not_expand_visual_schema():
     with pytest.raises(ValidationError):
         ObservedObject(object_id="cup", bbox=dict(x1=0, y1=0, x2=1, y2=1), item="soda", confidence=1)
     assert parse_interpretation('{"intent":"refill","item":"coke_zero"}').item == "coke_zero"
+
+
+async def test_orange_juice_stays_available_in_both_modes(controller):
+    from services.vision.labels import to_observation
+    assert to_observation([1.0], ["orange_juice__low"])["item"] == "orange_juice"
+    c = controller
+    c.clients.vision = scene("orange_juice", 1.0)
+    await observe(c)
+    assert c.allowed_items() == ["orange_juice"]
+    await say(c, "OJ please")
+    assert c.card.item == "orange_juice"
+    await c.set_demo_features(True)
+    assert c.allowed_items() == ["orange_juice"]
+    await say(c, "Orange juice please")
+    assert c.card.item == "orange_juice"

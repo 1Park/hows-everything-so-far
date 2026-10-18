@@ -63,6 +63,14 @@ class Settings(BaseModel):
     # Extra whisper servers the accuracy check also transcribes with, as
     # "label=url" pairs. Comparison only; the demo still uses stt_whisper_url.
     stt_compare: str = ""
+    # Board TTS (services/tts): Piper voice, decoder on the NPU when decoder .pte files exist.
+    tts_backend: Literal["disabled", "http"] = "disabled"
+    tts_base_url: HttpUrl = "http://127.0.0.1:8003"
+    tts_host: str = "127.0.0.1"
+    tts_port: int = Field(8003, ge=1, le=65535)
+    tts_voice_path: str = ""  # Piper voice .onnx (front/decoder graphs are split next to it)
+    tts_decoder_dir: str = ""  # holds <voice>.dec_f<frames>.pte; empty = CPU decoder only
+    tts_worker_bin: str = ""  # resident QNN worker; empty = reuse vision_worker_bin
     camera_source: str = ""  # empty = explicit static fixture, no implicit /dev/video0
     # Capture faster than the stream so a streamed frame is never a stale one.
     # Tune on the board: the encode loop is the cost, not the network.

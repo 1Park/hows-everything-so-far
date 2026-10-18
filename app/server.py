@@ -115,6 +115,8 @@ def create_app(settings=None, clients=None, hardware=None):
             content={
                 "ready": ok,
                 "dependencies": dependencies,
+                # Optional: without TTS the tablet falls back to the bundled WAV prompts.
+                "tts": await clients.tts_ready(),
                 "video": {"mode": video.mode, "error": video.error},
                 # UI가 리필 대상 박스를 Controller와 같은 기준으로 표시하도록
                 "policy": {
@@ -318,6 +320,17 @@ def create_app(settings=None, clients=None, hardware=None):
         return StreamingResponse(
             video.frames(), media_type="multipart/x-mixed-replace; boundary=frame"
         )
+
+    @app.get("/api/speech/{session_id}/{sequence}")
+    async def speech(session_id: str, sequence: int):
+        # Only the current state's line: the tablet asks for what it should say right now.
+        state = controller.state()
+        if session_id != state["session_id"] or sequence != state["sequence"]:
+            raise ApiError("stale_speech", "This state has already moved on", 409)
+        if not state["speech"]:
+            raise ApiError("no_speech", "Nothing to say for this state", 404)
+        return Response(await clients.speech(state["speech"]), media_type="audio/wav",
+                        headers={"Cache-Control": "no-store"})
 
     @app.get("/api/snapshot/{session_id}")
     async def snapshot(session_id: str):

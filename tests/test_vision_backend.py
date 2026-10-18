@@ -121,7 +121,7 @@ def test_category_mapping_is_read_only():
     from app.server import create_app
     with TestClient(create_app(Settings(qwen_backend="fixture"))) as client:
         mapping = client.get("/api/vision-categories").json()
-        assert mapping["groups"] == {"water": ["water"], "coke": ["coke", "coffee"]}
+        assert mapping["groups"] == {"water": ["water"], "coke": ["coke", "coffee"], "orange_juice": ["orange_juice"]}
         assert mapping["editable"] is False
         assert client.post("/api/vision-categories", json={"groups": {}}).status_code == 405
 

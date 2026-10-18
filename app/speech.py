@@ -1,0 +1,37 @@
+"""What the assistant says out loud for each state (spoken by the board TTS, played on the tablet).
+
+Short, friendly English lines. The screen keeps its own longer message; speech stays brief so the
+board microphone can start recording soon after the offer. None means stay silent.
+"""
+
+
+def say(item):
+    return item.replace("_", " ")  # orange_juice -> "orange juice"
+
+
+def speech_for(phase, target, card, item_confirm_threshold, allowed_items=None):
+    item = card.item if card else (target.item if target else None)
+    if phase == "offered" and target is not None:
+        if target.item == "unknown":
+            return "Your glass is empty. Would you like water, coke, coffee, or orange juice?"
+        if (target.item in ("coke", "coffee") and target.item_confidence is not None
+                and target.item_confidence < item_confirm_threshold):
+            return "Would you like a refill? Is that coke or coffee?"
+        return f"Your {say(target.item)} is running low. Would you like a refill?"
+    if phase == "card" and card is not None:
+        return f"One more {say(card.item)}, got it. Please press Confirm."
+    if phase == "not_understood":
+        if allowed_items is not None:
+            return "Sorry, I didn't catch that. Please choose " + ", ".join(say(d) for d in allowed_items) + "."
+        return "Sorry, I didn't catch that. Water, coke, coffee, or orange juice?"
+    if phase == "declined":
+        return "No problem. Just call me if you need anything."
+    if phase == "cancelled":
+        return "Okay, cancelled. Call me anytime."
+    if phase == "done" and item:
+        return f"Your {say(item)} refill is on its way."
+    if phase == "expired":
+        return "I'll check back on you later."
+    if phase == "error":
+        return "Sorry, something went wrong. Please try again."
+    return None

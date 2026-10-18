@@ -5,8 +5,8 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-Drink = Literal["water", "coke", "coffee"]
-RequestedDrink = Literal["water", "coke", "coffee", "sparkling_water", "soda", "coke_zero"]
+Drink = Literal["water", "coke", "coffee", "orange_juice"]
+RequestedDrink = Literal["water", "coke", "coffee", "orange_juice", "sparkling_water", "soda", "coke_zero"]
 Source = Literal["fixture", "external", "mlx", "executorch"]
 
 
@@ -66,7 +66,7 @@ class STTResult(Contract):
 
 class CurrentRequest(Contract):
     item: RequestedDrink
-    allowed_items: list[RequestedDrink] = Field(default_factory=lambda: ["water", "coke", "coffee"])
+    allowed_items: list[RequestedDrink] = Field(default_factory=lambda: ["water", "coke", "coffee", "orange_juice"])
 
 
 class Interpretation(Contract):
@@ -184,6 +184,10 @@ class CaptureStatus(Contract):
     error: str | None = None
 
 
+class SpeechRequest(Contract):
+    text: str = Field(min_length=1, max_length=400)
+
+
 class StateSnapshot(Contract):
     allowed_items: list[RequestedDrink] = Field(default_factory=list)
     untrained_categories: bool = False
@@ -206,6 +210,8 @@ class StateSnapshot(Contract):
     # How long board capture runs, so the page can show the time passing.
     audio_seconds: int = 6
     capture: CaptureStatus | None = None
+    # What the assistant says for this state (board TTS); None = stay silent.
+    speech: str | None = None
 
 
 class StateEvent(Contract):

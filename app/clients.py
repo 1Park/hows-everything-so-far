@@ -73,6 +73,34 @@ class ModelClients:
     async def stt(self, data, content_type):
         return await self.media("stt", data, content_type)
 
+    async def speech(self, text):
+        """Board TTS → WAV bytes. Same text is cached: the demo repeats a handful of lines."""
+        if self.settings.tts_backend != "http":
+            raise ApiError("tts_disabled", "Board TTS is not enabled", 404)
+        cache = self.__dict__.setdefault("_speech_cache", {})
+        if text in cache:
+            return cache[text]
+        try:
+            r = await self.http.post(str(self.settings.tts_base_url).rstrip("/") + "/v1/speak", json={"text": text})
+        except httpx.HTTPError:
+            raise ApiError("tts_unavailable", "Board TTS is unavailable", 502, True) from None
+        if r.status_code != 200 or r.headers.get("content-type", "").split(";")[0] != "audio/wav":
+            raise ApiError("tts_failed", "Board TTS could not speak this line", 502, True)
+        if len(cache) >= 64:
+            cache.pop(next(iter(cache)))
+        cache[text] = r.content
+        return r.content
+
+    async def tts_ready(self):
+        if self.settings.tts_backend != "http":
+            return {"ready": False, "source": "disabled"}
+        try:
+            r = await self.http.get(str(self.settings.tts_base_url).rstrip("/") + "/ready", timeout=4)
+            return {"ready": r.status_code == 200, "source": "board",
+                    "decoder": r.json().get("tts", {}).get("decoder")}
+        except (httpx.HTTPError, ValueError):
+            return {"ready": False, "source": "unavailable"}
+
     async def ready(self):
         async def sensory(kind):
             if getattr(self.settings, f"{kind}_backend") == "fixture":

@@ -1,0 +1,163 @@
+{
+  "recorded": "2026-10-18",
+  "board": "QCVENTUNO002",
+  "microphone": "Logitech Brio 101, ALSA plughw:CARD=B101, 16kHz mono",
+  "method": "one recording per phrase, transcribed by both servers, so the pair differs only by model",
+  "whisper_flags": "-t 4, prompt 'juice, cola, water, sprite, refill, no thanks'",
+  "models": {
+    "ggml-base.en": {
+      "takes": 20,
+      "exact_match": 0.75,
+      "mean_wer": 0.104,
+      "median_transcribe_ms": 6946
+    },
+    "ggml-tiny.en": {
+      "takes": 20,
+      "exact_match": 0.7,
+      "mean_wer": 0.15,
+      "median_transcribe_ms": 3018
+    }
+  },
+  "pairs": [
+    {
+      "expected": "More water please",
+      "base_heard": "more water please.",
+      "base_wer": 0.0,
+      "tiny_heard": "more water please",
+      "tiny_wer": 0.0
+    },
+    {
+      "expected": "A little water, please",
+      "base_heard": "oh little water please",
+      "base_wer": 0.25,
+      "tiny_heard": "oh little water please",
+      "tiny_wer": 0.25
+    },
+    {
+      "expected": "More coke please",
+      "base_heard": "One more a Coke please",
+      "base_wer": 0.6667,
+      "tiny_heard": "oh more coke please",
+      "tiny_wer": 0.3333
+    },
+    {
+      "expected": "More coke please",
+      "base_heard": "more coke please.",
+      "base_wer": 0.0,
+      "tiny_heard": "more coke please",
+      "tiny_wer": 0.0
+    },
+    {
+      "expected": "No thanks, I'm fine",
+      "base_heard": "no thanks I'm fine.",
+      "base_wer": 0.0,
+      "tiny_heard": "no thanks I'm fine",
+      "tiny_wer": 0.0
+    },
+    {
+      "expected": "A little water, please",
+      "base_heard": "oh little water please",
+      "base_wer": 0.25,
+      "tiny_heard": "oh little water please!",
+      "tiny_wer": 0.25
+    },
+    {
+      "expected": "A little water, please",
+      "base_heard": "little water please",
+      "base_wer": 0.25,
+      "tiny_heard": "a little water please",
+      "tiny_wer": 0.0
+    },
+    {
+      "expected": "Coffee instead, please",
+      "base_heard": "coffee instead please.",
+      "base_wer": 0.0,
+      "tiny_heard": "something is there please",
+      "tiny_wer": 1.0
+    },
+    {
+      "expected": "No thanks, I'm fine",
+      "base_heard": "no thanks, I'm fine",
+      "base_wer": 0.0,
+      "tiny_heard": "no thanks, I'm fine",
+      "tiny_wer": 0.0
+    },
+    {
+      "expected": "No thanks, I'm fine",
+      "base_heard": "no thanks, I'm fine.",
+      "base_wer": 0.0,
+      "tiny_heard": "no thanks, I'm fine",
+      "tiny_wer": 0.0
+    },
+    {
+      "expected": "Just a half portion of water",
+      "base_heard": "I still have a portion of water",
+      "base_wer": 0.6667,
+      "tiny_heard": "I still have a portion of water",
+      "tiny_wer": 0.6667
+    },
+    {
+      "expected": "Just a half portion of water",
+      "base_heard": "just a half portion of water",
+      "base_wer": 0.0,
+      "tiny_heard": "just a half portion of water",
+      "tiny_wer": 0.0
+    },
+    {
+      "expected": "More coke please",
+      "base_heard": "more coke please.",
+      "base_wer": 0.0,
+      "tiny_heard": "more coke please",
+      "tiny_wer": 0.0
+    },
+    {
+      "expected": "More coffee please",
+      "base_heard": ", more coffee please",
+      "base_wer": 0.0,
+      "tiny_heard": "more coffee please",
+      "tiny_wer": 0.0
+    },
+    {
+      "expected": "More coffee please",
+      "base_heard": "More coffee please.",
+      "base_wer": 0.0,
+      "tiny_heard": "more coffee please",
+      "tiny_wer": 0.0
+    },
+    {
+      "expected": "Actually make it water",
+      "base_heard": "actually make it water",
+      "base_wer": 0.0,
+      "tiny_heard": "actually making water.",
+      "tiny_wer": 0.5
+    },
+    {
+      "expected": "can I have some more water?",
+      "base_heard": "can I have some more water?",
+      "base_wer": 0.0,
+      "tiny_heard": "can I have some more water?",
+      "tiny_wer": 0.0
+    },
+    {
+      "expected": "can I have some more water?",
+      "base_heard": "Can I have some more water?",
+      "base_wer": 0.0,
+      "tiny_heard": "can I have some more water?",
+      "tiny_wer": 0.0
+    },
+    {
+      "expected": "water would be nice",
+      "base_heard": "water would be nice!",
+      "base_wer": 0.0,
+      "tiny_heard": "water would be nice",
+      "tiny_wer": 0.0
+    },
+    {
+      "expected": "more coffee sounds good",
+      "base_heard": "More coffee sounds good.",
+      "base_wer": 0.0,
+      "tiny_heard": "more coffee sounds good",
+      "tiny_wer": 0.0
+    }
+  ]
+}

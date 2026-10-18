@@ -158,7 +158,7 @@
     "current_request": {
       "item": "water"
     },
-    "utterance": "Orange juice please",
+    "utterance": "Lemonade please",
     "expected": {
       "intent": "not_understood",
       "item": null
@@ -217,6 +217,17 @@
     "expected": {
       "intent": "not_understood",
       "item": null
+    }
+  },
+  {
+    "id": "orange_juice",
+    "current_request": {
+      "item": "water"
+    },
+    "utterance": "Can I get an orange juice instead?",
+    "expected": {
+      "intent": "refill",
+      "item": "orange_juice"
     }
   }
 ]

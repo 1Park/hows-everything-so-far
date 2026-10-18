@@ -2,6 +2,7 @@
 
 import shutil
 import socket
+import time
 import tempfile
 import threading
 from pathlib import Path
@@ -157,3 +158,46 @@ async def test_bridge_hardware_reports_router_failure_as_503(sockdir):
     with pytest.raises(ApiError) as failure:
         await hardware.set_color(1, 2, 3)
     assert failure.value.status == 503 and failure.value.retryable
+
+
+def test_transport_failures_all_arrive_as_one_error(router, sockdir):
+    # Callers handle RouterError; a msgpack or type failure escaping as itself
+    # would surface as a 500 instead of the retryable 503 the demo expects.
+    router(lambda request: b"\xc1\xc1\xc1not msgpack at all")
+    client = RouterClient(2, str(sockdir / "router.sock"))
+    with pytest.raises(RouterError):
+        client.call("refill_phase")
+    assert client.socket is None
+    client.close()
+
+
+async def test_a_timed_out_call_does_not_share_its_socket(sockdir):
+    # The worker thread cannot be killed, so it may still be using the socket.
+    # The next call must not write into the same stream.
+    class SlowClient:
+        def __init__(self):
+            self.closed = 0
+
+        def call(self, *_):
+            time.sleep(5)
+
+        def close(self):
+            self.closed += 1
+
+    slow = SlowClient()
+    hardware = BridgeHardware(0.2, client=slow)
+    with pytest.raises(ApiError) as failure:
+        await hardware.set_color(1, 2, 3)
+    assert failure.value.status == 503
+    assert slow.closed == 1, "the abandoned connection was left open for the next call"
+
+
+async def test_a_reply_of_the_wrong_shape_is_a_fault_not_a_crash():
+    class OddClient:
+        def call(self, method, *_):
+            return None if method == "refill_phase" else True
+
+        def close(self):
+            pass
+
+    assert await BridgeHardware(1, client=OddClient()).advance() == "fault"

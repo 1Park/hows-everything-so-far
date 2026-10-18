@@ -65,6 +65,19 @@ async function api(path, options = {}) {
   } catch (error) { showError(error.message); throw error; }
 }
 function post(path, data) { return api(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)}); }
+// Plays one decoded buffer; resolves true only if it finished while sound stayed on.
+async function playBuffer(buffer, version) {
+  if (!sound || version !== audioVersion || audioContext.state !== 'running') return false;
+  playingSource?.stop();
+  playingSource = audioContext.createBufferSource();
+  playingSource.buffer = buffer;
+  playingSource.connect(audioContext.destination);
+  const source = playingSource;
+  return await new Promise(resolve => {
+    source.onended = () => resolve(sound && version === audioVersion);
+    source.start();
+  });
+}
 async function playPrompt(name) {
   if (!sound || !audioContext) return false;
   const version = ++audioVersion;
@@ -74,16 +87,7 @@ async function playPrompt(name) {
       if (!response.ok) throw Error('Audio file unavailable');
       audioBuffers.set(name, await audioContext.decodeAudioData(await response.arrayBuffer()));
     }
-    if (!sound || version !== audioVersion || audioContext.state !== 'running') return false;
-    playingSource?.stop();
-    playingSource = audioContext.createBufferSource();
-    playingSource.buffer = audioBuffers.get(name);
-    playingSource.connect(audioContext.destination);
-    const source = playingSource;
-    return await new Promise(resolve => {
-      source.onended = () => resolve(sound && version === audioVersion);
-      source.start();
-    });
+    return await playBuffer(audioBuffers.get(name), version);
   } catch {
     if (version !== audioVersion) return;
     setSound(false);
@@ -91,10 +95,27 @@ async function playPrompt(name) {
     return false;
   }
 }
+// Says this state's line with the board TTS; falls back to the bundled WAV (or silence).
+async function speakState(fallback) {
+  if (!sound || !audioContext) return false;
+  const current = state;
+  if (current?.speech) {
+    const version = ++audioVersion;
+    try {
+      const response = await fetch(`/api/speech/${current.session_id}/${current.sequence}`);
+      if (!response.ok) throw Error('Speech unavailable');
+      const buffer = await audioContext.decodeAudioData(await response.arrayBuffer());
+      return await playBuffer(buffer, version);
+    } catch {
+      if (version !== audioVersion) return false;
+    }
+  }
+  return fallback ? playPrompt(fallback) : false;
+}
 async function announceOffer() {
   const prompt = state;
   if (!prompt || prompt.phase !== 'offered' || !connected) return;
-  const finished = await playPrompt('offer');
+  const finished = await speakState('offer');
   if (!finished || state?.session_id !== prompt.session_id || state.sequence !== prompt.sequence || !connected) return;
   if (state.audio_input === 'disabled') return;
   try {
@@ -217,7 +238,7 @@ function render(next, authoritative = false) {
     const selected = obj.object_id === state.target?.object_id;
     // 리필 필요 = Controller 정책과 같은 잔량·confidence 기준 (빈 잔 unknown도 눈으로는 리필 대상이라 표시)
     // Vision은 빈 잔을 item unknown으로 보낸다 (계약에 empty 없음) → 화면에서만 empty로 표시
-    const item = obj.item === 'unknown' && obj.fill_ratio !== null && obj.fill_ratio <= 0.1 ? 'empty' : obj.item;
+    const item = obj.item === 'unknown' && obj.fill_ratio !== null && obj.fill_ratio <= 0.1 ? 'empty' : obj.item.replace('_', ' ');
     const refill = obj.fill_ratio !== null && obj.fill_ratio <= policy.low_fill_threshold && obj.confidence >= policy.min_confidence;
     const box = document.createElement('div'); box.className = 'bbox' + (selected ? ' selected' : '') + (refill ? ' refill' : '');
     const b = obj.bbox; Object.assign(box.style, {left:`${b.x1*100}%`, top:`${b.y1*100}%`, width:`${(b.x2-b.x1)*100}%`, height:`${(b.y2-b.y1)*100}%`});
@@ -267,9 +288,10 @@ function render(next, authoritative = false) {
   if (lastPhase !== state.phase) {
     if (lastPhase === 'offered') {audioVersion++; playingSource?.stop();}
     if (state.phase === 'offered') announceOffer();
-    if (state.phase === 'card') playPrompt('review');
-    if (state.phase === 'done') playPrompt('done');
-    if (state.phase === 'cancelled') playPrompt('cancelled');
+    if (state.phase === 'card') speakState('review');
+    if (state.phase === 'done') speakState('done');
+    if (state.phase === 'cancelled') speakState('cancelled');
+    if (['declined','not_understood','expired','error'].includes(state.phase)) speakState(null);
     lastPhase = state.phase;
   }
 }

@@ -70,7 +70,7 @@ def test_generation_uses_item_only_context():
     body = generation("test", CurrentRequest(item="coffee"), "Same again please")
     assert json.loads(body.messages[1].content) == {
         "current_request": {"item": "coffee"}, "utterance": "Same again please",
-        "allowed_items": ["water", "coke", "coffee"],
+        "allowed_items": ["water", "coke", "coffee", "orange_juice"],
     }
 
 

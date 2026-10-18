@@ -1,9 +1,10 @@
 """Fixed post-softmax category groups; independent of the classifier's weights."""
 
-VISION_CATEGORY_GROUPS = {"water": ("water",), "coke": ("coke", "coffee")}
+VISION_CATEGORY_GROUPS = {"water": ("water",), "coke": ("coke", "coffee"), "orange_juice": ("orange_juice",)}
 DEMO_CATEGORY_GROUPS = {
     "water": ("water", "sparkling_water", "soda"),
     "coke": ("coke", "coke_zero", "coffee"),
+    "orange_juice": ("orange_juice",),
 }
 VISION_CATEGORY_MAP = {
     member: representative

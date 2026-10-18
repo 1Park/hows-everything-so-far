@@ -5,6 +5,7 @@ from collections import deque
 from app.hardware.io import BridgeHardware, MockHardware
 from app.audio import BoardMicrophone
 from app.events import EventLog
+from app.speech import speech_for
 from common.api import ApiError, log
 from common.contracts import CurrentRequest, RequestCard, StateEvent, uid
 from common.vision_categories import available_drinks, VISION_CATEGORY_MAP, VISION_CATEGORY_GROUPS
@@ -96,6 +97,10 @@ class Controller:
             "transcript": self.transcript,
             "stt_source": self.stt_source,
             "capture": self.capture_status,
+            "speech": (self.offer_message(self.target) if self.phase == "offered" and self.target
+                       and (self.untrained_categories or self.target.item in ("coke", "coffee"))
+                       else speech_for(self.phase, self.target, self.card,
+                                       self.settings.item_confirm_threshold, self.allowed_items())),
         }
 
     def show_phase_led(self, phase):

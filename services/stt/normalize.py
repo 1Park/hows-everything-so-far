@@ -9,7 +9,8 @@ It only fixes drink names Whisper commonly mishears; it does not interpret inten
 - Strips Whisper tags such as [BLANK_AUDIO] and collapses whitespace.
 - Keeps the rest of the sentence (including casing) untouched for the customer review screen.
 
-The menu must stay in sync with app/language.py (water, coke, coffee).
+The menu must stay in sync with app/language.py (water, coke, coffee, orange juice).
+"orange juice" stays two words in the text; items reports it as orange_juice.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ import re
 from dataclasses import dataclass, field
 
 MENU: tuple[str, ...] = ("water", "coke", "coffee")
+PHRASES: dict[str, str] = {"orange juice": "orange_juice"}  # multi-word menu items
 
 # Longer keys are applied first, so "coca cola" wins over "coca".
 ALIASES: dict[str, str] = {
@@ -30,6 +32,9 @@ ALIASES: dict[str, str] = {
     "cokes": "coke",
     "coffees": "coffee",
     "waters": "water",
+    "orange juices": "orange juice",
+    "o.j.": "orange juice",
+    "oj": "orange juice",
 }
 
 # Words that look close to a menu item but must never be rewritten.
@@ -70,7 +75,10 @@ def normalize(raw: str) -> Normalized:
     text = re.sub(r"\s+", " ", text).strip()
     text = _apply_aliases(text)
     text = _WORD.sub(_fuzzy_word, text)
-    items = [w.lower() for w in _WORD.findall(text) if w.lower() in MENU]
+    marked = text
+    for phrase, item in PHRASES.items():
+        marked = re.sub(rf"\b{phrase}\b", item, marked, flags=re.I)
+    items = [w.lower() for w in re.findall(r"[A-Za-z_][A-Za-z_'-]*", marked) if w.lower() in (*MENU, *PHRASES.values())]
     return Normalized(raw=raw, text=text, items=items)
 
 

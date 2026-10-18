@@ -17,7 +17,7 @@ Controller 정책(기본 confidence ≥ 0.7, fill_ratio ≤ 0.3 / 보드 .env.bo
 
 from common.vision_categories import VISION_CATEGORY_MAP
 
-DRINKS = ("water", "coke", "coffee")
+DRINKS = ("water", "coke", "coffee", "orange_juice")
 # 단계 → 대표 잔량 비율. full/mid/low 구간(합성 데이터 생성 기준)의 중앙값 근처. bundle.json 으로 덮어쓸 수 있다.
 DEFAULT_FILL_RATIO = {"full": 0.85, "mid": 0.5, "low": 0.18, "empty": 0.02}
 REFILL_LEVELS = ("low", "empty")  # 잔량 확신도에서 한 묶음으로 보는 단계 (둘 다 리필 대상)
