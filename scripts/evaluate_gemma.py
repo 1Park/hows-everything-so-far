@@ -22,8 +22,8 @@ from common.contracts import CurrentRequest  # noqa: E402
 def cases():
     clean = json.loads((ROOT / "fixtures/drink_cases.json").read_text(encoding="utf-8"))
     noise = json.loads((ROOT / "fixtures/drink_cases_distorted.json").read_text(encoding="utf-8"))
-    assert len(clean) == len(noise) == 20
-    assert len({r["id"] for r in noise}) == 20
+    assert len(clean) == len(noise)
+    assert len({r["id"] for r in noise}) == len(noise)
     by_id = {r["id"]: r for r in clean}
     assert set(by_id) == {r["id"] for r in noise}
     return [dict(r, suite="clean") for r in clean] + [

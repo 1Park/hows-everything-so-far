@@ -231,7 +231,7 @@ function render(next, authoritative = false) {
     const selected = obj.object_id === state.target?.object_id;
     // 리필 필요 = Controller 정책과 같은 잔량·confidence 기준 (빈 잔 unknown도 눈으로는 리필 대상이라 표시)
     // Vision은 빈 잔을 item unknown으로 보낸다 (계약에 empty 없음) → 화면에서만 empty로 표시
-    const item = obj.item === 'unknown' && obj.fill_ratio !== null && obj.fill_ratio <= 0.1 ? 'empty' : obj.item;
+    const item = obj.item === 'unknown' && obj.fill_ratio !== null && obj.fill_ratio <= 0.1 ? 'empty' : obj.item.replace('_', ' ');
     const refill = obj.fill_ratio !== null && obj.fill_ratio <= policy.low_fill_threshold && obj.confidence >= policy.min_confidence;
     const box = document.createElement('div'); box.className = 'bbox' + (selected ? ' selected' : '') + (refill ? ' refill' : '');
     const b = obj.bbox; Object.assign(box.style, {left:`${b.x1*100}%`, top:`${b.y1*100}%`, width:`${(b.x2-b.x1)*100}%`, height:`${(b.y2-b.y1)*100}%`});
@@ -251,7 +251,7 @@ function render(next, authoritative = false) {
   $('requestCard').hidden = !state.card || !['card','interpreting','not_understood','error','loading','returning','done'].includes(state.phase);
   if (monitoring) $('requestCard').hidden = true;
   if (state.card) {
-    $('cardDrink').textContent = state.card.item;
+    $('cardDrink').textContent = state.card.item.replace('_', ' ');
     $('revision').textContent = `v${state.card.revision}`;
     $('targetId').textContent = `Target ${state.card.object_id} · Frozen at proposal · ${state.qwen_source || 'pending'} Qwen`;
     // CSS presentation of the frozen target. Never supplied as model crop/preprocessing.

@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-Drink = Literal["water", "coke", "coffee"]
+Drink = Literal["water", "coke", "coffee", "orange_juice"]
 Source = Literal["fixture", "external", "mlx", "executorch"]
 
 

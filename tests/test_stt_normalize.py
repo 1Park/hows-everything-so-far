@@ -13,6 +13,8 @@ CASES = [
     ("Coca Cola", "coke", ["coke"]),
     ("Just a little Coke", "Just a little Coke", ["coke"]),
     ("Cofee please", "coffee please", ["coffee"]),
+    ("An OJ please", "An orange juice please", ["orange_juice"]),
+    ("Orange juice and a coke", "Orange juice and a coke", ["orange_juice", "coke"]),
     ("More watter", "More water", ["water"]),
     ("No thanks, I'm good.", "No thanks, I'm good.", []),
     ("Maybe later.", "Maybe later.", []),  # 'later' must not become 'water'

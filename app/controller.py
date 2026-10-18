@@ -340,7 +340,7 @@ class Controller:
                     self.arm_deadline()
                     self.emit(
                         "not_understood",
-                        "I couldn't understand your request. Please choose water, coke, or coffee.",
+                        "I couldn't understand your request. Please choose water, coke, coffee, or orange juice.",
                     )
                 else:
                     self.card = RequestCard(
