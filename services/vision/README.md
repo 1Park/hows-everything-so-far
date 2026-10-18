@@ -16,7 +16,7 @@ softmax 이후 `coffee`와 `coke`의 확률을 합산해 대표 클래스 **`cok
 Controller는 현재 frozen scene의 모든 관찰 카테고리를 펼쳐 `allowed_items`를 만든다:
 water만 있으면 water, coke 그룹만 있으면 coke/coffee, 둘 다 있으면 세 음료다.
 LLM 프롬프트에 이 목록을 전달하고, 모델이 목록 밖 음료를 반환하면 Controller가
-`not_understood`로 처리해 확인을 차단한다. UI의 음료 그림 버튼도 같은 목록을 사용한다.
+`not_understood`로 처리해 확인을 차단한다. 고객은 음성 또는 텍스트로 음료를 요청한다.
 unknown은 선택지를 추가하지 않는다. 고객의 선택은 요청 카드이며 자동 물리 승인이 아니다.
 
 고정 매핑의 원본은 `common/vision_categories.py`, 적용은 `labels.py`에 있다.

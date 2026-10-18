@@ -46,7 +46,7 @@ DINO의 기존 softmax 출력에서 `coffee + coke → coke`, `water → water`�
 대표 이름 `coke`는 관찰 그룹이며, 커피로 확정했다는 뜻이 아니다. 잔량 계산과 모델 가중치는 유지한다.
 Controller는 frozen scene에 인식된 모든 그룹을 펼쳐 요청 가능한 `allowed_items`를 만든다.
 예: coke만 보이면 coke/coffee, water만 보이면 water, 둘 다 보이면 water/coke/coffee.
-이 목록은 LLM 제품 프롬프트와 UI 그림 선택지에 공통으로 사용하며, Controller가 LLM의
+이 목록은 LLM 제품 프롬프트에 전달하며, Controller가 LLM의
 목록 밖 요청을 재확인 상태로 돌려 확인을 차단한다. Confirm은 여전히 별도로 필요하다.
 Demo tools는 고정 매핑을 읽기 전용으로 표시한다. 구현 원본은 `common/vision_categories.py`다.
 

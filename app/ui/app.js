@@ -255,22 +255,11 @@ function render(next, authoritative = false) {
     $('sceneTitle').textContent = 'Watching for a stable scene';
     $('sceneSubtitle').textContent = $('captureStatus').textContent;
   }
-  const choices = $('drinkChoices'); choices.replaceChildren();
   $('untrainedCategories').checked = !!state.untrained_categories;
   $('untrainedCategories').disabled = ['observing','interpreting','listening','transcribing','loading','returning'].includes(state.phase);
   $('demoCategoryMapping').textContent = state.untrained_categories
     ? 'DEMO ON · water → water / sparkling water / soda · coke → coke / coke zero / coffee'
     : 'Off · No additional drink variants.';
-  choices.hidden = !state.target || monitoring;
-  for (const item of state.allowed_items || []) {
-    const button = document.createElement('button'); button.type = 'button'; button.className = 'secondary drink-choice';
-    const icon = {sparkling_water:'water', soda:'water', coke_zero:'coke'}[item] || item;
-    const image = document.createElement('img'); image.src = `/ui/${icon}.svg`; image.alt = ''; image.width = 48; image.height = 48;
-    const label = document.createElement('span'); label.textContent = item.replaceAll('_', ' ');
-    button.append(image, label); button.disabled = !canEdit() || !!pendingAction;
-    button.onclick = () => send(`${item.replaceAll('_', ' ')}, please`).catch(() => {});
-    choices.append(button);
-  }
   $('requestCard').hidden = !state.card || !['card','interpreting','not_understood','error','loading','returning','done'].includes(state.phase);
   if (monitoring) $('requestCard').hidden = true;
   if (state.card) {
