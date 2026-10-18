@@ -18,8 +18,12 @@
 | `TTS_BACKEND` | Controller 쪽 설정. `http`면 상태마다 말할 문장(`speech`)을 이 서비스로 읽게 한다 |
 
 Controller는 상태마다 말할 문장(`app/speech.py`)을 `StateSnapshot.speech`로 내보내고, 태블릿은
-`GET /api/speech/{session_id}/{sequence}`로 그 음성을 받아 재생한다. TTS가 꺼져 있거나 실패하면 태블릿은
-기존 고정 WAV(`app/ui/audio/`)를 틀거나 조용히 넘어간다. 같은 문장은 Controller가 캐시한다.
+`GET /api/speech/{session_id}/{sequence}`로 그 음성을 받아 재생한다. `TTS_BACKEND=http`에서는
+실패 시 이전 WAV로 대체하지 않고 오류를 표시하며, 안내 완료 ACK·자동 녹음을 시작하지 않는다.
+Enable sound의 환영 음성과 Replay voice도 같은 TTS를 사용한다. 환영·테스트 문장은
+`GET /api/speech-preview`로 생성한다. 같은 문장은 Controller가 캐시한다.
+개발에서 명시적으로 `TTS_BACKEND=disabled`를 사용한 경우에만 기존 고정 WAV를 사용한다.
+http 설정에서는 TTS 준비 여부를 Controller `/ready` 성공 조건에 포함한다.
 
 ## 보드 실측 (2026-10-18)
 

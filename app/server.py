@@ -96,6 +96,7 @@ def create_app(settings=None, clients=None, hardware=None):
     @app.get("/ready")
     async def ready():
         dependencies = await clients.ready()
+        tts = await clients.tts_ready()
         hardware_ready = True
         if settings.hardware_backend == "bridge":
             try:
@@ -105,6 +106,7 @@ def create_app(settings=None, clients=None, hardware=None):
                 hardware_ready = False
         ok = (
             all(v["ready"] for v in dependencies.values())
+            and (settings.tts_backend == "disabled" or tts["ready"])
             and not video.error
             and video.latest is not None
             and hardware_ready
@@ -115,8 +117,7 @@ def create_app(settings=None, clients=None, hardware=None):
             content={
                 "ready": ok,
                 "dependencies": dependencies,
-                # Optional: without TTS the tablet falls back to the bundled WAV prompts.
-                "tts": await clients.tts_ready(),
+                "tts": tts,
                 "video": {"mode": video.mode, "error": video.error},
                 # UI가 리필 대상 박스를 Controller와 같은 기준으로 표시하도록
                 "policy": {
@@ -325,6 +326,11 @@ def create_app(settings=None, clients=None, hardware=None):
         return StreamingResponse(
             video.frames(), media_type="multipart/x-mixed-replace; boundary=frame"
         )
+
+    @app.get("/api/speech-preview")
+    async def speech_preview():
+        return Response(await clients.speech("Hello. How is everything so far? Would you like a refill?"),
+                        media_type="audio/wav", headers={"Cache-Control": "no-store"})
 
     @app.get("/api/speech/{session_id}/{sequence}")
     async def speech(session_id: str, sequence: int):

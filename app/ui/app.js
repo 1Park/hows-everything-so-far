@@ -79,7 +79,7 @@ async function playBuffer(buffer, version) {
   });
 }
 async function playPrompt(name) {
-  if (!sound || !audioContext) return false;
+  if (!sound || !audioContext || state?.tts_backend !== 'disabled') return false;
   const version = ++audioVersion;
   try {
     if (!audioBuffers.has(name)) {
@@ -95,22 +95,28 @@ async function playPrompt(name) {
     return false;
   }
 }
-// Says this state's line with the board TTS; falls back to the bundled WAV (or silence).
-async function speakState(fallback) {
+async function playTts(url) {
   if (!sound || !audioContext) return false;
-  const current = state;
-  if (current?.speech) {
-    const version = ++audioVersion;
-    try {
-      const response = await fetch(`/api/speech/${current.session_id}/${current.sequence}`);
-      if (!response.ok) throw Error('Speech unavailable');
-      const buffer = await audioContext.decodeAudioData(await response.arrayBuffer());
-      return await playBuffer(buffer, version);
-    } catch {
-      if (version !== audioVersion) return false;
-    }
+  const version = ++audioVersion;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw Error('Speech unavailable');
+    const buffer = await audioContext.decodeAudioData(await response.arrayBuffer());
+    return await playBuffer(buffer, version);
+  } catch {
+    if (version === audioVersion) showError('TTS playback failed. Check the TTS service and tap Replay voice to retry.');
+    return false;
+  }
+}
+// Production uses TTS exclusively. Bundled audio is only for explicitly disabled TTS in development.
+async function speakState(fallback) {
+  if (state?.tts_backend === 'http') {
+    return state.speech ? playTts(`/api/speech/${state.session_id}/${state.sequence}`) : false;
   }
   return fallback ? playPrompt(fallback) : false;
+}
+function playWelcome() {
+  return state?.tts_backend === 'http' ? playTts('/api/speech-preview') : playPrompt('welcome');
 }
 async function announceAndListen() {
   const prompt = state;
@@ -143,6 +149,7 @@ async function checkConnection() {
     const response = await fetch('/ready'); const info = await response.json(); if (info.policy) policy = info.policy;
     const sources = $('sources'); sources.replaceChildren();
     for (const [name, data] of Object.entries(info.dependencies)) sources.append(modePill(name.toUpperCase(), data.source, data.ready));
+    if (info.tts) sources.append(modePill('TTS', info.tts.source, info.tts.ready || info.tts.source === 'disabled'));
     sources.append(modePill('Hardware', info.hardware, info.hardware_ready)); sources.append(modePill('Location', info.location));
     $('videoMode').textContent = state?.snapshot_url ? 'Analyzed frame · frozen' : info.video.mode === 'fixture-image' ? 'Sample image' : 'Live source';
     $('imageCredit').textContent = info.video.mode === 'fixture-image' ? 'AI-generated sample · illustrative fixture' : 'Captured by the server · single video owner';
@@ -171,7 +178,6 @@ function render(next, authoritative = false) {
   paintCapture();
   const monitoring = autoScanning();
   $('replayVoice').disabled = ['listening','transcribing'].includes(state.phase);
-  if ($('replayVoice').disabled) $('voicePreview').pause();
   const boardAudio = state.audio_input && state.audio_input !== 'disabled';
   $('phase').textContent = state.phase.toUpperCase(); $('message').textContent = state.message;
   const editable = canEdit() && !pendingAction;
@@ -356,10 +362,15 @@ document.querySelectorAll('[data-say]').forEach(b => b.onclick = () => {$('utter
 $('confirm').onclick = async () => {const c=state?.card; if(!c || pendingAction || state.phase !== 'card') return; try {await action('confirm', () => post('/api/confirm', {scene_id:c.scene_id,object_id:c.object_id,request_id:c.request_id,revision:c.revision}));} catch {api('/api/state').then(render).catch(()=>{});}};
 $('cancel').onclick = () => {if(state && pendingAction !== 'cancel') action('cancel', () => post('/api/cancel',{session_id:state.session_id})).catch(()=>{});};
 $('refresh').onclick = checkConnection;
-$('replayVoice').onclick = () => {
-  const preview = $('voicePreview');
-  preview.currentTime = 0;
-  preview.play().catch(() => showError('Voice playback failed. Check your tablet volume and audio output.'));
+$('replayVoice').onclick = async () => {
+  if (['listening','transcribing'].includes(state?.phase)) return;
+  if (!sound) {$('audioToggle').click(); return;}
+  try {
+    await audioContext.resume();
+    if (['offered','not_understood'].includes(state?.phase)) await announceAndListen();
+    else if (state?.speech) await speakState('offer');
+    else await playWelcome();
+  } catch {showError('Voice playback failed. Check your tablet volume and audio output.');}
 };
 $('audioToggle').onclick = () => {
   audioVersion++;
@@ -368,7 +379,7 @@ $('audioToggle').onclick = () => {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) {setSound(false); showError('This browser does not support audio playback.'); return;}
     audioContext ||= new AudioContextClass();
-    audioContext.resume().then(()=>['offered','not_understood'].includes(state?.phase) ? announceAndListen() : playPrompt('welcome')).catch(()=>showError('Tap Enable sound to activate audio.'));
+    audioContext.resume().then(()=>['offered','not_understood'].includes(state?.phase) ? announceAndListen() : state?.speech ? speakState('offer') : playWelcome()).catch(()=>showError('Tap Enable sound to activate audio.'));
   } else {playingSource?.stop(); playingSource=null;}
 };
 $('livePreview').parentElement.addEventListener('toggle', event => {

@@ -107,6 +107,8 @@ def test_controller_serves_the_current_state_line(monkeypatch):
         r = c.get(f"/api/speech/{s['session_id']}/{s['sequence']}")
         assert r.status_code == 200 and r.headers["content-type"] == "audio/wav"
         assert spoken == [s["speech"]]
+        assert c.get("/api/speech-preview").status_code == 200
+        assert spoken[-1] == "Hello. How is everything so far? Would you like a refill?"
         assert c.get(f"/api/speech/{s['session_id']}/{s['sequence'] - 1}").status_code == 409
         assert c.get("/ready").json()["tts"]["source"] == "disabled"
 
@@ -121,6 +123,7 @@ def test_controller_speech_is_disabled_by_default():
             s = ws.receive_json()["state"]
         r = c.get(f"/api/speech/{s['session_id']}/{s['sequence']}")
         assert r.status_code == 404 and r.json()["error"]["code"] == "tts_disabled"
+        assert c.get("/api/speech-preview").json()["error"]["code"] == "tts_disabled"
 
 
 @pytest.mark.parametrize("phase", ["idle", "observing", "listening", "skipped"])

@@ -214,6 +214,7 @@ class StateSnapshot(Contract):
     capture: CaptureStatus | None = None
     # What the assistant says for this state (board TTS); None = stay silent.
     speech: str | None = None
+    tts_backend: Literal["disabled", "http"] = "disabled"
 
 
 class StateEvent(Contract):

@@ -21,7 +21,7 @@
 
 - Gemma: `.env.board`의 `QWEN_MODEL_BACKEND=executorch`, `QWEN_MODEL=gemma4`. `bash scripts/board_llm.sh use gemma4`로 기본 선택을 고정한다. 경로·실행 수명은 [LLM 서비스](../services/qwen/README.md)를 따른다.
 - Vision: `.env.board` 기본 내부 backend는 fixture다. 실제 모델은 아래처럼 external factory·bundle·worker를 명시해야 한다. bundle은 디렉터리이며 `bundle.json`, `.pte`, head가 필요하다.
-- TTS: `.env.board`의 `TTS_*`. voice와 NPU 디코더(`<voice>.dec_f384.pte`)를 `models/board/tts/`에 두고 `.venv`에 `.[tts]` 의존성을 설치한다. 없으면 태블릿은 고정 WAV를 튼다. [TTS 서비스](../services/tts/README.md).
+- TTS: `.env.board`의 `TTS_*`. voice와 NPU 디코더(`<voice>.dec_f384.pte`)를 `models/board/tts/`에 두고 `.venv`에 `.[tts]` 의존성을 설치한다. `TTS_BACKEND=http`에서는 TTS가 없으면 `/ready=503`과 재생 오류를 표시하며 이전 WAV로 대체하지 않는다. [TTS 서비스](../services/tts/README.md).
 - STT: `.env.board`의 Whisper adapter가 `127.0.0.1:8178`에 연결한다. 외부 서버를 먼저 준비한다.
 - 카메라·ALSA 장치는 `.env.board`와 현장 장치 목록을 대조한다. `python scripts/diagnose.py`로 읽기 전용 진단을 수행한다.
 

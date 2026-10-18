@@ -94,6 +94,7 @@ class Controller:
             "sequence": self.sequence,
             "deadline": self.deadline,
             "audio_input": self.settings.audio_input,
+            "tts_backend": self.settings.tts_backend,
             "audio_seconds": self.settings.audio_seconds,
             "requires_confirmation": self.settings.require_confirmation,
             "transcript": self.transcript,
