@@ -57,7 +57,7 @@ On the first Docker export, ExecuTorch downloads QAIRT SDK 2.37 (~3GB) and libc+
 | Board LLM | `scripts/board_llm.sh status / use gemma4 / ask "..."` | Switches to and runs the organizers' Gemma `.pte` |
 | Training crops | `python -m ml.training.make_crops --data data/real --bundle <bundle> --runner-bin <runner> --out data/crops` | YOLO mode: training photos → the same pad crops as inference (`data/crops/`, neighboring objects in `data/crops_extra/`) |
 | Board camera collection | `python -m ml.tools.board_collect --bundle <bundle> --runner-bin <runner> --labels water__low water__mid ...` | Controller `/api/frame` (real 640×480) → YOLO crops labeled from left to right |
-| Head training | `python -m ml.training.make_head --data data/crops --dino-pte <pte> --runner {py,cli} --class-weight balanced` (**with the .pte that will be deployed**) | head JSON |
+| Head training | `python -m ml.training.make_head --data data/crops [more roots] --dino-pte <pte> --runner {py,cli} --model lda --augment 4` (**with the .pte that will be deployed**; board v6/v7 head; logistic: `--class-weight balanced`) | head JSON + features `.npz` |
 | bundle | `python -m ml.export.make_bundle --out models/{local,board}/vision/<name> ...` | `bundle.json` + .pte + head |
 
 ### Rules
