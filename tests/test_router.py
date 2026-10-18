@@ -189,7 +189,8 @@ async def test_a_timed_out_call_does_not_share_its_socket(sockdir):
     with pytest.raises(ApiError) as failure:
         await hardware.set_color(1, 2, 3)
     assert failure.value.status == 503
-    assert slow.closed == 1, "the abandoned connection was left open for the next call"
+    # Once per attempt: each abandoned socket may still be in use by its thread.
+    assert slow.closed == 2, "an abandoned connection was left open for the next call"
 
 
 async def test_a_reply_of_the_wrong_shape_is_a_fault_not_a_crash():
@@ -201,3 +202,60 @@ async def test_a_reply_of_the_wrong_shape_is_a_fault_not_a_crash():
             pass
 
     assert await BridgeHardware(1, client=OddClient()).advance() == "fault"
+
+
+async def test_one_transport_failure_does_not_stop_the_demo():
+    # A restarted Router or a socket left dirty by an earlier timeout clears on a
+    # fresh connection, so confirmation should survive it.
+    class FlakyClient:
+        def __init__(self):
+            self.calls = 0
+            self.closed = 0
+
+        def call(self, method, *_):
+            self.calls += 1
+            if self.calls == 1:
+                raise RouterError("Router socket unavailable")
+            return True
+
+        def close(self):
+            self.closed += 1
+
+    flaky = FlakyClient()
+    hardware = BridgeHardware(1, client=flaky)
+    await hardware.start("command-1")
+    assert flaky.calls == 2 and flaky.closed == 1
+
+
+async def test_a_start_whose_reply_was_lost_is_not_reported_as_refused():
+    # The MCU refuses a command id it has already seen, so a retry of a start that
+    # did arrive looks like a rejection. A running sequence settles it.
+    class LostReplyClient:
+        def __init__(self):
+            self.first = True
+
+        def call(self, method, *_):
+            if method == "refill_start":
+                if self.first:
+                    self.first = False
+                    raise RouterError("reply lost")
+                return False  # the MCU already has this command id
+            return 1  # LOADING: it really did start
+
+        def close(self):
+            pass
+
+    await BridgeHardware(1, client=LostReplyClient()).start("command-2")
+
+
+async def test_a_genuine_refusal_still_raises():
+    class BusyClient:
+        def call(self, method, *_):
+            return False if method == "refill_start" else 0  # IDLE: nothing running
+
+        def close(self):
+            pass
+
+    with pytest.raises(ApiError) as failure:
+        await BridgeHardware(1, client=BusyClient()).start("command-3")
+    assert failure.value.status == 409

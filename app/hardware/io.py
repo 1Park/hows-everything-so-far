@@ -76,27 +76,42 @@ class BridgeHardware:
         self.command_id = ""
 
     async def rpc(self, name, *args):
-        try:
-            async with self.rpc_lock:
-                return await asyncio.wait_for(
-                    asyncio.to_thread(self.client.call, name, *args), self.timeout
-                )
-        except (RouterError, OSError, TimeoutError):
-            # A timed-out thread cannot be killed, and it still holds the socket, so
-            # the connection is abandoned rather than shared with the next call.
-            # The MCU watchdog remains authoritative for stopping the sequence.
-            self.client.close()
-            raise ApiError(
-                "bridge_error",
-                "Bridge did not acknowledge the command; check the MCU watchdog",
-                503,
-                True,
-            ) from None
+        """Calls the MCU, retrying once on a transport failure.
+
+        The failures that actually happen are a restarted Router or a connection
+        left dirty by an earlier timeout, and both clear on a fresh socket. One
+        retry is the difference between a demo that continues and one that stops
+        at the moment of confirmation.
+        """
+        for attempt in (1, 2):
+            try:
+                async with self.rpc_lock:
+                    return await asyncio.wait_for(
+                        asyncio.to_thread(self.client.call, name, *args), self.timeout
+                    )
+            except (RouterError, OSError, TimeoutError):
+                # A timed-out thread cannot be killed, and it still holds the socket,
+                # so the connection is abandoned rather than shared with the retry.
+                # The MCU watchdog remains authoritative for stopping the sequence.
+                self.client.close()
+                if attempt == 2:
+                    raise ApiError(
+                        "bridge_error",
+                        "Bridge did not acknowledge the command; check the MCU watchdog",
+                        503,
+                        True,
+                    ) from None
 
     async def start(self, command_id):
         self.command_id = command_id
-        if not await self.rpc("refill_start", command_id):
-            raise ApiError("hardware_rejected", "MCU rejected the mock sequence", 409)
+        if await self.rpc("refill_start", command_id):
+            return
+        # A refusal after a retry is ambiguous: the first attempt may have reached
+        # the MCU and only its reply was lost, and the MCU refuses a command id it
+        # has already seen. A running sequence means this command did start.
+        if await self.advance() in ("loading", "returning"):
+            return
+        raise ApiError("hardware_rejected", "MCU rejected the mock sequence", 409)
 
     async def set_led(self, on: bool):
         await self.rpc("set_led_state", on)
