@@ -18,6 +18,16 @@ last successful check, WebSocket status/last message/retry count, and recent eve
 calling external networks or model services. Samples are taken every 5 seconds; during an outage the last
 sample is shown with its age. After recovery, Demo tools → Connection diagnostics keeps the recent history.
 
+The board also writes `logs/connection.jsonl`, independently of the browser. A background thread checks
+end0 and Wi-Fi link state once per second, records link changes immediately and full snapshots every
+5 seconds, including packet errors, the last HTTP probe and latency per client, and event-loop heartbeat
+age. A client is marked stale after 10 seconds without a completed probe and its return is recorded.
+Stale means no recent requests, not proof of a cable fault; a closed/backgrounded browser can also cause it.
+WebSocket opens/closes are recorded without request content. A stalled HTTP loop does not stop the
+sampling thread, although a stopped process or powered-off board cannot log. Files survive service
+restarts and rotate at 2 MB with 3 backups (about 8 MB total). Follow them over SSH with
+`tail -F ~/project/hows-everything-so-far/logs/connection.jsonl`.
+
 Reconnect check: run a separate offline server on port 8096, then `npm run test:reconnect`.
 
 **Enable untrained drink variants (demo only)** in Demo tools is OFF by default.

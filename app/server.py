@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from fastapi.staticfiles import StaticFiles
 
 from app.clients import ModelClients
+from app.connection_monitor import ConnectionMonitor
 from app.capture import AutoCapture
 from app.controller import Controller
 from app.events import EventLog
@@ -62,15 +63,26 @@ def create_app(settings=None, clients=None, hardware=None):
     controller = Controller(settings, clients, hardware)
     video = VideoSource(settings.camera_source, settings.camera_fps, settings.video_stream_fps)
     capture = AutoCapture(controller, video)
+    connections = ConnectionMonitor(ROOT / 'logs/connection.jsonl', lambda: ethernet_status())
+
+    async def tick_connections():
+        while True:
+            connections.tick()
+            await asyncio.sleep(1)
 
     @asynccontextmanager
     async def lifespan(app):
         video.start()
 
         watcher = asyncio.create_task(capture.run())
+        connections.start()
+        connection_ticker = asyncio.create_task(tick_connections())
         try:
             yield
         finally:
+            connection_ticker.cancel()
+            await asyncio.gather(connection_ticker, return_exceptions=True)
+            await asyncio.to_thread(connections.stop)
             if watcher:
                 watcher.cancel()
                 await asyncio.gather(watcher, return_exceptions=True)
@@ -79,6 +91,20 @@ def create_app(settings=None, clients=None, hardware=None):
 
     app = create_api("Controller", lifespan)
     app.state.controller, app.state.video, app.state.capture = controller, video, capture
+
+    @app.middleware('http')
+    async def record_connection_probe(request: Request, call_next):
+        if request.url.path not in ('/health', '/api/connection-status'):
+            return await call_next(request)
+        started = time.monotonic()
+        status = 500
+        try:
+            response = await call_next(request)
+            status = response.status_code
+            return response
+        finally:
+            if request.client:
+                connections.seen(request.client.host, status, (time.monotonic() - started) * 1000)
 
     # The tablet kept running an older app.js after a deploy because the browser
     # revalidated into a 304. The UI is tiny and served over a direct link, so
@@ -392,6 +418,8 @@ def create_app(settings=None, clients=None, hardware=None):
     @app.websocket("/ws")
     async def events(websocket: WebSocket):
         await websocket.accept()
+        client_ip = websocket.client.host if websocket.client else 'unknown'
+        connections.event('websocket_open', client_ip=client_ip)
         queue = asyncio.Queue(maxsize=16)
         controller.subscribers.add(queue)
         try:
@@ -408,5 +436,6 @@ def create_app(settings=None, clients=None, hardware=None):
             pass
         finally:
             controller.subscribers.discard(queue)
+            connections.event('websocket_closed', client_ip=client_ip)
 
     return app
