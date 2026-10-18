@@ -62,6 +62,7 @@ systemctl --user status refill-controller refill-llm refill-vision refill-tts re
 ```
 
 After deploying, restart the app with `systemctl --user restart refill-controller`.
+To switch the Vision bundle, edit `VISION_MODEL_PATH` in `~/.config/refill-assist/vision.env` (keep a backup of the old line) and run `systemctl --user restart refill-vision`; a process started by hand is not restarted on reboot.
 If the Vision code changed, also run `systemctl --user restart refill-vision`.
 Stop with `systemctl --user stop refill-controller refill-vision`; do not run systemd and a separate supervisor
 at the same time. Logs are in the existing `logs/controller.log`, `logs/stt.log`, and
@@ -72,7 +73,7 @@ supervisors, then cleans up only the lock/ready/stop files of exited processes. 
 `/ready` may return 503. arduino-router is a separate system service; check that it is enabled.
 Verify: without USB, check that `/ready` reports the real models, TTS, microphone, and Bridge as ready, and that the tablet can connect.
 
-Below is an example layout with the provided SDK at `~/git/executorch` and the bundle at `dinov2-qnn-v5e` (includes orange juice and the snack bag at the demo spot). Check the actual paths and start **only services that have no existing listener**. Set the selected env explicitly for each process.
+Below is an example layout with the provided SDK at `~/git/executorch` and the bundle at `dinov2-qnn-v6` (LDA head with augmentation; includes orange juice and the snack bag at the demo spot; `-v5e` is the previous logistic-regression head). Check the actual paths and start **only services that have no existing listener**. Set the selected env explicitly for each process.
 
 ```sh
 mkdir -p logs tmp
@@ -81,7 +82,7 @@ export LD_LIBRARY_PATH="$HOME/git/executorch/build-x86/backends/qualcomm:/usr/li
 export ADSP_LIBRARY_PATH=/usr/lib
 
 VISION_MODEL_BACKEND=external VISION_ADAPTER=services.vision.backend:create_backend \
-VISION_MODEL_PATH=models/board/vision/dinov2-qnn-v5e \
+VISION_MODEL_PATH=models/board/vision/dinov2-qnn-v6 \
 VISION_WORKER_BIN="$PWD/models/board/bin/qnn_vision_worker" \
 nohup .venv/bin/python -m uvicorn services.vision.server:create_app --factory \
   --host 127.0.0.1 --port 8001 > logs/vision-8001.log 2>&1 < /dev/null &
