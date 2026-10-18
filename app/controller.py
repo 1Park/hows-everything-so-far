@@ -7,6 +7,7 @@ from app.audio import BoardMicrophone
 from app.events import EventLog
 from common.api import ApiError, log
 from common.contracts import CurrentRequest, RequestCard, StateEvent, uid
+from common.vision_categories import available_drinks, VISION_CATEGORY_MAP, VISION_CATEGORY_GROUPS
 
 # What the board shows for each controller phase. Linux owns this mapping so a new
 # state needs no firmware change; the MCU only applies the colour it is given.
@@ -71,9 +72,12 @@ class Controller:
         self.voice_task = None
         self.transcript = self.stt_source = None
         self.capture_status = None
+        self.untrained_categories = False  # Session-only demo opt-in; never a production default.
 
     def state(self):
         return {
+            "allowed_items": self.allowed_items(),
+            "untrained_categories": self.untrained_categories,
             "instance_id": self.instance_id,
             "session_id": self.session_id,
             "phase": self.phase,
@@ -219,18 +223,32 @@ class Controller:
         self.arm_deadline()
         self.emit("offered", self.offer_message(self.target))
 
-    def offer_message(self, target):
-        """Name the observed drink, or ask which one when Vision is unsure between look-alikes.
+    def allowed_items(self):
+        return available_drinks((o.item for o in self.scene.objects), self.untrained_categories) if self.scene else []
 
-        Coke and coffee look alike in the same glass. The guess still seeds the request card,
-        so the customer sees and can correct the drink before the explicit Confirm.
-        """
-        uncertain = (
-            target.item in ("coke", "coffee")
-            and target.item_confidence is not None
-            and target.item_confidence < self.settings.item_confirm_threshold
-        )
-        if uncertain:
+    async def set_demo_features(self, enabled):
+        async with self.lock:
+            if enabled == self.untrained_categories:
+                return self.state()
+            if self.phase in ("observing", "interpreting", "listening", "transcribing", "loading", "returning"):
+                raise ApiError("demo_feature_busy", "Wait for the current operation or cancel before changing demo features", 409)
+            self.untrained_categories = enabled
+            self.token += 1
+            self.card = None  # A previous menu's approval cannot survive a feature change.
+            if self.target and self.phase in ("offered", "card", "not_understood", "error"):
+                self.arm_deadline()
+                self.emit("offered", self.offer_message(self.target))
+            else:
+                self.emit(self.phase, self.message)
+            return self.state()
+
+    def offer_message(self, target):
+        """A grouped observation always asks for the member, regardless of confidence."""
+        grouped = len(VISION_CATEGORY_GROUPS.get(VISION_CATEGORY_MAP.get(target.item), ())) > 1
+        if self.untrained_categories:
+            options = available_drinks([target.item], demo=True)
+            return "Would you like a refill? Please choose " + ", ".join(d.replace("_", " ") for d in options) + "."
+        if grouped:
             return "Would you like a refill? Is that coke or coffee?"
         return f"Would you like a refill of {target.item}?"
 
@@ -259,6 +277,7 @@ class Controller:
         """Caller holds self.lock; shared by typed input and board STT."""
         current = CurrentRequest(
             item=self.card.item if self.card else self.target.item,
+            allowed_items=self.allowed_items(),
         )
         self.token += 1
         self.deadline, self.last_error = None, None
@@ -333,12 +352,13 @@ class Controller:
                         "cancelled" if result.intent == "cancel" else "declined",
                         "No refill will be started.",
                     )
-                elif result.intent == "not_understood":
+                elif result.intent == "not_understood" or result.item not in current.allowed_items:
                     # Keep previous card as edit context, but phase blocks all confirmation.
                     self.arm_deadline()
                     self.emit(
                         "not_understood",
-                        "I couldn't understand your request. Please choose water, coke, or coffee.",
+                        "I couldn't understand your request. Please choose "
+                        + ", ".join(d.replace("_", " ") for d in current.allowed_items) + " from the observed scene.",
                     )
                 else:
                     self.card = RequestCard(

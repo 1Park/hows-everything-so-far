@@ -87,7 +87,14 @@ class FixtureTextBackend:
         elif re.search(r"\b(no|nope|fine|don't need)\b", utterance):
             intent = "decline"
         else:
-            drinks = [d for d in ("water", "coke", "coffee") if re.search(rf"\b{d}\b", utterance)]
+            named = utterance
+            drinks = []
+            for variant in ("sparkling_water", "coke_zero"):
+                pattern = rf"\b{variant.replace('_', ' ')}\b"
+                if re.search(pattern, named):
+                    drinks.append(variant)
+                    named = re.sub(pattern, "", named)
+            drinks += [d for d in ("water", "coke", "coffee", "soda") if re.search(rf"\b{d}\b", named)]
             if len(drinks) > 1 or re.search(
                 r"\b(juice|tea|time|maybe|whatever|not sure|ignore)\b", utterance
             ):
@@ -98,6 +105,8 @@ class FixtureTextBackend:
                 r"yes|please|same|small|little|less|half|regular|normal|full", utterance
             ):
                 intent = "not_understood"
+        if intent == "refill" and item not in data.get("allowed_items", ["water", "coke", "coffee"]):
+            intent = "not_understood"
         result = {
             "intent": intent,
             "item": item if intent == "refill" else None,

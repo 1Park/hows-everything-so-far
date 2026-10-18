@@ -69,8 +69,24 @@ def test_not_understood_output():
 def test_generation_uses_item_only_context():
     body = generation("test", CurrentRequest(item="coffee"), "Same again please")
     assert json.loads(body.messages[1].content) == {
-        "current_request": {"item": "coffee"}, "utterance": "Same again please"
+        "current_request": {"item": "coffee"}, "utterance": "Same again please",
+        "allowed_items": ["water", "coke", "coffee"],
     }
+
+
+def test_generation_supplies_observed_group_menu():
+    body = generation("test", CurrentRequest(item="coke", allowed_items=["coke", "coffee"]), "Coffee please")
+    payload = json.loads(body.messages[1].content)
+    assert payload["allowed_items"] == ["coke", "coffee"]
+    assert "MUST belong to allowed_items" in body.messages[0].content
+
+
+def test_scene_category_expansion():
+    from common.vision_categories import available_drinks
+    assert available_drinks(["unknown"]) == []
+    assert available_drinks(["water"]) == ["water"]
+    assert available_drinks(["coke", "coffee", "coke"]) == ["coke", "coffee"]
+    assert available_drinks(["coke", "water"]) == ["water", "coke", "coffee"]
 
 
 def test_item_confidence_is_optional_and_bounded():

@@ -196,8 +196,8 @@ def scene(item, item_confidence, fill=0.15):
 
 @pytest.mark.parametrize(
     ("item", "item_confidence", "asks"),
-    [("coke", 0.6, True), ("coffee", 0.79, True), ("coke", 0.95, False),
-     ("coke", None, False), ("water", 0.5, False)],
+    [("coke", 0.6, True), ("coffee", 0.79, True), ("coke", 0.95, True),
+     ("coke", None, True), ("water", 0.5, False)],
 )
 async def test_offer_asks_drink_when_coke_coffee_uncertain(controller, item, item_confidence, asks):
     c = controller
@@ -209,6 +209,31 @@ async def test_offer_asks_drink_when_coke_coffee_uncertain(controller, item, ite
         assert "coke or coffee" in message
     else:
         assert message == f"Would you like a refill of {item}?"
-    # 묻는 경우에도 추정 음료로 카드를 만들고, 고객이 바꿀 수 있다
     await say(c, "Coffee, please")
-    assert c.phase == "card" and c.card.item == "coffee"
+    if item == "water":
+        assert c.phase == "not_understood" and c.card is None
+    else:
+        assert c.phase == "card" and c.card.item == "coffee"
+
+
+async def test_llm_cannot_select_outside_observed_groups(controller):
+    from common.contracts import Interpretation
+    c = controller
+    c.clients.vision = scene("coke", 1.0)
+    await observe(c)
+    assert c.state()["allowed_items"] == ["coke", "coffee"]
+    await say(c, "Coffee, please")
+    assert c.card.item == "coffee"
+    old = confirmation(c)
+
+    async def ignoring_menu(current, utterance):
+        assert current.allowed_items == ["coke", "coffee"]
+        return Interpretation(intent="refill", item="water"), "fixture"
+
+    c.clients.language = ignoring_menu
+    await say(c, "Water please")
+    assert c.phase == "not_understood" and c.card.item == "coffee"
+    assert "choose coke, coffee" in c.message
+    with pytest.raises(ApiError):
+        await c.confirm(old)
+    assert not c.hardware.commands

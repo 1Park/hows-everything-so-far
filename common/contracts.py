@@ -6,6 +6,7 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Drink = Literal["water", "coke", "coffee"]
+RequestedDrink = Literal["water", "coke", "coffee", "sparkling_water", "soda", "coke_zero"]
 Source = Literal["fixture", "external", "mlx", "executorch"]
 
 
@@ -64,12 +65,13 @@ class STTResult(Contract):
 
 
 class CurrentRequest(Contract):
-    item: Drink
+    item: RequestedDrink
+    allowed_items: list[RequestedDrink] = Field(default_factory=lambda: ["water", "coke", "coffee"])
 
 
 class Interpretation(Contract):
     intent: Literal["refill", "decline", "cancel", "not_understood"]
-    item: Drink | None
+    item: RequestedDrink | None
 
     @model_validator(mode="after")
     def coherent(self):
@@ -98,7 +100,8 @@ class Generation(Contract):
     chat_template_kwargs: TemplateOptions = Field(default_factory=TemplateOptions)
 
 
-class RequestCard(CurrentRequest):
+class RequestCard(Contract):
+    item: RequestedDrink
     request_id: str
     scene_id: str
     object_id: str
@@ -165,6 +168,10 @@ class CaptureModeInput(Contract):
     mode: Literal["manual", "auto"]
 
 
+class DemoFeaturesInput(Contract):
+    untrained_categories: bool = Field(strict=True)
+
+
 class CaptureStatus(Contract):
     mode: Literal["manual", "auto"] = "manual"
     status: Literal["manual", "scanning", "stabilizing", "paused", "waiting", "error"] = "manual"
@@ -178,6 +185,8 @@ class CaptureStatus(Contract):
 
 
 class StateSnapshot(Contract):
+    allowed_items: list[RequestedDrink] = Field(default_factory=list)
+    untrained_categories: bool = False
     instance_id: str
     session_id: str
     phase: Phase

@@ -8,12 +8,14 @@
                잔량 확신도는 low와 empty를 한 묶음(REFILL_LEVELS)으로 본다. 둘 다 리필 대상이라, 투명한 물이
                조금 남은 잔처럼 low↔empty 사이에서 헷갈려도 리필 판단은 흔들리지 않기 때문이다.
                이 묶음이 이기면 음료 확신도에도 반대편을 더한다: 음료 잔이면 + p(empty), 빈 잔(unknown)이면
-               + Σ p(<drink>__low). coke↔coffee, low↔full 사이 헷갈림은 그대로 점수를 낮춘다.
+               + Σ p(<drink>__low). low↔full 사이 헷갈림은 그대로 점수를 낮춘다.
   item_confidence : 음료가 있다고 볼 때 "어느 음료인지"만의 확신도 = 최고 음료 marginal / 음료 marginal 합.
                     empty/unknown 확률은 빼고 정규화한다. item 이 unknown 이면 None.
-                    coke↔coffee 처럼 음료만 애매한 경우를 Controller가 고객에게 묻는 데 쓴다.
+                    카테고리 통합 후의 확신도다 (coffee + coke → coke).
 Controller 정책(기본 confidence ≥ 0.7, fill_ratio ≤ 0.3 / 보드 .env.board 0.6, 0.35)은 이 값을 그대로 쓴다.
 """
+
+from common.vision_categories import VISION_CATEGORY_MAP
 
 DRINKS = ("water", "coke", "coffee")
 # 단계 → 대표 잔량 비율. full/mid/low 구간(합성 데이터 생성 기준)의 중앙값 근처. bundle.json 으로 덮어쓸 수 있다.
@@ -25,7 +27,7 @@ def parse(label):
     if label == "empty":
         return "unknown", "empty"
     drink, _, level = label.partition("__")
-    return (drink if drink in DRINKS else "unknown"), level
+    return VISION_CATEGORY_MAP.get(drink, "unknown"), level
 
 
 OTHER = "other"

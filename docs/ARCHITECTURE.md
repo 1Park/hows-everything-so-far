@@ -39,3 +39,20 @@ Controller는 lock·generation token·카드 revision으로 중복 확인과 취
 `QWEN_*`는 기존 서비스 경계 이름이며 보드의 실제 모델은 Gemma4다. `qwen_cli`는 별도 선택하는 일회성 Qwen runner다. 모델 실패 시 자동 fallback은 없다. LLM worker 오류는 다음 생성 요청에서 재로드할 수 있고, Vision worker 오류는 서비스 재시작으로 복구한다.
 
 앱은 native Python/venv/FastAPI, 서비스별 Uvicorn worker 1개다. 학습·export 환경은 `ml/`에 분리한다. 보드 실행·프로세스 소유는 [runbook](BOARD_RUNBOOK.md), 연결 규칙은 [계약](CONTRACTS.md)을 따른다.
+
+## 시각 카테고리와 요청 메뉴
+
+DINO의 기존 softmax 출력에서 `coffee + coke → coke`, `water → water`로 확률을 합산한다.
+대표 이름 `coke`는 관찰 그룹이며, 커피로 확정했다는 뜻이 아니다. 잔량 계산과 모델 가중치는 유지한다.
+Controller는 frozen scene에 인식된 모든 그룹을 펼쳐 요청 가능한 `allowed_items`를 만든다.
+예: coke만 보이면 coke/coffee, water만 보이면 water, 둘 다 보이면 water/coke/coffee.
+이 목록은 LLM 제품 프롬프트와 UI 그림 선택지에 공통으로 사용하며, Controller가 LLM의
+목록 밖 요청을 재확인 상태로 돌려 확인을 차단한다. Confirm은 여전히 별도로 필요하다.
+Demo tools는 고정 매핑을 읽기 전용으로 표시한다. 구현 원본은 `common/vision_categories.py`다.
+
+Demo tools의 **Enable untrained drink variants (demo only)** 는 기본 OFF다.
+켜면 요청 메뉴만 water → water/sparkling water/soda, coke → coke/coke zero/coffee로 확장한다.
+Vision 학습 클래스·확률·모델은 바꾸지 않으며, 추가 음료는 고객 발화로 선택한다.
+API 식별자는 `sparkling_water`, `coke_zero`, 영어 UI는 공백으로 표시한다.
+토글은 Controller 메모리에 유지되어 태블릿 재접속에 공유되고 서버 재시작 시 OFF로 돌아간다.
+변경 시 요청 카드를 폐기해 재확인을 요구하며 추론·녹음·시퀀스 진행 중에는 변경을 거절한다.

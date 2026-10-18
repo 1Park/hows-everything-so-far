@@ -7,6 +7,8 @@
 - `scene_id`는 분석 이미지 하나, `object_id`는 그 장면 안의 객체다. 장면 사이 추적 ID가 아니다. `session_id`는 고객 응대, 카드 `request_id/revision`은 요청과 수정 버전이다.
 - bbox는 **원본 전체 이미지 기준 normalized xyxy [0,1]**, 좌상단 원점이다. Controller가 원본을 보관하고 Vision이 같은 좌표계로 반환한다.
 - 관찰 item은 water/coke/coffee/unknown, 요청 item은 water/coke/coffee다. `fill_ratio`, `item_confidence`는 null일 수 있다. `confidence`와 `item_confidence`는 각각 종합·음료 종류 확신도다.
+- DINO backend는 coffee/coke 확률을 합쳐 대표 관찰 item `coke`로 반환한다. 이때 `item_confidence`는 그룹 확신도다. fixture·별도 adapter는 기존 관찰 enum을 사용할 수 있다.
+- 상태의 `allowed_items`는 frozen scene 전체의 관찰 그룹을 펼친 요청 메뉴다. coke 그룹은 coke/coffee를 허용하며 unknown은 메뉴를 추가하지 않는다. LLM 입력에는 `current_request`, `allowed_items`, `utterance`를 전달하고 Controller도 목록 밖 refill을 차단한다.
 - 요청·카드·LLM 출력에는 분량이 없다. 관찰 음료와 다른 음료로 요청을 수정해도 대상 객체는 유지한다.
 - 한 번에 한 대상·요청만 처리한다. Confirm은 현재 카드의 scene/object/request/revision이 모두 일치해야 한다. 제안·STT·LLM 결과만으로 하드웨어를 승인하지 않는다.
 
@@ -40,6 +42,8 @@ async def close(self): ...  # 선택
 | 경로 | 용도 |
 | --- | --- |
 | `GET /api/state` | 전체 `StateSnapshot` |
+| `GET /api/vision-categories` | 고정 groups/member 매핑, editable=false; 수정 API 없음 |
+| `POST /api/demo-features` | `{untrained_categories: boolean}` → 전체 상태. 기본 false; 진행 중 변경은 409 |
 | `GET/POST /api/capture` | 자동/수동 모드·진행 상태, POST `{mode}` |
 | `POST /api/observe` | multipart 선택 이미지·scenario로 관찰 시작 |
 | `POST /api/utterance` | scene_id/object_id/utterance로 요청 해석 |

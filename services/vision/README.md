@@ -6,6 +6,28 @@ fixture 또는 아래 external backend를 명시적으로 선택한다. 자동 f
 
 ## DINOv2 backend (`backend.py`)
 
+### 카테고리 통합
+
+기존 DINO `.pte`와 logistic regression `head.json`은 변경하지 않는다.
+softmax 이후 `coffee`와 `coke`의 확률을 합산해 대표 클래스 **`coke`** 로 반환하고,
+`water`는 유지한다. 잔량 단계는 합치지 않으며 기존 확률 가중 평균을 유지한다.
+음료 신뢰도는 통합한 확률로 계산한다. 따라서 관찰 결과의 `coke`는 커피도 포함한다.
+고객이 명시한 coffee 요청 및 메뉴는 그대로 coffee를 사용할 수 있다.
+Controller는 현재 frozen scene의 모든 관찰 카테고리를 펼쳐 `allowed_items`를 만든다:
+water만 있으면 water, coke 그룹만 있으면 coke/coffee, 둘 다 있으면 세 음료다.
+LLM 프롬프트에 이 목록을 전달하고, 모델이 목록 밖 음료를 반환하면 Controller가
+`not_understood`로 처리해 확인을 차단한다. UI의 음료 그림 버튼도 같은 목록을 사용한다.
+unknown은 선택지를 추가하지 않는다. 고객의 선택은 요청 카드이며 자동 물리 승인이 아니다.
+
+고정 매핑의 원본은 `common/vision_categories.py`, 적용은 `labels.py`에 있다.
+Demo tools의 읽기 전용 표시와 `GET /api/vision-categories`가 같은 매핑을 사용한다.
+런타임 수정 API는 제공하지 않는다. 이 통합은 DINO backend 후처리에 적용되며
+fixture 및 별도 외부 adapter의 결과를 Controller에서 강제로 바꾸지는 않는다.
+
+추가 하위 음료는 Controller의 demo-only 토글로만 활성화한다 (기본 OFF).
+water → water/sparkling water/soda, coke → coke/coke zero/coffee이며 DINO head 클래스는
+추가하지 않는다. Vision 계약의 관찰 enum과 고객 요청 enum은 분리되어 있다.
+
 ```sh
 VISION_MODEL_BACKEND=external \
 VISION_ADAPTER=services.vision.backend:create_backend \
