@@ -48,6 +48,15 @@ Settings precedence is explicit overrides in code > process environment variable
 The Controller owns the camera and microphone; the browser owns the UI and speaker. For optional video/USB input, install `.[camera]` and set `CAMERA_SOURCE`. An empty value means the explicit sample image.
 The board starts in Automatic by default and captures after a 3-second stability check. The dev `.env.example` uses Manual. [Auto capture](docs/AUTO_CAPTURE.md).
 
+## Tech Stack
+
+### Architecture
+
+<img width="1728" height="864" alt="image" src="https://github.com/user-attachments/assets/32cdc81e-978e-4d86-93f5-7a907f5c4e8b" />
+
+Details: https://github.com/1Park/hows-everything-so-far/blob/main/docs/ARCHITECTURE.md
+
+
 ## Docs and validation
 
 - [Structure and execution paths](docs/ARCHITECTURE.md), [API boundaries](docs/CONTRACTS.md)
