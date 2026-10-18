@@ -72,6 +72,9 @@ class Settings(BaseModel):
     audio_channels: int = Field(1, ge=1, le=2)
     audio_seconds: int = Field(6, ge=1, le=15)
     observe_interval_seconds: float = Field(0, ge=0, le=60)  # zero disables automatic observation
+    capture_mode: Literal["manual", "auto"] = "manual"
+    auto_capture_interval_seconds: float = Field(0.25, ge=0.1, le=5)
+    auto_capture_stable_seconds: float = Field(5, ge=0.1, le=30)
     # JSON Lines history of Controller phase changes (app/events.py). Empty disables.
     event_log_path: str = ""
 

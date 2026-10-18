@@ -48,6 +48,8 @@ FastAPI+Uvicorn, 서버별 worker1, ROS/앱 Docker 없음. 학습·export Docker
 
 ## 제품 로직과 모델 서버
 
+자동 캡처는 Controller의 `app/capture.py`에서 주기적으로 **기존 Vision API**를 호출한다. 종류별 객체 개수가 5초간 동일할 때, 해당 구간에서 bbox 겹침 면적이 가장 작은 프레임/분석 결과를 그대로 세션에 채택한다. 고객 응대 중에는 중단하며 모델 상주/전처리 책임은 Vision 서비스에 유지한다. [설정·알고리즘·중복 방지](AUTO_CAPTURE.md).
+
 - app/language.py: 제품 영어 프롬프트·현재 요청+발화·파싱·허용값. generic Qwen 서버가 제품 정책을 소유하지 않는다.
 - services/qwen: model/messages/생성 옵션 검증, admitted queue4/동시1, 전체20초 timeout, MLX/fixture/ExecuTorch 경계. 실패 시 fixture 전환 없음.
 - Mac 실제 `/v1/models`로 ID 확인, `/v1/chat/completions`로 생성. `mlx-community/Qwen3-0.6B-4bit`, temperature0, thinking false 요청. 서버 설정·모델 변경 없음.

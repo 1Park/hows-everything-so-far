@@ -6,6 +6,34 @@ let draftVersion = 0, transcriptionVersion = 0, micVersion = 0;
 let micPending = false, transcribing = false, pendingAction = null;
 let audioVersion = 0;
 let policy = {min_confidence: 0.7, low_fill_threshold: 0.3};  // /ready 값으로 덮어씀
+let captureState = null;
+const captureTerminal = ['idle','done','cancelled','declined','skipped','expired','error'];
+function autoScanning() {
+  return captureState?.mode === 'auto' && captureTerminal.includes(state?.phase)
+    && captureState.status !== 'paused';
+}
+function paintCapture() {
+  if (!captureState) return;
+  $('captureMode').value = captureState.mode;
+  const seconds = Math.min(captureState.stable_seconds, captureState.required_seconds).toFixed(1);
+  const labels = {
+    manual: 'Manual capture · Press Start demo to inspect a scene.',
+    scanning: 'Automatic capture · Waiting for cups.',
+    stabilizing: `Automatic capture · Stable types ${seconds} / ${captureState.required_seconds}s · ${captureState.samples} frames`,
+    paused: 'Automatic capture paused during the current interaction.',
+    waiting: 'Automatic capture · This scene was already inspected. Change the cups or restart capture.',
+    error: captureState.error || 'Automatic capture unavailable. Retrying.'
+  };
+  $('captureStatus').textContent = labels[captureState.status]
+    + (captureState.source ? ` · ${captureState.source.toUpperCase()} Vision` : '')
+    + (captureState.overlap_area !== null ? ` · overlap ${(captureState.overlap_area*100).toFixed(2)}%` : '');
+}
+function updateCapture(next) {
+  if (captureState && next.revision < captureState.revision) return;
+  captureState = next;
+  if (state) render(state);
+  else paintCapture();
+}
 const audioBuffers = new Map();
 const editablePhases = ['offered','card','not_understood','error'];
 // 사진틀 비율을 실제 사진(카메라 4:3, fixture 등) 비율에 맞춘다 → 박스 좌표가 사진과 일치
@@ -94,13 +122,16 @@ async function checkConnection() {
     liveSource = info.video.mode !== 'fixture-image';
     // One panel: live until a capture freezes it, so there is never a question
     // about which frame the request refers to.
-    if (liveSource && !state?.snapshot_url) attachStream($('sceneImage'));
+    if (liveSource && (!state?.snapshot_url || autoScanning())) attachStream($('sceneImage'));
+    if (state) render(state);
     showBackToLive();
   } catch { $('sources').textContent = 'Cannot reach the Controller. Reconnecting…'; }
 }
 function render(next, authoritative = false) {
   if (state && state.instance_id === next.instance_id && next.sequence < state.sequence) return;
   if (state && state.instance_id !== next.instance_id && !authoritative) return;
+  if (state && state.instance_id !== next.instance_id) captureState = null;
+  if (next.capture && (!captureState || next.capture.revision >= captureState.revision)) captureState = next.capture;
   if (!state || state.session_id !== next.session_id || state.instance_id !== next.instance_id) {
     stopRecording(true); transcriptionVersion++; draftVersion++;
     $('utterance').value = ''; $('transcript').hidden = true;
@@ -109,6 +140,8 @@ function render(next, authoritative = false) {
     displayedSession = ''; lastPhase = '';
   }
   state = next;
+  paintCapture();
+  const monitoring = autoScanning();
   $('replayVoice').disabled = ['listening','transcribing'].includes(state.phase);
   if ($('replayVoice').disabled) $('voicePreview').pause();
   const boardAudio = state.audio_input && state.audio_input !== 'disabled';
@@ -147,7 +180,17 @@ function render(next, authoritative = false) {
   $('cancel').disabled = !connected || pendingAction === 'cancel' || ['idle','done','cancelled','declined','skipped','expired'].includes(state.phase);
   $('start').disabled = !connected || !!pendingAction || ['observing','listening','transcribing','loading','returning'].includes(state.phase);
   $('start').innerHTML = (state.phase === 'idle' ? 'Start demo' : 'Inspect again') + ' <span>↗</span>';
-  if (state.snapshot_url && displayedSession !== state.session_id) {
+  if (captureState?.mode === 'auto') {
+    $('start').innerHTML = 'Restart auto capture <span>↗</span>';
+    $('start').disabled = !connected || !!pendingAction || !captureTerminal.includes(state.phase);
+  }
+  if (monitoring) {
+    displayedSession = '';
+    $('boxes').hidden = true;
+    if (liveSource) attachStream($('sceneImage'));
+    else if ($('sceneImage').getAttribute('src') !== '/api/frame') $('sceneImage').src = '/api/frame';
+    $('videoMode').textContent = 'Automatic capture · scanning';
+  } else if (state.snapshot_url && displayedSession !== state.session_id) {
     $('boxes').hidden = true;
     detachStream($('sceneImage'));
     $('sceneImage').src = state.snapshot_url; displayedSession = state.session_id;
@@ -163,7 +206,7 @@ function render(next, authoritative = false) {
   showBackToLive();
   syncFrameRatio();
   const boxes = $('boxes'); boxes.replaceChildren(); const objects = $('objects'); objects.replaceChildren();
-  for (const obj of state.scene?.objects || []) {
+  for (const obj of (monitoring ? [] : state.scene?.objects || [])) {
     const selected = obj.object_id === state.target?.object_id;
     // 리필 필요 = Controller 정책과 같은 잔량·confidence 기준 (빈 잔 unknown도 눈으로는 리필 대상이라 표시)
     // Vision은 빈 잔을 item unknown으로 보낸다 (계약에 empty 없음) → 화면에서만 empty로 표시
@@ -180,7 +223,12 @@ function render(next, authoritative = false) {
   }
   $('sceneTitle').textContent = state.scene ? `${state.scene.objects.length} cups observed` : 'Ready when you are';
   $('sceneSubtitle').textContent = state.scene ? `${state.scene.source === 'fixture' ? 'FIXTURE · Predetermined labels and scores' : 'EXTERNAL · Model team observations'}` : 'Inspect a scene to see the cups and their fill levels.';
+  if (monitoring) {
+    $('sceneTitle').textContent = 'Watching for a stable scene';
+    $('sceneSubtitle').textContent = $('captureStatus').textContent;
+  }
   $('requestCard').hidden = !state.card || !['card','interpreting','not_understood','error','loading','returning','done'].includes(state.phase);
+  if (monitoring) $('requestCard').hidden = true;
   if (state.card) {
     $('cardDrink').textContent = state.card.item;
     $('revision').textContent = `v${state.card.revision}`;
@@ -215,7 +263,7 @@ function connect() {
   clearTimeout(retryTimer);
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
   ws.onopen = () => {connected=true; lastPhase=''; $('connection').textContent='● Connected'; $('connection').classList.add('online'); checkConnection();};
-  ws.onmessage = event => {const data=JSON.parse(event.data); if(data.type==='state') render(data.state, true);};
+  ws.onmessage = event => {const data=JSON.parse(event.data); if(data.type==='state') render(data.state, true); else if(data.type==='capture' && data.instance_id === state?.instance_id) updateCapture(data.capture);};
   ws.onclose = () => {connected=false; audioVersion++; playingSource?.stop(); $('connection').textContent='Reconnecting…'; $('connection').classList.remove('online'); if(state) render(state); retryTimer=setTimeout(connect,1500);};
   ws.onerror = () => ws.close();
 }
@@ -236,7 +284,19 @@ async function action(name, operation) {
     if (state) render(state);
   }
 }
-$('start').onclick = () => { if(!sound) {$('audioToggle').click();} observe().catch(()=>{}); };
+$('start').onclick = () => {
+  if(!sound) $('audioToggle').click();
+  if (captureState?.mode === 'auto') post('/api/capture', {mode:'auto'}).then(updateCapture).catch(()=>{});
+  else observe().catch(()=>{});
+};
+$('captureMode').onchange = async () => {
+  const mode = $('captureMode').value;
+  if (mode === 'auto' && !sound) $('audioToggle').click();
+  $('captureMode').disabled = true;
+  try {updateCapture(await post('/api/capture', {mode}));}
+  catch {paintCapture();}
+  finally {$('captureMode').disabled = false;}
+};
 async function send(utterance) {
   if(!canEdit() || pendingAction) return;
   const input = {scene_id:state.scene.scene_id, object_id:state.target.object_id, utterance};

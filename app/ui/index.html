@@ -53,7 +53,9 @@
     <summary>Demo tools &amp; diagnostics</summary>
     <div id="sources" class="sources">Checking services…</div>
     <p id="mediaSupport" class="confirmation-note">Microphone &amp; speaker: this browser</p>
+    <p id="captureStatus" role="status">Manual capture · Press Start demo to inspect a scene.</p>
     <div class="options-row">
+      <label>Capture mode<select id="captureMode" aria-describedby="captureStatus"><option value="manual">Manual</option><option value="auto">Automatic</option></select></label>
       <label>Scenario<select id="scenario"><option value="normal">Low water · normal</option><option value="enough">Enough remaining · skip</option><option value="uncertain">Low confidence · skip</option></select></label>
       <label class="file-label">Image input<input id="imageFile" type="file" accept="image/jpeg,image/png"></label>
       <label class="file-label">Upload audio<input id="audioFile" type="file" accept="audio/wav,audio/webm,audio/ogg,audio/mp4"></label>

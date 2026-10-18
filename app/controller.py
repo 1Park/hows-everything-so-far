@@ -70,6 +70,7 @@ class Controller:
         self.microphone = BoardMicrophone(settings)
         self.voice_task = None
         self.transcript = self.stt_source = None
+        self.capture_status = None
 
     def state(self):
         return {
@@ -90,6 +91,7 @@ class Controller:
             "audio_seconds": self.settings.audio_seconds,
             "transcript": self.transcript,
             "stt_source": self.stt_source,
+            "capture": self.capture_status,
         }
 
     def show_phase_led(self, phase):
@@ -144,9 +146,11 @@ class Controller:
                 self.deadline = None
                 self.emit("expired", "The request expired. Inspect the scene again to retry.")
 
-    async def start(self, data: bytes, content_type: str, scenario: str, automatic=False):
+    async def start(self, data: bytes, content_type: str, scenario: str, automatic=False,
+                    preanalyzed=None, expected_token=None):
         async with self.lock:
-            if automatic and self.phase not in ("idle", "skipped"):
+            if automatic and (self.phase not in TERMINAL
+                              or (expected_token is not None and expected_token != self.token)):
                 return self.state()
             if self.phase in ("loading", "returning"):
                 raise ApiError(
@@ -162,7 +166,10 @@ class Controller:
             self.transcript = self.stt_source = None
             scene_id = uid()
             self.emit("observing", "Inspecting the scene…")
-            self.launch(self.observe(token, data, content_type, scene_id, scenario))
+            if preanalyzed is not None:
+                self.apply_observation(preanalyzed)
+            else:
+                self.launch(self.observe(token, data, content_type, scene_id, scenario))
             return self.state()
 
     async def fail(self, token, error):
@@ -184,25 +191,7 @@ class Controller:
             async with self.lock:
                 if token != self.token:
                     return
-                self.scene = result
-                eligible = [
-                    o
-                    for o in result.objects
-                    if o.item != "unknown"
-                    and o.fill_ratio is not None
-                    and o.confidence >= self.settings.min_confidence
-                    and o.fill_ratio <= self.settings.low_fill_threshold
-                ]
-                if not eligible:
-                    self.emit(
-                        "skipped",
-                        "No confident low-fill cup was found. No refill will be suggested.",
-                    )
-                    return
-                self.target = min(eligible, key=lambda o: (o.fill_ratio, o.object_id))
-                # A proposal is NOT a confirmable card. A customer utterance is required.
-                self.arm_deadline()
-                self.emit("offered", self.offer_message(self.target))
+                self.apply_observation(result)
         except TimeoutError:
             await self.fail(
                 token,
@@ -215,6 +204,20 @@ class Controller:
             await self.fail(
                 token, ApiError("vision_error", "Scene analysis failed. Please retry", 502, True)
             )
+
+    def apply_observation(self, result):
+        """Caller holds lock. Keep selected frame and its exact analysis together."""
+        self.scene = result
+        eligible = [o for o in result.objects if o.item != "unknown"
+                    and o.fill_ratio is not None
+                    and o.confidence >= self.settings.min_confidence
+                    and o.fill_ratio <= self.settings.low_fill_threshold]
+        if not eligible:
+            self.emit("skipped", "No confident low-fill cup was found. No refill will be suggested.")
+            return
+        self.target = min(eligible, key=lambda o: (o.fill_ratio, o.object_id))
+        self.arm_deadline()
+        self.emit("offered", self.offer_message(self.target))
 
     def offer_message(self, target):
         """Name the observed drink, or ask which one when Vision is unsure between look-alikes.

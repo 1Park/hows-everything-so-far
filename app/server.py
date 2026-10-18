@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from fastapi.staticfiles import StaticFiles
 
 from app.clients import ModelClients
+from app.capture import AutoCapture
 from app.controller import Controller
 from app.events import EventLog
 from app.media import VideoSource
@@ -23,6 +24,8 @@ from common.contracts import (
     Heartbeat,
     ListenInput,
     SttTake,
+    CaptureModeInput,
+    CaptureStatus,
 )
 from common.media import read_upload, validate_audio, validate_image
 
@@ -32,25 +35,13 @@ def create_app(settings=None, clients=None, hardware=None):
     clients = clients or ModelClients(settings)
     controller = Controller(settings, clients, hardware)
     video = VideoSource(settings.camera_source, settings.camera_fps, settings.video_stream_fps)
+    capture = AutoCapture(controller, video)
 
     @asynccontextmanager
     async def lifespan(app):
         video.start()
 
-        async def watch_scene():
-            while True:
-                await asyncio.sleep(max(0.2, settings.observe_interval_seconds))
-                # Pause for the whole customer interaction. Never interrupt a card/sequence.
-                if controller.phase in ("idle", "skipped"):
-                    try:
-                        data, mime = video.frame()
-                        validate_image(data, mime)
-                        if len(data) <= settings.max_image_bytes:
-                            await controller.start(data, mime, "normal", automatic=True)
-                    except ApiError:
-                        pass
-
-        watcher = asyncio.create_task(watch_scene()) if settings.observe_interval_seconds else None
+        watcher = asyncio.create_task(capture.run())
         try:
             yield
         finally:
@@ -61,7 +52,7 @@ def create_app(settings=None, clients=None, hardware=None):
             await controller.close()
 
     app = create_api("Controller", lifespan)
-    app.state.controller, app.state.video = controller, video
+    app.state.controller, app.state.video, app.state.capture = controller, video, capture
 
     # The tablet kept running an older app.js after a deploy because the browser
     # revalidated into a 304. The UI is tiny and served over a direct link, so
@@ -138,6 +129,14 @@ def create_app(settings=None, clients=None, hardware=None):
     @app.get("/api/state", response_model=StateSnapshot)
     async def state():
         return controller.state()
+
+    @app.get("/api/capture", response_model=CaptureStatus)
+    async def capture_status():
+        return controller.capture_status
+
+    @app.post("/api/capture", response_model=CaptureStatus)
+    async def capture_mode(body: CaptureModeInput):
+        return capture.set_mode(body.mode)
 
     @app.post("/api/observe", status_code=202, response_model=StateSnapshot)
     async def observe(

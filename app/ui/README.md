@@ -1,5 +1,7 @@
 # 실제 Demo UI
 
+Demo tools & diagnostics의 **Capture mode → Manual / Automatic**으로 캡처 방식을 바꾼다. 자동 모드는 서버에서 5초간 객체 수/종류가 같으면 선택 프레임을 freeze하고 기존 음성 안내 흐름을 시작한다. 진행 상태는 별도 capture 이벤트이며 요청/확인 sequence를 변경하지 않는다. 수동 모드는 기존 Start demo 동작을 유지한다. [동작 상세](../../docs/AUTO_CAPTURE.md).
+
 Controller가 `/`에서 제공하는 프레임워크 없는 HTML/CSS/JS. 설명용 docs/architecture.html과 별개다. **보드 마이크 / 태블릿 UI·스피커**: offered WS 이벤트→Web Audio 고정 WAV 재생 완료→보드 녹음 ACK→STT→Qwen→카드. 최초 Enable sound만 직접 누르며 인식 결과에 따른 이후 화면 전환은 자동이다. live TTS 없음. AUDIO_INPUT=disabled일 때만 개발용 브라우저 녹음/파일 전사→검토→Send 경로를 제공한다.
 
 새 장면은 이전 입력·전사·녹음을 초기화한다. 취소된 녹음과 늦게 승인된 마이크 권한은 폐기하며, 늦은 STT 결과는 사용자가 수정한 텍스트를 덮어쓰지 않는다. 요청 전송 중 중복 제출을 차단하되 취소는 가능하다. 취소·거절·만료 후 요청 카드는 숨긴다. 분석 프레임이 로드되기 전에는 bbox를 숨긴다.

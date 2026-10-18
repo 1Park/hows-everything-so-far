@@ -19,6 +19,8 @@
 
 ## 공통 HTTP
 
+자동 캡처: `GET /api/capture`, `POST /api/capture` (`{"mode":"manual"}` / `{"mode":"auto"}`)는 CaptureStatus를 반환한다. Controller state의 `capture`와 별도 WS `type=capture` 이벤트로 모드/5초 안정성 진행도를 제공한다. 이 이벤트는 요청 sequence를 변경하지 않는다. [프레임 선택·중복 방지·설정](AUTO_CAPTURE.md).
+
 `GET /health`는 프로세스 생존, `/ready`는 backend 가용성(503 가능). Qwen readiness는 모델 목록에 설정 ID가 있는지 검사하며 생성 성공과 구분한다.
 
 ```json

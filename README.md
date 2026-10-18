@@ -27,6 +27,8 @@ python scripts/dev.py
 
 `http://127.0.0.1:8080` → Start demo → Record request(또는 텍스트) → 전사 검토·Send → 카드 → Confirm refill. 종료 Ctrl+C. 다른 터미널에서 `python scripts/dev.py --stop`도 가능하다. 프로세스 환경변수 > 선택 dotenv(`--env-file`/REFILL_ENV_FILE, 기본 .env) > 기본값. 비밀은 개인 환경에만 저장한다.
 
+**자동 시작:** Demo tools & diagnostics → Capture mode → Automatic. 객체 종류별 개수가 5초간 같으면 bbox 겹침 면적이 가장 작은 프레임을 선택해 자동으로 시작한다. 기본은 기존 Manual이며 모델 source는 그대로 사용한다. [설정·알고리즘·검증](docs/AUTO_CAPTURE.md).
+
 | 모드 | 명령 | 이 기기에서 시작하는 프로세스 |
 | --- | --- | --- |
 | 기본 direct | `python scripts/dev.py` | Controller/UI만. Mac API 직접 호출, Vision/STT fixture |
