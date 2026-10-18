@@ -10,6 +10,7 @@
 | 8000 (localhost) | Qwen API → 상주 Gemma4 | 별도 Uvicorn |
 | 8001 (localhost) | Vision → 상주 YOLO + DINOv2 | 별도 Uvicorn |
 | 8002 (localhost) | STT API → whisper.cpp HTTP | 위 supervisor |
+| 8003 (localhost) | TTS → Piper, 디코더 상주 NPU | 별도 Uvicorn |
 | 8178 | 외부 whisper.cpp | 레포 밖에서 관리 |
 
 이 배치에서 `integration`/`board` 모드나 `start-board.sh`를 추가 실행하면 모델 서버 포트가 충돌한다. 이 도구들은 네 서비스를 모두 새로 관리할 때만 사용한다.
@@ -20,6 +21,7 @@
 
 - Gemma: `.env.board`의 `QWEN_MODEL_BACKEND=executorch`, `QWEN_MODEL=gemma4`. `bash scripts/board_llm.sh use gemma4`로 기본 선택을 고정한다. 경로·실행 수명은 [LLM 서비스](../services/qwen/README.md)를 따른다.
 - Vision: `.env.board` 기본 내부 backend는 fixture다. 실제 모델은 아래처럼 external factory·bundle·worker를 명시해야 한다. bundle은 디렉터리이며 `bundle.json`, `.pte`, head가 필요하다.
+- TTS: `.env.board`의 `TTS_*`. voice와 NPU 디코더(`<voice>.dec_f384.pte`)를 `models/board/tts/`에 두고 `.venv`에 `.[tts]` 의존성을 설치한다. 없으면 태블릿은 고정 WAV를 튼다. [TTS 서비스](../services/tts/README.md).
 - STT: `.env.board`의 Whisper adapter가 `127.0.0.1:8178`에 연결한다. 외부 서버를 먼저 준비한다.
 - 카메라·ALSA 장치는 `.env.board`와 현장 장치 목록을 대조한다. `python scripts/diagnose.py`로 읽기 전용 진단을 수행한다.
 
@@ -53,6 +55,11 @@ nohup .venv/bin/python -m uvicorn services.qwen.server:create_app --factory \
   --host 127.0.0.1 --port 8000 > logs/qwen-8000.log 2>&1 < /dev/null &
 echo $! > tmp/qwen-8000.pid
 
+VISION_WORKER_BIN="$PWD/models/board/bin/qnn_vision_worker" \
+nohup .venv/bin/python -m uvicorn services.tts.server:create_app --factory \
+  --host 127.0.0.1 --port 8003 > logs/tts-8003.log 2>&1 < /dev/null &
+echo $! > tmp/tts-8003.pid
+
 .venv/bin/python scripts/dev.py --mode direct --with-stt --env-file .env.board
 ```
 
@@ -61,6 +68,7 @@ Gemma4와 Vision은 서버 시작 시 모델을 로드하므로 생성/invoke �
 ```sh
 curl -fsS http://127.0.0.1:8000/ready
 curl -fsS http://127.0.0.1:8001/ready
+curl -fsS http://127.0.0.1:8003/ready
 curl -fsS http://127.0.0.1:8080/ready
 ```
 

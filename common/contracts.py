@@ -177,6 +177,10 @@ class CaptureStatus(Contract):
     error: str | None = None
 
 
+class SpeechRequest(Contract):
+    text: str = Field(min_length=1, max_length=400)
+
+
 class StateSnapshot(Contract):
     instance_id: str
     session_id: str
@@ -197,6 +201,8 @@ class StateSnapshot(Contract):
     # How long board capture runs, so the page can show the time passing.
     audio_seconds: int = 6
     capture: CaptureStatus | None = None
+    # What the assistant says for this state (board TTS); None = stay silent.
+    speech: str | None = None
 
 
 class StateEvent(Contract):

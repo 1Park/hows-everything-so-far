@@ -1,0 +1,31 @@
+"""What the assistant says out loud for each state (spoken by the board TTS, played on the tablet).
+
+Short, friendly English lines. The screen keeps its own longer message; speech stays brief so the
+board microphone can start recording soon after the offer. None means stay silent.
+"""
+
+
+def speech_for(phase, target, card, item_confirm_threshold):
+    item = card.item if card else (target.item if target else None)
+    if phase == "offered" and target is not None:
+        if target.item == "unknown":
+            return "Your glass is empty. Would you like water, coke, or coffee?"
+        if (target.item in ("coke", "coffee") and target.item_confidence is not None
+                and target.item_confidence < item_confirm_threshold):
+            return "Would you like a refill? Is that coke or coffee?"
+        return f"Your {target.item} is running low. Would you like a refill?"
+    if phase == "card" and card is not None:
+        return f"One more {card.item}, got it. Please press Confirm."
+    if phase == "not_understood":
+        return "Sorry, I didn't catch that. Water, coke, or coffee?"
+    if phase == "declined":
+        return "No problem. Just call me if you need anything."
+    if phase == "cancelled":
+        return "Okay, cancelled. Call me anytime."
+    if phase == "done" and item:
+        return f"Your {item} refill is on its way."
+    if phase == "expired":
+        return "I'll check back on you later."
+    if phase == "error":
+        return "Sorry, something went wrong. Please try again."
+    return None
