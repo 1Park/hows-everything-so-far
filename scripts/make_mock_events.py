@@ -5,6 +5,8 @@ Scenario: an evening bar, 16:00-23:00 local time, 2026-10-11 (Sun) .. 2026-10-17
 - 40 ``requested`` lines, each ~30 s (20-45 s) after a low detection in the same session.
 - Busier on Friday/Saturday and from 19:00 to 22:00; coffee early, beer/cocktail late.
 - Every line carries ``"mock": true`` so it can be merged with real records and still be told apart.
+- Nothing at or after CUTOFF (19:00 on the demo day): live records from the demo take over from there,
+  so the most recent lines on the dashboard are real ones. The counts above are before this cut.
 
 Deterministic (fixed seed). Usage:
     python scripts/make_mock_events.py [--out fixtures/mock_events.jsonl] [--seed 1029]
@@ -35,6 +37,7 @@ DRINK_WEIGHT = {
     21: [2, 0.5, 5, 2, 5],
     22: [2, 0.5, 4, 3, 5],
 }
+CUTOFF = datetime(2026, 10, 17, 19, tzinfo=LOCAL)
 LOW_RANGE, HIGH_RANGE = (0.02, 0.30), (0.35, 0.95)
 N_LOW, N_HIGH, N_REQUESTED = 50, 50, 40
 
@@ -142,6 +145,7 @@ def generate(seed: int = 1029) -> list[dict]:
         delay = timedelta(seconds=rng.uniform(20, 45))
         rows.append(request(rng, row, when + delay))
 
+    rows = [r for r in rows if datetime.fromisoformat(r["ts"]) < CUTOFF]
     return sorted(rows, key=lambda r: (r["ts"], r["event"] != "detected", r["object_id"]))
 
 

@@ -17,7 +17,8 @@ def test_counts_and_shape():
     counts = Counter(
         r["event"] if r["event"] == "requested" else f"detected/{r['level']}" for r in rows
     )
-    assert counts == {"detected/low": 50, "detected/high": 50, "requested": 40}
+    # 50 low / 50 high / 40 requested before the cutoff drops the demo evening.
+    assert counts == {"detected/low": 45, "detected/high": 43, "requested": 37}
     assert all(r["mock"] is True for r in rows)
     assert {r["item"] for r in rows} <= {"coke", "coffee", "beer", "water", "cocktail"}
     assert [r["ts"] for r in rows] == sorted(r["ts"] for r in rows)
@@ -29,13 +30,14 @@ def test_times_are_bar_hours_in_the_week():
         assert "2026-10-11" <= local.date().isoformat() <= "2026-10-17"
         # Requests trail a detection by up to 45 s, so allow them just past 23:00.
         assert 16 <= local.hour < 23 or (r["event"] == "requested" and local.hour == 23)
+        assert local < datetime(2026, 10, 17, 19, tzinfo=LOCAL)
 
 
 def test_each_request_follows_a_low_cup_by_about_30_seconds():
     rows = mock.generate()
     lows = {(r["session"], r["object_id"]): r for r in rows if r.get("level") == "low"}
     requested = [r for r in rows if r["event"] == "requested"]
-    assert len({r["session"] for r in requested}) == 40
+    assert len({r["session"] for r in requested}) == len(requested)
     for r in requested:
         low = lows[(r["session"], r["object_id"])]
         delay = datetime.fromisoformat(r["ts"]) - datetime.fromisoformat(low["ts"])

@@ -142,6 +142,41 @@ function ranking(rows) {
   }));
 }
 
+const stamp = new Intl.DateTimeFormat('en-US', {timeZone: VENUE_TZ, weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
+function ago(ts) {
+  const minutes = Math.round((Date.now() - new Date(ts)) / 60000);
+  // Mock history runs to 10pm on the demo day, so it can sit in the future.
+  if (minutes < 0) return '';
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 60 * 24) return `${Math.round(minutes / 60)} h ago`;
+  return `${Math.round(minutes / 60 / 24)} d ago`;
+}
+function recent(rows) {
+  const box = $('recentLog');
+  const latest = [...rows].sort((a, b) => new Date(b.ts) - new Date(a.ts)).slice(0, 5);
+  if (!latest.length) { box.textContent = 'No events yet.'; return; }
+  box.replaceChildren(...latest.map(r => {
+    const li = document.createElement('li'); li.className = `recent-row ${r.event}`;
+    li.innerHTML = '<span class="recent-kind"></span><span class="recent-drink"><i></i><b></b></span><span class="recent-detail"></span><span class="recent-time"><b></b><small></small></span>';
+    li.querySelector('.recent-kind').textContent = r.event === 'requested' ? 'Request' : 'Detect';
+    li.querySelector('.recent-drink i').style.background = color(r.item);
+    li.querySelector('.recent-drink b').textContent = r.item;
+    const detail = li.querySelector('.recent-detail');
+    if (r.event === 'detected') {
+      const level = document.createElement('span'); level.className = `level-tag ${r.level}`;
+      level.textContent = r.level === 'unknown' ? 'Fill ?' : r.level;
+      detail.append(level);
+      if (r.fill_ratio != null) detail.append(` ${Math.round(r.fill_ratio * 100)}% left`);
+    } else {
+      detail.textContent = r.transcript ? `\u201C${r.transcript}\u201D` : 'Refill requested';
+    }
+    li.querySelector('.recent-time b').textContent = stamp.format(new Date(r.ts));
+    li.querySelector('.recent-time small').textContent = ago(r.ts);
+    return li;
+  }));
+}
+
 function render() {
   const rows = events
     .filter(e => e.ts && (e.event === 'detected' || e.event === 'requested'))
@@ -158,6 +193,7 @@ function render() {
   }
 
   ranking(requested);
+  recent(rows);
 
   const byHour = countBy(requested, 'hour'), byDay = countBy(requested, 'day');
   const hourValues = hours.map(h => byHour.get(h) || 0), dayValues = days.map(d => byDay.get(d) || 0);

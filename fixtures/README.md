@@ -8,4 +8,4 @@ drink_cases_distorted.json은 위 20개와 ID로 대응하는 **수동 합성 ST
 
 `python scripts/dev.py --mode fixture`는 Vision/STT/Hardware fixture + 실제 Qwen HTTP 조합이다. Qwen까지 모델 없이 재현하려면 `--mode offline`을 사용한다.
 
-mock_events.jsonl은 대시보드용 **모의 이력**이다(`scripts/make_mock_events.py`, 고정 seed로 재생성). 저녁 바 가정, 2026-10-11~17 16:00–23:00(America/Los_Angeles, ts는 UTC), 음료 coke/coffee/beer/water/cocktail. detected 100줄(low 50, high 50)과 low 감지 약 30초(20–45초) 뒤 requested 40줄. 형식은 `logs/events.jsonl`과 같고 모든 줄에 `"mock": true`가 있어 실제 기록과 합쳐도 구분된다. beer/cocktail은 앱 메뉴(water/coke/coffee)에 없는 대시보드 전용 값이다.
+mock_events.jsonl은 대시보드용 **모의 이력**이다(`scripts/make_mock_events.py`, 고정 seed로 재생성). 저녁 바 가정, 2026-10-11~17 16:00–23:00(America/Los_Angeles, ts는 UTC), 음료 coke/coffee/beer/water/cocktail. detected 88줄(low 45, high 43)과 low 감지 약 30초(20–45초) 뒤 requested 37줄. 데모 당일 10/17 19:00 이후는 잘라내서 그 뒤로는 실제 기록이 가장 최근 줄이 된다. 형식은 `logs/events.jsonl`과 같고 모든 줄에 `"mock": true`가 있어 실제 기록과 합쳐도 구분된다. beer/cocktail은 앱 메뉴(water/coke/coffee)에 없는 대시보드 전용 값이다.
