@@ -23,7 +23,8 @@ addEventListener('click', event => {
 });
 
 // The live view is served by the display on 8004; same host as this deck.
-document.getElementById('demoLink').href = `${location.protocol}//${location.hostname}:8004/`;
+const liveView = `${location.protocol}//${location.hostname}:8004/`;
+for (const id of ['demoLink', 'demoLinkEnd']) document.getElementById(id).href = liveView;
 
 // The robot picture is optional: the slide should read as a plan, not a broken image.
 const robot = document.getElementById('robot');

@@ -12,31 +12,42 @@
 <section class="slide title-slide">
   <p class="eyebrow">ExecuTorch Hackathon · IoT track · Arduino VENTUNO Q</p>
   <h1>How's everything so far?</h1>
-  <p class="lede">A serving robot stops at your table, sees that your drink is low,
+  <p class="lede">A serving robot stops at your table, notices your <b>empty glass</b>,
     asks if you would like a refill, and acts on your answer — every model on the board.</p>
-  <p class="note">No cloud call in the loop. The camera, the microphone, the models and the
-    microcontroller are all on one device.</p>
+  <p class="note">No server, no cloud call in the loop. The camera, the microphone, the models
+    and the microcontroller are all on one device.</p>
 </section>
 
 <section class="slide">
-  <h2>Why on the device</h2>
+  <h2>A restaurant has no server room</h2>
   <div class="cards">
+    <div class="card">
+      <h3>Nobody runs a GPU behind the counter</h3>
+      <p>A dining room has power, a router of uncertain quality, and no one to operate
+        a machine. Anything that needs a server will not be installed.</p>
+    </div>
+    <div class="card">
+      <h3>An empty glass is the whole job</h3>
+      <p>It is a small, visible fact at every table, and noticing it is what saves a
+        customer from waving someone down. That is what we put on the board.</p>
+    </div>
     <div class="card">
       <h3>Tables are private</h3>
       <p>Cameras and microphones sit where people eat and talk. Nothing from this table
-        leaves the board.</p>
-    </div>
-    <div class="card">
-      <h3>A venue is not a datacentre</h3>
-      <p>Conference Wi-Fi drops. A refill should not wait on a round trip to a region
-        on another coast.</p>
-    </div>
-    <div class="card">
-      <h3>Confidence is a decision</h3>
-      <p>Reaching for a glass you only think is empty is worse than asking. A low score
-        makes the robot ask rather than act.</p>
+        leaves the device — not the frame, not the voice.</p>
     </div>
   </div>
+  <p class="note">So the constraint came first: if it cannot run on the robot, it is not
+    part of the demo. Confidence is treated the same way — reaching for a glass you only
+    think is empty is worse than asking, so a low score makes it ask.</p>
+</section>
+
+<section class="slide title-slide">
+  <p class="eyebrow">Before the architecture</p>
+  <h2 class="demo-heading">Let's watch it run</h2>
+  <p class="lede">An empty glass on the table, a spoken answer, and the board acting on it.
+    Then we will come back to how it is built.</p>
+  <a id="demoLink" class="jump" href="#">Open the live view ↗</a>
 </section>
 
 <section class="slide">
@@ -138,10 +149,10 @@
 </section>
 
 <section class="slide title-slide">
-  <h2 class="demo-heading">Let's watch it run</h2>
-  <p class="lede">The next screen is the live view: what the camera sees, what the board
-    heard, and how it read the request.</p>
-  <a id="demoLink" class="jump" href="#">Open the live view ↗</a>
+  <h2 class="demo-heading">One board, one table</h2>
+  <p class="lede">Vision, speech, language and voice on the device, and a microcontroller
+    that acts only after the customer says so.</p>
+  <a id="demoLinkEnd" class="jump" href="#">Back to the live view ↗</a>
 </section>
 
 </main>
