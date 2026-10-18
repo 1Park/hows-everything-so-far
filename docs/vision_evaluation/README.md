@@ -216,7 +216,26 @@ Single-seed screening of other heads with augmentation: linear SVM 95.8%, RBF SV
 Before deploying, v5e and v6 were run end to end on five saved board scenes (snack bag scene, an older frame with cut-off glasses and cans, and three real demo captures): the same boxes were refill targets in all five, the snack bag stayed dropped, and the orange juice glass beside it moved from 0.42 to 0.50 fill (about 60% in reality). One nearly empty glass with a red can behind it changed from `coke` to `water`, which matches the clear remnant in it.
 
 - Trade-off: LDA posteriors are sharp, so v6 confidence is usually 0.9–1.0 and the 0.6 confidence floor filters less. CV false refills did not increase, but watch this in the rehearsal.
-- v6 was trained with an ad hoc script on the board features (StandardScaler → `LinearDiscriminantAnalysis(solver="lsqr", shrinkage="auto")`, exported as `W = coef_`, `b = intercept_`); `make_head` does not have an LDA or augmentation option yet.
+- The head is StandardScaler → `LinearDiscriminantAnalysis(solver="lsqr", shrinkage="auto")`, exported as `W = coef_`, `b = intercept_`. v6/v7 were first fit with an ad hoc script; `make_head --model lda --augment 4` now does the same (on the v7 training features it reproduces the deployed v7 head to within 6e-5 in `W`/`b`). LDA needs scikit-learn.
+
+## Board-camera sessions at the demo spot (2026-10-18, board bundle v7)
+
+Problem: in rehearsal at the demo spot, v6 often read low water glasses as `mid` (no refill offer).
+
+- Data: two sessions captured with the board camera (640×480) at the demo spot while moving the camera, 12 frames each, crops labeled by position: `s1_wl_cl_empty` (water low, coke low, empty, bottles) and `s2_shuffled` (order and glasses changed; coffee low, water low, empty). 75 crops, ×4 augmented, added to the v6 training set (2995 rows in total). Head: `make_head --model lda --augment 4` equivalent.
+- Check: train on one session, test on the other (v6 has seen neither). Counted with the Controller rule (fill ≤ 0.35, confidence ≥ 0.6, not empty); for `empty` and `other` the count is wrongly offered / dropped.
+
+| Held-out session | Head | Water low offered | Coke / coffee low offered | Empty wrongly offered | Other dropped |
+|---|---|---:|---:|---:|---:|
+| s1 | v6 | 6/11 (4 read as `mid`) | coke 11/12 | 1/9 | 4/4 |
+| s1 | v7 trained with s2 | 10/11 | **coke 3/12 (9 read as empty)** | 2/9 | 4/4 |
+| s2 | v6 | 9/12 | coffee 11/11 | 0/12 | 4/4 |
+| s2 | v7 trained with s1 | 10/12 | coffee 11/11 | 1/12 | 4/4 |
+
+- Grouped CV on the older data (sessions always in training), with empty counted as "do not offer" as in the Controller: v6 configuration 97.9%, v7 configuration 98.2% refill decision; full/mid false refills 2.3 → 3.0 /310. The v6 table above counts empty as "should flag", so its numbers are not directly comparable.
+- Saved scenes, v6 vs v7 end to end: the snack bag stays dropped, the orange juice glass is unchanged, and refill targets on drinks are the same except two glasses v6 offered as water low and v7 reads as empty: in `s1_frame05` that glass is labeled empty (v6 was wrong; this frame is in v7's training), the other scene is unlabeled.
+- Deployed: `dinov2-qnn-v7` (both sessions in training), selected in `~/.config/refill-assist/vision.env`.
+- Risk: with only s2 in training, v7 read most s1 coke-low glasses as empty. The deployed head has seen s1, but a coke-low glass in a new arrangement may still be read as empty and get no offer. Check coke low live at the demo spot before the demo; a third session with coke low in other positions is the fix if it misses.
 
 ## Board NPU measurements (2026-10-17, VENTUNO Q / QCS8275, organizer ExecuTorch + QNN 2.49)
 

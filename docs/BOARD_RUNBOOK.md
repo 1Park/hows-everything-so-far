@@ -11,7 +11,8 @@ Code and settings changes follow **local edit → verify → commit/push → dep
 | 8001 (localhost) | Vision → resident YOLO + DINOv2 | separate Uvicorn |
 | 8002 (localhost) | STT API → whisper.cpp HTTP | the supervisor above |
 | 8003 (localhost) | TTS → Piper, decoder resident on NPU | separate Uvicorn |
-| 8178 | external whisper.cpp | managed outside the repo |
+| 8179 | whisper.cpp `ggml-tiny.en`, used by the STT API | `refill-whisper-tiny` unit ([whisper.cpp server](WHISPER_SERVER.md)) |
+| 8178 | whisper.cpp `ggml-base.en`, comparison/fallback | `refill-whisper-base` unit |
 
 In this layout, also running `integration`/`board` mode or `start-board.sh` causes model server port conflicts. Use those tools only when they manage all four services from scratch.
 
@@ -22,7 +23,7 @@ From the repo root, set up `.venv` and the dependencies (`pip install -c require
 - Gemma: `QWEN_MODEL_BACKEND=executorch`, `QWEN_MODEL=gemma4` in `.env.board`. Pin the default selection with `bash scripts/board_llm.sh use gemma4`. Paths and process lifetime follow the [LLM service](../services/qwen/README.md).
 - Vision: the default internal backend in `.env.board` is fixture. The real model requires explicitly setting the external factory, bundle, and worker as shown below. A bundle is a directory and needs `bundle.json`, `.pte`, and a head.
 - TTS: `TTS_*` in `.env.board`. Put the voice and the NPU decoder (`<voice>.dec_f384.pte`) in `models/board/tts/` and install the `.[tts]` dependencies into `.venv`. With `TTS_BACKEND=http`, missing TTS shows `/ready=503` and a playback error, and it does not fall back to the old WAVs. [TTS service](../services/tts/README.md).
-- STT: the Whisper adapter in `.env.board` connects to `127.0.0.1:8178`. Prepare the external server first.
+- STT: the Whisper adapter in `.env.board` connects to `127.0.0.1:8179` (tiny.en). Build and start the whisper.cpp servers first: [whisper.cpp server](WHISPER_SERVER.md).
 - Check the camera and ALSA devices in `.env.board` against the on-site device list. Run `python scripts/diagnose.py` for read-only diagnostics.
 
 Build the Vision worker in a separate path without modifying the provided SDK:
@@ -73,7 +74,7 @@ supervisors, then cleans up only the lock/ready/stop files of exited processes. 
 `/ready` may return 503. arduino-router is a separate system service; check that it is enabled.
 Verify: without USB, check that `/ready` reports the real models, TTS, microphone, and Bridge as ready, and that the tablet can connect.
 
-Below is an example layout with the provided SDK at `~/git/executorch` and the bundle at `dinov2-qnn-v6` (LDA head with augmentation; includes orange juice and the snack bag at the demo spot; `-v5e` is the previous logistic-regression head). Check the actual paths and start **only services that have no existing listener**. Set the selected env explicitly for each process.
+Below is an example layout with the provided SDK at `~/git/executorch` and the bundle at `dinov2-qnn-v7` (LDA head with augmentation; v6 plus two board-camera sessions at the demo spot; `-v6` is the previous head, `-v5e` the last logistic-regression head). Check the actual paths and start **only services that have no existing listener**. Set the selected env explicitly for each process.
 
 ```sh
 mkdir -p logs tmp
@@ -82,7 +83,7 @@ export LD_LIBRARY_PATH="$HOME/git/executorch/build-x86/backends/qualcomm:/usr/li
 export ADSP_LIBRARY_PATH=/usr/lib
 
 VISION_MODEL_BACKEND=external VISION_ADAPTER=services.vision.backend:create_backend \
-VISION_MODEL_PATH=models/board/vision/dinov2-qnn-v6 \
+VISION_MODEL_PATH=models/board/vision/dinov2-qnn-v7 \
 VISION_WORKER_BIN="$PWD/models/board/bin/qnn_vision_worker" \
 nohup .venv/bin/python -m uvicorn services.vision.server:create_app --factory \
   --host 127.0.0.1 --port 8001 > logs/vision-8001.log 2>&1 < /dev/null &

@@ -11,6 +11,8 @@
   <h1>How's everything so far?</h1>
   <div class="runtime" id="runtime"></div>
   <span id="link" class="link">connecting…</span>
+  <a id="dashboardLink" class="jump" target="_blank" rel="noopener">What the table asked for ↗</a>
+  <a id="deckLink" class="jump">Back to slides ↗</a>
 </header>
 
 <main>
@@ -20,7 +22,6 @@
       <img id="sceneImage" alt="What the board is looking at">
       <div id="boxes"></div>
     </div>
-    <p id="speech" class="speech"></p>
   </section>
 
   <aside class="rail">
@@ -38,14 +39,14 @@
       <div id="objects" class="objects"></div>
     </div>
 
-    <div class="panel" id="heardPanel" hidden>
-      <h2>Heard</h2>
-      <p id="transcript" class="quote"></p>
-    </div>
-
     <div class="panel" id="requestPanel" hidden>
       <h2>Understood as</h2>
       <p id="request" class="request"></p>
+    </div>
+
+    <div class="panel chat-panel">
+      <h2>Conversation</h2>
+      <div id="chat" class="chat"></div>
     </div>
   </aside>
 </main>

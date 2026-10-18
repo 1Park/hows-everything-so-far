@@ -31,6 +31,7 @@ def create_app():
 
     settings = load_settings()
     controller = f"http://127.0.0.1:{settings.controller_port}"
+    llm = f"http://127.0.0.1:{settings.qwen_port}"
 
     @app.get("/health")
     async def health():
@@ -46,8 +47,16 @@ def create_app():
         """
         try:
             async with httpx.AsyncClient(timeout=4, trust_env=False) as client:
-                response = await client.get(controller + "/ready")
-                return response.json()
+                ready = (await client.get(controller + "/ready")).json()
+                # The Controller reports that the language service answered, not
+                # what it runs on. Only the service itself knows whether the model
+                # is on the board's NPU or on a remote host, and the display should
+                # not claim NPU without asking.
+                try:
+                    ready["llm"] = (await client.get(llm + "/ready")).json()
+                except (httpx.HTTPError, ValueError):
+                    ready["llm"] = {}
+                return ready
         except (httpx.HTTPError, ValueError):
             return {"ready": False, "dependencies": {}}
 

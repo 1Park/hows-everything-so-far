@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HESF · Bearmetric</title>
+<link rel="stylesheet" href="/deck/deck.css">
+</head>
+<body>
+<main id="deck">
+
+<section class="slide title-slide">
+  <p class="eyebrow">Team Bearmetric · ExecuTorch Hackathon · Arduino VENTUNO Q</p>
+  <h1>How's Everything So Far?</h1>
+  <p class="lede">A serving robot notices your empty glass, asks whether you would like
+    another, and acts on your answer — with every model running on the board.</p>
+</section>
+
+<section class="slide">
+  <h2>What makes this board special?</h2>
+  <div class="split-lead">
+    <p class="big">It has an NPU.<br>It can run AI <b>on the device itself</b>.</p>
+    <p class="aside">So we went looking for a place where on-device is not a preference
+      but a requirement.</p>
+  </div>
+</section>
+
+<section class="slide">
+  <h2>Restaurant serving robots</h2>
+  <div class="cards">
+    <div class="card">
+      <h3>The Wi-Fi is unreliable</h3>
+      <p>Dining rooms are full of people, metal and microwaves. A robot that stops
+        working when the signal drops is not a robot anyone keeps.</p>
+    </div>
+    <div class="card">
+      <h3>Faces and voices stay at the table</h3>
+      <p>A robot that watches tables and listens to guests should not be sending them
+        to someone else's servers. Nothing leaves the device.</p>
+    </div>
+    <div class="card">
+      <h3>So the robot has to think locally</h3>
+      <p>That is exactly what the NPU on this board is for, and it is why the whole
+        pipeline here runs on it.</p>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <h2>The problem: empty glasses</h2>
+  <div class="split-lead">
+    <p class="big">Staff are busy.<br>Guests wait.<br>The restaurant loses refill sales.</p>
+    <p class="aside">It is a small thing to notice and an easy thing to miss, which is
+      what makes it worth automating. HESF lets the robot see the empty glass and ask
+      the guest whether they would like another drink — before anyone has to wave
+      somebody down.</p>
+  </div>
+</section>
+
+<section class="slide title-slide" id="demo">
+  <p class="eyebrow">Enough talking</p>
+  <h2 class="demo-heading">Let's see it live</h2>
+  <a id="demoLink" class="jump" href="#">Open the live view ↗</a>
+</section>
+
+<section class="slide">
+  <h2>The flow — all of it on one board</h2>
+  <ol class="flow">
+    <li>
+      <span class="step">See</span>
+      <p>YOLO finds the glasses, then DINOv2 reads each one: which drink, and how full.
+        <b class="npu">NPU · about 0.1s per frame</b></p>
+    </li>
+    <li>
+      <span class="step">Ask</span>
+      <p>If a glass is low, the robot asks "Would you like another one?" with Piper.
+        <b class="npu">NPU · voice decoder as a .pte</b></p>
+    </li>
+    <li>
+      <span class="step">Listen</span>
+      <p>The guest's answer is recorded on the board and turned into text by Whisper.
+        <b class="cpu">CPU · 4 of 8 cores</b></p>
+    </li>
+    <li>
+      <span class="step">Understand</span>
+      <p>Gemma 4 returns the intent — refill, no thanks, cancel, or didn't understand —
+        and handles "not coke, coffee please". <b class="npu">NPU · about 2s</b></p>
+    </li>
+    <li>
+      <span class="step">Act</span>
+      <p>The microcontroller runs the refill sequence and shows its status.
+        <b>STM32H5 · one command over Arduino Bridge</b></p>
+    </li>
+  </ol>
+</section>
+
+<section class="slide">
+  <h2>How it fits together</h2>
+  <div class="diagram" id="diagram"></div>
+  <p class="note">One Linux process owns the camera. The microcontroller owns the pins.
+    Between them is a single command, not a video feed.</p>
+</section>
+
+<section class="slide">
+  <h2>Is it really the NPU?</h2>
+  <div class="cards">
+    <div class="card">
+      <h3>The graph is delegated</h3>
+      <p>Each <code>.pte</code> holds a QNN delegate and <b>no CPU kernels</b> — not one
+        <code>aten::</code> operator left in the program.</p>
+    </div>
+    <div class="card">
+      <h3>The DSP is in use</h3>
+      <p>While inference runs, the vision and language processes hold
+        <code>/dev/fastrpc-cdsp</code> handles: work is crossing to Hexagon.</p>
+    </div>
+    <div class="card">
+      <h3>What we do not claim</h3>
+      <p>We exported no CPU baseline, so we quote no speed-up. Speech recognition runs
+        on the CPU and is labelled that way everywhere.</p>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <h2>Measured on the board</h2>
+  <div class="numbers">
+    <div><b>0.1<small>s</small></b><span>see the table<br>YOLO + DINOv2 · NPU</span></div>
+    <div><b>2.8<small>s</small></b><span>transcribe<br>Whisper tiny.en · CPU</span></div>
+    <div><b>1.8<small>s</small></b><span>understand<br>Gemma 4 · NPU</span></div>
+    <div><b>3<small>s</small></b><span>refill sequence<br>on the microcontroller</span></div>
+  </div>
+  <p class="note">Choosing the speech model was a measurement rather than a preference:
+    the same twenty recordings went through both, so the pairs differ only by model.
+    tiny.en matched base.en on 17 of 20, kept the drink name on 19 of 20, and cut
+    transcription from 6.9s to 3.0s.</p>
+</section>
+
+<section class="slide" id="log">
+  <h2>Every glass, every request, logged</h2>
+  <div class="split-lead">
+    <p class="big">Which drinks run low.<br>Which drinks people ask for.</p>
+    <p class="aside">The robot already has to look at the table and understand the
+      answer, so recording both costs nothing — and it turns a refill assistant into
+      something an owner can plan staffing and stock around.</p>
+  </div>
+  <a id="dashboardLink" class="jump" href="#" target="_blank" rel="noopener">Open the dashboard ↗</a>
+</section>
+
+<section class="slide">
+  <h2>It is not only about drinks</h2>
+  <div class="split">
+    <figure class="shot">
+      <img id="robot" src="/deck/assets/robot.png" alt="The module on a serving robot">
+      <figcaption id="robotNote" hidden>Drop an image at <code>app/deck/assets/robot.png</code>.</figcaption>
+    </figure>
+    <ul class="points">
+      <li><b>A hospital ward.</b> The same loop watches an IV bag instead of a glass and
+        calls a nurse the moment it runs low.</li>
+      <li><b>Privacy matters even more there.</b> Patients and their rooms never leave
+        the device, which is the whole reason this runs on the NPU.</li>
+      <li><b>The module rides, it does not drive.</b> Navigation stays with the robot;
+        this looks after the table it stopped beside.</li>
+      <li><b>The arm is the easy part to add.</b> The microcontroller already runs a
+        bounded sequence with a host watchdog — today it drives a display, not a gripper.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide title-slide">
+  <h1>Thank you</h1>
+  <p class="lede">We are Bearmetric.</p>
+  <p class="note">How's Everything So Far — on-device vision, speech, language and voice,
+    on one Arduino VENTUNO Q.</p>
+  <a id="demoLinkEnd" class="jump" href="#">Back to the live view ↗</a>
+</section>
+
+</main>
+
+<footer>
+  <span id="position"></span>
+  <span class="hint">← → or click to move</span>
+</footer>
+<script src="/deck/deck.js" defer></script>
+</body>
+</html>
