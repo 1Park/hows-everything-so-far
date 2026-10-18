@@ -23,6 +23,11 @@ const REACHED = {
 const FAILED = new Set(['skipped', 'declined', 'cancelled', 'expired', 'error']);
 
 let state = null;
+let policy = {low_fill_threshold: 0.35, min_confidence: 0.6};
+// The conversation builds up here: the room should be able to read what was said
+// a moment ago, not just the current line.
+let chat = [];
+let chatSession = null;
 let shownSnapshot = null;
 let streaming = false;
 let retry = null;
@@ -56,10 +61,20 @@ async function loadRuntime() {
   // Same-origin: this server relays the Controller's /ready, which a cross-origin
   // fetch could not read.
   try {
-    paintRuntime(await (await fetch('/runtime')).json());
+    const ready = await (await fetch('/runtime')).json();
+    // The same thresholds the Controller marks a refill with, so both screens
+    // call the same cup low.
+    if (ready.policy) policy = ready.policy;
+    paintRuntime(ready);
   } catch {
     paintRuntime(null);
   }
+}
+
+function needsRefill(object) {
+  return object.fill_ratio !== null && object.confidence !== null
+    && object.fill_ratio <= policy.low_fill_threshold
+    && object.confidence >= policy.min_confidence;
 }
 
 function paintSteps(phase) {
@@ -104,16 +119,21 @@ function paintBoxes() {
   if (!state?.snapshot_url) return;
   for (const object of state.scene?.objects || []) {
     const node = document.createElement('div');
-    const isTarget = object.object_id === state.target?.object_id;
-    node.className = `bbox${isTarget ? ' target' : ''}`;
+    const selected = object.object_id === state.target?.object_id;
+    const refill = needsRefill(object);
+    node.className = `bbox${selected ? ' selected' : ''}${refill ? ' refill' : ''}`;
     const b = object.bbox;
     Object.assign(node.style, {
       left: `${b.x1 * 100}%`, top: `${b.y1 * 100}%`,
       width: `${(b.x2 - b.x1) * 100}%`, height: `${(b.y2 - b.y1) * 100}%`,
     });
     const label = document.createElement('span');
-    const fill = object.fill_ratio === null ? '' : ` · ${Math.round(object.fill_ratio * 100)}%`;
-    label.textContent = `${object.item.replace(/_/g, ' ')}${fill}`;
+    label.className = 'box-label';
+    const item = object.item.replace(/_/g, ' ');
+    const fill = object.fill_ratio === null
+      ? 'fill ?' : `${Math.round(object.fill_ratio * 100)}% left`;
+    label.textContent = `${object.object_id} · ${item}${refill ? ' · REFILL' : ''}\n`
+      + `${fill} · conf ${Math.round((object.confidence ?? 0) * 100)}%`;
     node.append(label);
     boxes.append(node);
   }
@@ -133,8 +153,9 @@ function paintObjects() {
   for (const object of objects) {
     const isTarget = object.object_id === state.target?.object_id;
     const fill = object.fill_ratio;
+    const refill = needsRefill(object);
     const node = document.createElement('div');
-    node.className = `object${isTarget ? ' target' : ''}${fill !== null && fill <= 0.35 ? ' low' : ''}`;
+    node.className = `object${isTarget ? ' target' : ''}${refill ? ' refill' : ''}`;
 
     const name = document.createElement('span');
     name.className = 'name';
@@ -156,20 +177,47 @@ function paintObjects() {
   }
 }
 
+// The room cannot hear the tablet, so both sides of the exchange are written out
+// and kept: an assistant line when it is spoken, a customer line when it is heard.
+function recordTurns() {
+  if (!state) return;
+  if (chatSession !== state.session_id) {
+    chatSession = state.session_id;
+    chat = [];
+  }
+  const add = (who, text, note) => {
+    if (!text) return;
+    const last = chat[chat.length - 1];
+    if (last && last.who === who && last.text === text) return;
+    chat.push({who, text, note});
+  };
+  add('assistant', state.speech);
+  add('customer', state.transcript,
+      state.stt_source ? `${state.stt_source.toUpperCase()} speech recognition` : null);
+}
+
+function paintChat() {
+  const box = $('chat');
+  box.replaceChildren();
+  for (const turn of chat) {
+    const node = document.createElement('div');
+    node.className = `turn ${turn.who}`;
+    node.append(document.createTextNode(
+      turn.who === 'customer' ? `“${turn.text}”` : turn.text));
+    if (turn.note) {
+      const note = document.createElement('small');
+      note.textContent = turn.note;
+      node.append(note);
+    }
+    box.append(node);
+  }
+  box.scrollTop = box.scrollHeight;
+}
+
 function paintText() {
   $('phaseTag').textContent = (state?.phase || 'idle').replace(/_/g, ' ').toUpperCase();
-  // The room cannot hear the tablet, so the spoken line is captioned here.
-  $('speech').textContent = state?.speech || state?.message || '';
-
-  const heard = Boolean(state?.transcript);
-  $('heardPanel').hidden = !heard;
-  if (heard) {
-    $('transcript').replaceChildren(document.createTextNode(`“${state.transcript}”`));
-    const source = document.createElement('span');
-    source.className = 'source';
-    source.textContent = `${(state.stt_source || '').toUpperCase()} speech recognition`;
-    $('transcript').append(source);
-  }
+  recordTurns();
+  paintChat();
 
   const card = state?.card;
   $('requestPanel').hidden = !card;
