@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Refill Assist · Dashboard</title><link rel="stylesheet" href="/ui/style.css"><link rel="stylesheet" href="/ui/dashboard.css"></head>
+<body class="dashboard">
+<header>
+  <div class="title-row">
+    <div><span class="eyebrow">REFILL ASSIST · BAR HISTORY</span><h1>What the table asked for</h1></div>
+  </div>
+  <p id="rangeNote" class="range-note"></p>
+</header>
+<main>
+  <section class="kpis">
+    <div class="kpi"><span class="kpi-label">Cups detected</span><strong id="kpiDetected">–</strong><small id="kpiDetectedSub"></small></div>
+    <div class="kpi"><span class="kpi-label">Refill requests</span><strong id="kpiRequests">–</strong><small id="kpiRequestsSub"></small></div>
+    <div class="kpi accent"><span class="kpi-label">Most requested drink</span><strong id="kpiTopDrink">–</strong><small id="kpiTopDrinkSub"></small></div>
+    <div class="kpi accent"><span class="kpi-label">Busiest day</span><strong id="kpiTopDay">–</strong><small id="kpiTopDaySub"></small></div>
+    <div class="kpi accent"><span class="kpi-label">Peak hour</span><strong id="kpiTopHour">–</strong><small id="kpiTopHourSub"></small></div>
+  </section>
+
+  <div class="dash-grid">
+    <section class="panel chart-card">
+      <div class="chart-head"><div><h2>Most requested drinks</h2><p>Refill requests confirmed into a card</p></div></div>
+      <div id="drinkRanking" class="ranking"></div>
+    </section>
+
+    <section class="panel chart-card">
+      <div class="chart-head"><div><h2>Requests by hour</h2><p>When customers ask for a refill</p></div></div>
+      <div class="chart" id="hourRequests"></div>
+    </section>
+
+    <section class="panel chart-card">
+      <div class="chart-head"><div><h2>By hour · drinks detected</h2><p>Cups seen at each hour of the evening, by drink</p></div>
+        <div class="segmented level" data-chart="hourLevel"><button data-level="low" class="on">Low</button><button data-level="high">High</button></div></div>
+      <div class="chart" id="hourLevel"></div>
+      <div class="legend" data-legend></div>
+    </section>
+
+    <section class="panel chart-card">
+      <div class="chart-head"><div><h2>By weekday · drinks detected</h2><p>Cups seen on each day of the week, by drink</p></div>
+        <div class="segmented level" data-chart="dayLevel"><button data-level="low" class="on">Low</button><button data-level="high">High</button></div></div>
+      <div class="chart" id="dayLevel"></div>
+      <div class="legend" data-legend></div>
+    </section>
+
+    <section class="panel chart-card wide">
+      <div class="chart-head"><div><h2>Requests by day</h2><p>The busiest day is highlighted</p></div></div>
+      <div class="chart" id="dayRequests"></div>
+    </section>
+  </div>
+
+  <div class="footer"><span>REFILL ASSIST / VENTUNO Q</span><span id="footerNote">Mock history is illustrative · Live rows come from this board's event log</span></div>
+  <div id="error" role="alert" class="error" hidden></div>
+</main><script src="/ui/dashboard.js" defer></script>
+</body></html>

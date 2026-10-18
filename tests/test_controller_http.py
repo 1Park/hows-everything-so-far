@@ -51,3 +51,15 @@ def test_ready_exposes_refill_policy_for_ui_boxes():
     settings = Settings(qwen_backend="fixture", min_confidence=0.65, low_fill_threshold=0.35)
     with TestClient(create_app(settings)) as c:
         assert c.get("/ready").json()["policy"] == {"min_confidence": 0.65, "low_fill_threshold": 0.35}
+
+
+def test_dashboard_merges_mock_history_with_live_log(tmp_path):
+    log = tmp_path / "events.jsonl"
+    log.write_text('{"ts": "2026-10-17T20:00:00+00:00", "event": "requested", "item": "water"}\n')
+    settings = Settings(qwen_backend="fixture", event_log_path=str(log))
+    with TestClient(create_app(settings)) as c:
+        assert c.get("/dashboard").headers["content-type"].startswith("text/html")
+        events = c.get("/api/events").json()["events"]
+        live = [e for e in events if not e.get("mock")]
+        assert live == [{"ts": "2026-10-17T20:00:00+00:00", "event": "requested", "item": "water"}]
+        assert len(events) - len(live) == 140
