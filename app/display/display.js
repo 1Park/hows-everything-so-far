@@ -11,6 +11,8 @@ const CONTROLLER = (params.get('controller') || `${location.hostname}:8080`).rep
 const HTTP = `${location.protocol}//${CONTROLLER}`;
 const WS = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${CONTROLLER}/ws`;
 
+$('dashboardLink').href = `${HTTP}/dashboard`;
+
 const STEPS = ['look', 'offer', 'listen', 'hear', 'understand', 'act'];
 // How far each phase has carried the demo. Anything not listed leaves the rail alone.
 const REACHED = {

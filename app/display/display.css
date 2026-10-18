@@ -15,6 +15,10 @@ h1{font:normal 26px/1 Georgia,serif;margin:0;letter-spacing:-.5px}
 .chip.cpu{border-color:#5a4a2c;color:var(--amber)}
 .link{font-size:12px;color:var(--dim)}
 .link.down{color:var(--red)}
+/* Opens on the Controller, which is where the dashboard lives. */
+.jump{font-size:12px;color:var(--ink);text-decoration:none;white-space:nowrap;
+  border:1px solid var(--line);border-radius:20px;padding:5px 12px}
+.jump:hover{border-color:var(--green);color:var(--green)}
 
 main{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(360px,1fr);
   gap:20px;padding:20px 28px;height:calc(100vh - 60px)}
