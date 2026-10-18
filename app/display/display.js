@@ -13,7 +13,7 @@ const WS = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${CONTROLLER}/ws`
 
 $('dashboardLink').href = `${HTTP}/dashboard`;
 // The deck is on this host too; presenting is a loop, not a one-way trip.
-$('deckLink').href = `${location.protocol}//${location.hostname}:8005/`;
+$('deckLink').href = `${location.protocol}//${location.hostname}:8005/#demo`;
 
 const STEPS = ['look', 'offer', 'listen', 'hear', 'understand', 'act'];
 // How far each phase has carried the demo. Anything not listed leaves the rail alone.

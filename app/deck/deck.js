@@ -7,7 +7,20 @@ function show(next) {
   index = Math.max(0, Math.min(slides.length - 1, next));
   slides.forEach((slide, i) => slide.classList.toggle('current', i === index));
   document.getElementById('position').textContent = `${index + 1} / ${slides.length}`;
-  location.hash = index ? `#${index + 1}` : '';
+  // Named slides keep their name in the address, so a link back from another
+  // screen survives the deck being reordered.
+  const name = slides[index].id;
+  location.hash = name ? `#${name}` : index ? `#${index + 1}` : '';
+}
+
+// A hash is either a slide name or its position, in that order of preference.
+function slideFromHash() {
+  const hash = location.hash.slice(1);
+  if (!hash) return 0;
+  const named = slides.findIndex(slide => slide.id === hash);
+  if (named >= 0) return named;
+  const position = Number(hash);
+  return Number.isFinite(position) && position > 0 ? position - 1 : 0;
 }
 
 addEventListener('keydown', event => {
@@ -120,4 +133,4 @@ document.getElementById('diagram').innerHTML = `
   <text class="sub" x="500" y="364">wired Ethernet</text>
 </svg>`;
 
-show(location.hash ? Number(location.hash.slice(1)) - 1 : 0);
+show(slideFromHash());
