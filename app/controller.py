@@ -122,6 +122,22 @@ class Controller:
         except RuntimeError:
             pass  # no running loop; nothing is watching the LED either
 
+    def stage(self, name, started, **fields):
+        """One line per pipeline step, so a slow run says which step was slow.
+
+        The demo path had no timings at all: a long pause was visible but could
+        have been the microphone, the model, or the board.
+        """
+        # The formatter only serialises a dict message, so fields go in the message.
+        log.info(
+            {
+                "message": "stage",
+                "stage": name,
+                "elapsed_ms": round((time.perf_counter() - started) * 1000),
+                **fields,
+            }
+        )
+
     def emit(self, phase, message):
         self.phase, self.message = phase, message
         self.sequence += 1
@@ -195,8 +211,10 @@ class Controller:
 
     async def observe(self, token, data, content_type, scene_id, scenario):
         try:
+            started = time.perf_counter()
             async with asyncio.timeout(self.settings.inference_timeout):
                 result = await self.clients.vision(data, content_type, scene_id, scenario)
+            self.stage("vision", started, objects=len(result.objects))
             async with self.lock:
                 if token != self.token:
                     return
@@ -318,13 +336,17 @@ class Controller:
 
     async def hear(self, token):
         try:
+            started = time.perf_counter()
             audio = await self.microphone.capture()
+            self.stage("record", started, bytes=len(audio))
             async with self.lock:
                 if token != self.token:
                     return
                 self.emit("transcribing", "Transcribing your request… You can cancel at any time.")
+            started = time.perf_counter()
             async with asyncio.timeout(self.settings.inference_timeout):
                 result = await self.clients.stt(audio, "audio/wav")
+            self.stage("stt", started, source=result.source, chars=len(result.text))
             async with self.lock:
                 if token != self.token:
                     return
@@ -345,8 +367,10 @@ class Controller:
 
     async def interpret(self, token, current, utterance):
         try:
+            started = time.perf_counter()
             async with asyncio.timeout(self.settings.inference_timeout):
                 result, source = await self.clients.language(current, utterance)
+            self.stage("language", started, intent=result.intent, source=source)
             async with self.lock:
                 if token != self.token:
                     return
