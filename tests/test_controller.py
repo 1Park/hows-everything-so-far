@@ -84,7 +84,7 @@ async def test_not_understood_blocks_confirmation_and_allows_retry(controller):
     assert "portion" not in c.card.model_dump()
     old = confirmation(c)
     await say(c, "Maybe, I'm not sure")
-    assert c.phase == "not_understood" and "understand" in c.message
+    assert c.phase == "not_understood" and "Could you say that again?" in c.message
     with pytest.raises(ApiError):
         await c.confirm(old)
     assert not c.hardware.commands
@@ -231,7 +231,8 @@ async def test_llm_cannot_select_outside_observed_groups(controller):
     c.clients.language = ignoring_menu
     await say(c, "Water please")
     assert c.phase == "not_understood" and c.card.item == "coffee"
-    assert "choose coke, coffee" in c.message
+    assert "Could you say that again?" in c.message
+    assert "coke" not in c.message and "coffee" not in c.message
     with pytest.raises(ApiError):
         await c.confirm(old)
     assert not c.hardware.commands

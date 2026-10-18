@@ -43,7 +43,7 @@ class MockHardware:
 
     async def start(self, command_id: str):
         if self.state.phase not in ("idle", "done", "cancelled"):
-            raise ApiError("hardware_busy", "The mock sequence is already running", 409)
+            raise ApiError("hardware_busy", "A refill request is already in progress.", 409)
         if command_id in self.commands:
             raise ApiError("duplicate_command", "This command has already been started", 409)
         self.commands.append(command_id)
@@ -111,7 +111,7 @@ class BridgeHardware:
         # has already seen. A running sequence means this command did start.
         if await self.advance() in ("loading", "returning"):
             return
-        raise ApiError("hardware_rejected", "MCU rejected the mock sequence", 409)
+        raise ApiError("hardware_rejected", "The device could not start the refill process.", 409)
 
     async def set_led(self, on: bool):
         await self.rpc("set_led_state", on)

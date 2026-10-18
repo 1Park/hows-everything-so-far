@@ -173,7 +173,7 @@ async function checkConnection() {
     const sources = $('sources'); sources.replaceChildren();
     for (const [name, data] of Object.entries(info.dependencies)) sources.append(modePill(name === 'qwen' ? 'LLM' : name.toUpperCase(), modelLabel(name, data, info), data.ready));
     if (info.tts) sources.append(modePill('TTS', info.tts.source, info.tts.ready || info.tts.source === 'disabled'));
-    sources.append(modePill('Hardware', info.hardware, info.hardware_ready)); sources.append(modePill('Location', info.location));
+    sources.append(modePill('Hardware', info.hardware === 'mock' ? 'simulator' : info.hardware, info.hardware_ready)); sources.append(modePill('Location', info.location));
     $('videoMode').textContent = state?.snapshot_url ? 'Analyzed frame · frozen' : info.video.mode === 'fixture-image' ? 'Sample image' : 'Live source';
     $('imageCredit').textContent = info.video.mode === 'fixture-image' ? 'AI-generated sample · illustrative fixture' : 'Captured by the server · single video owner';
     $('liveStatus').textContent = info.video.error || 'Server capture · camera is opened once · 5 fps preview';
@@ -240,7 +240,7 @@ function render(next, authoritative = false) {
   $('confirm').disabled = !connected || !!pendingAction || state.phase !== 'card';
   $('confirmNote').textContent = needsConfirm
     ? 'Nothing starts until you press Confirm. Changing your request requires a new confirmation.'
-    : 'Your spoken request starts the mock sequence. Cancel stops it.';
+    : 'Your spoken request starts preparation. You can cancel at any time.';
   document.querySelector('[data-step="2"]').textContent = needsConfirm ? 'Confirm' : 'Request understood';
   $('cancel').disabled = !connected || pendingAction === 'cancel' || ['idle','done','cancelled','declined','skipped','expired'].includes(state.phase);
   $('start').disabled = !connected || !!pendingAction || ['observing','listening','transcribing','loading','returning'].includes(state.phase);

@@ -419,7 +419,7 @@ class Controller:
                         self.arm_deadline()
                         self.emit(
                             "card",
-                            "Review your request, then press Confirm to start the mock sequence.",
+                            "Review your request, then press Confirm.",
                         )
                     else:
                         # Understanding the request is the approval. Invalidate earlier
@@ -427,7 +427,7 @@ class Controller:
                         # still wins and no stale task can start the sequence later.
                         self.deadline = None
                         self.token += 1
-                        self.emit("loading", "Got it. Mock loading is starting…")
+                        self.emit("loading", "Got it. Preparing your refill request…")
                         self.launch(self.run_hardware(self.token, self.card.request_id))
         except TimeoutError:
             await self.fail(
@@ -462,7 +462,7 @@ class Controller:
             self.token += 1
             token = self.token
             self.deadline = None
-            self.emit("loading", "Confirmed. Mock loading is starting…")
+            self.emit("loading", "Confirmed. Preparing your refill request…")
             self.launch(self.run_hardware(token, self.card.request_id))
             return self.state()
 
@@ -483,19 +483,19 @@ class Controller:
                         if phase == "done":
                             self.emit(
                                 "done",
-                                "Mock return complete. Your refill request is ready for the kitchen.",
+                                "Your refill request is ready. Thank you!",
                             )
                             return
                         if phase not in ("loading", "returning"):
                             raise ApiError(
                                 "hardware_fault",
-                                "The mock sequence stopped unexpectedly",
+                                "The refill process stopped unexpectedly. Please try again.",
                                 503,
                                 True,
                             )
                         self.emit(
                             phase,
-                            "Mock return to kitchen…" if phase == "returning" else "Mock loading…",
+                            "Finalizing your refill request…" if phase == "returning" else "Preparing your refill request…",
                         )
         except (ApiError, TimeoutError) as error:
             try:
