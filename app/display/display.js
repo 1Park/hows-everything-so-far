@@ -29,9 +29,11 @@ let policy = {low_fill_threshold: 0.35, min_confidence: 0.6};
 let chat = [];
 let chatSession = null;
 // The last line recorded from each side. A transcript stays in the state after it
-// is read, so comparing against the end of the log re-added it as soon as the
-// assistant replied.
+// is read, so without this it was re-added as soon as the assistant replied.
+// Cleared when a new recording starts, so a customer who repeats a sentence after
+// "say that again" is shown twice, which is what the room saw happen.
 let said = {assistant: null, customer: null};
+let lastPhase = null;
 let shownSnapshot = null;
 let streaming = false;
 let retry = null;
@@ -190,6 +192,10 @@ function recordTurns() {
     chat = [];
     said = {assistant: null, customer: null};
   }
+  if (state.phase === 'listening' && lastPhase !== 'listening') {
+    said = {assistant: null, customer: null};  // a new take may repeat the last one
+  }
+  lastPhase = state.phase;
   const add = (who, text, note) => {
     if (!text || said[who] === text) return;
     said[who] = text;
