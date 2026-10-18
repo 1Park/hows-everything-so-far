@@ -16,7 +16,7 @@ from tests.test_controller import observe, say, scene, confirmation
 
 @pytest.fixture
 async def controller():
-    settings = Settings(qwen_backend="fixture", response_timeout=30)
+    settings = Settings(require_confirmation=True, qwen_backend="fixture", response_timeout=30)
     c = Controller(settings, ModelClients(settings))
     yield c
     await c.close()
@@ -73,12 +73,12 @@ async def test_toggle_rejected_during_inference(controller):
 
 
 def test_feature_api_default_off_and_strict_input():
-    with TestClient(create_app(Settings(qwen_backend="fixture"))) as client:
+    with TestClient(create_app(Settings(require_confirmation=True, qwen_backend="fixture"))) as client:
         assert client.get("/api/state").json()["untrained_categories"] is False
         assert client.post("/api/demo-features", json={"untrained_categories":"false"}).status_code == 422
         assert client.post("/api/demo-features", json={"untrained_categories":True}).json()["untrained_categories"] is True
         assert client.get("/api/state").json()["untrained_categories"] is True
-    with TestClient(create_app(Settings(qwen_backend="fixture"))) as client:
+    with TestClient(create_app(Settings(require_confirmation=True, qwen_backend="fixture"))) as client:
         assert client.get("/api/state").json()["untrained_categories"] is False
 
 

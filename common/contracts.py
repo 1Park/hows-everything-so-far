@@ -207,6 +207,8 @@ class StateSnapshot(Contract):
     transcript: str | None = None
     stt_source: Literal["fixture", "external"] | None = None
     audio_input: Literal["disabled", "fixture", "alsa"] = "disabled"
+    # Whether the card waits for a press. The page hides Confirm when it does not.
+    requires_confirmation: bool = False
     # How long board capture runs, so the page can show the time passing.
     audio_seconds: int = 6
     capture: CaptureStatus | None = None

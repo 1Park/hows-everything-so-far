@@ -20,7 +20,7 @@ async def settled(c):
 
 
 def make(path):
-    settings = Settings(
+    settings = Settings(require_confirmation=True, 
         qwen_backend="fixture",
         mock_step_seconds=0.01,
         response_timeout=1,

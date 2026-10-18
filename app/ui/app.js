@@ -204,7 +204,15 @@ function render(next, authoritative = false) {
     $('transcript').hidden = true;
   }
   document.querySelectorAll('[data-say]').forEach(b => b.disabled = !editable);
+  // With confirmation off the sequence starts on its own, so the button would
+  // only ever be a disabled decoration.
+  const needsConfirm = state.requires_confirmation !== false;
+  $('confirm').hidden = !needsConfirm;
   $('confirm').disabled = !connected || !!pendingAction || state.phase !== 'card';
+  $('confirmNote').textContent = needsConfirm
+    ? 'Nothing starts until you press Confirm. Changing your request requires a new confirmation.'
+    : 'Your spoken request starts the mock sequence. Cancel stops it.';
+  document.querySelector('[data-step="2"]').textContent = needsConfirm ? 'Confirm' : 'Request understood';
   $('cancel').disabled = !connected || pendingAction === 'cancel' || ['idle','done','cancelled','declined','skipped','expired'].includes(state.phase);
   $('start').disabled = !connected || !!pendingAction || ['observing','listening','transcribing','loading','returning'].includes(state.phase);
   $('start').innerHTML = (state.phase === 'idle' ? 'Start demo' : 'Inspect again') + ' <span>↗</span>';

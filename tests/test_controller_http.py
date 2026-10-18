@@ -7,7 +7,7 @@ from common.config import Settings
 
 
 def test_real_routes_ws_and_confirm_identity():
-    settings = Settings(qwen_backend="fixture", mock_step_seconds=0.02)
+    settings = Settings(require_confirmation=True, qwen_backend="fixture", mock_step_seconds=0.02)
     with TestClient(create_app(settings)) as c:
         with c.websocket_connect("/ws") as ws:
             assert ws.receive_json()["state"]["phase"] == "idle"
@@ -37,7 +37,7 @@ def test_real_routes_ws_and_confirm_identity():
 
 
 def test_raw_body_transport_limit():
-    settings = Settings(qwen_backend="fixture")
+    settings = Settings(require_confirmation=True, qwen_backend="fixture")
     with TestClient(create_app(settings)) as c:
         r = c.post(
             "/api/observe",
@@ -48,7 +48,7 @@ def test_raw_body_transport_limit():
 
 
 def test_ready_exposes_refill_policy_for_ui_boxes():
-    settings = Settings(qwen_backend="fixture", min_confidence=0.65, low_fill_threshold=0.35)
+    settings = Settings(require_confirmation=True, qwen_backend="fixture", min_confidence=0.65, low_fill_threshold=0.35)
     with TestClient(create_app(settings)) as c:
         assert c.get("/ready").json()["policy"] == {"min_confidence": 0.65, "low_fill_threshold": 0.35}
 
@@ -56,7 +56,7 @@ def test_ready_exposes_refill_policy_for_ui_boxes():
 def test_dashboard_merges_mock_history_with_live_log(tmp_path):
     log = tmp_path / "events.jsonl"
     log.write_text('{"ts": "2026-10-17T20:00:00+00:00", "event": "requested", "item": "water"}\n')
-    settings = Settings(qwen_backend="fixture", event_log_path=str(log))
+    settings = Settings(require_confirmation=True, qwen_backend="fixture", event_log_path=str(log))
     with TestClient(create_app(settings)) as c:
         assert c.get("/dashboard").headers["content-type"].startswith("text/html")
         events = c.get("/api/events").json()["events"]

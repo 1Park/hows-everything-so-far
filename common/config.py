@@ -48,6 +48,10 @@ class Settings(BaseModel):
     queue_limit: int = Field(4, ge=1, le=32)
     max_image_bytes: int = Field(5_000_000, ge=1024, le=20_000_000)
     max_audio_bytes: int = Field(10_000_000, ge=1024, le=25_000_000)
+    # The demo is driven by speech: once the request is understood there is nothing
+    # a press adds, and reaching for the tablet breaks the flow. Cancel still stops
+    # a running sequence. Set true to put the confirm step back.
+    require_confirmation: bool = False
     min_confidence: float = Field(0.7, ge=0, le=1)
     low_fill_threshold: float = Field(0.3, ge=0, le=1)
     # Ask the customer which drink when Vision reports coke/coffee with item_confidence below this.

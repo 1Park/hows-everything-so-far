@@ -17,7 +17,7 @@ def port():
 
 def test_start_demo_stop_restart_and_duplicate():
     selected = port()
-    env = {**os.environ, "CONTROLLER_PORT": str(selected)}
+    env = {**os.environ, "CONTROLLER_PORT": str(selected), "REQUIRE_CONFIRMATION": "true"}
     command = [sys.executable, "scripts/dev.py", "--mode", "offline"]
     lock = ROOT / f"tmp/dev-{selected}.lock"
     for _ in range(2):
@@ -104,6 +104,7 @@ def test_startup_failure_rolls_back_children():
         "VISION_PORT": str(ports[2]),
         "STT_PORT": str(ports[3]),
         "QWEN_MODEL_BACKEND": "fixture",
+        "REQUIRE_CONFIRMATION": "true",
         "STT_MODEL_BACKEND": "external",
         "STT_ADAPTER": "missing_adapter_package:create_backend",
     }
@@ -129,6 +130,7 @@ def test_fixture_uses_qwen_http_without_silent_fallback():
         env = {
             **os.environ,
             "CONTROLLER_PORT": str(selected),
+            "REQUIRE_CONFIRMATION": "true",
             "QWEN_BASE_URL": f"http://127.0.0.1:{unavailable.getsockname()[1]}",
             "QWEN_BACKEND": "fixture",
             "VISION_BACKEND": "http",

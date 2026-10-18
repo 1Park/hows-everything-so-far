@@ -14,7 +14,7 @@ from common.contracts import ListenInput
 
 
 def settings(**kwargs):
-    return Settings(qwen_backend="fixture", audio_input="fixture", **kwargs)
+    return Settings(require_confirmation=True, qwen_backend="fixture", audio_input="fixture", **kwargs)
 
 
 async def offer(c):
@@ -155,7 +155,7 @@ async def test_cancel_reaps_real_capture_child(monkeypatch):
 
     monkeypatch.setattr(asyncio, "create_subprocess_exec", launch)
     monkeypatch.setattr("shutil.which", lambda name: sys.executable)
-    microphone = BoardMicrophone(Settings(audio_input="alsa", audio_device="test-device"))
+    microphone = BoardMicrophone(Settings(require_confirmation=True, audio_input="alsa", audio_device="test-device"))
     task = asyncio.create_task(microphone.capture())
     while not children:
         await asyncio.sleep(0.01)

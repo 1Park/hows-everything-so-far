@@ -95,6 +95,7 @@ class Controller:
             "deadline": self.deadline,
             "audio_input": self.settings.audio_input,
             "audio_seconds": self.settings.audio_seconds,
+            "requires_confirmation": self.settings.require_confirmation,
             "transcript": self.transcript,
             "stt_source": self.stt_source,
             "capture": self.capture_status,
@@ -422,11 +423,20 @@ class Controller:
                         object_id=self.target.object_id,
                         item=result.item,
                     )
-                    self.arm_deadline()
-                    self.emit(
-                        "card",
-                        "Review your request, then press Confirm to start the mock sequence.",
-                    )
+                    if self.settings.require_confirmation:
+                        self.arm_deadline()
+                        self.emit(
+                            "card",
+                            "Review your request, then press Confirm to start the mock sequence.",
+                        )
+                    else:
+                        # Understanding the request is the approval. Invalidate earlier
+                        # work the same way a press does, so a cancel that arrives first
+                        # still wins and no stale task can start the sequence later.
+                        self.deadline = None
+                        self.token += 1
+                        self.emit("loading", "Got it. Mock loading is starting…")
+                        self.launch(self.run_hardware(self.token, self.card.request_id))
         except TimeoutError:
             await self.fail(
                 token,

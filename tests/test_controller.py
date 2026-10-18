@@ -19,7 +19,7 @@ async def settled(c):
 
 @pytest.fixture
 async def controller():
-    settings = Settings(qwen_backend="fixture", mock_step_seconds=0.01, response_timeout=1)
+    settings = Settings(require_confirmation=True, qwen_backend="fixture", mock_step_seconds=0.01, response_timeout=1)
     c = Controller(settings, ModelClients(settings))
     yield c
     await c.close()
@@ -237,3 +237,39 @@ async def test_llm_cannot_select_outside_observed_groups(controller):
     with pytest.raises(ApiError):
         await c.confirm(old)
     assert not c.hardware.commands
+
+
+async def test_an_understood_request_starts_without_a_press():
+    # Understanding the request is the approval, so no card should sit waiting.
+    settings = Settings(
+        qwen_backend="fixture",
+        mock_step_seconds=0.01,
+        response_timeout=1,
+        require_confirmation=False,
+    )
+    c = Controller(settings, ModelClients(settings))
+    try:
+        await observe(c)
+        assert c.phase == "offered"
+        await say(c, "a little water please")
+        assert c.phase == "done", c.state()
+        assert c.state()["requires_confirmation"] is False
+    finally:
+        await c.close()
+
+
+async def test_the_confirm_step_can_be_put_back():
+    settings = Settings(
+        qwen_backend="fixture",
+        mock_step_seconds=0.01,
+        response_timeout=1,
+        require_confirmation=True,
+    )
+    c = Controller(settings, ModelClients(settings))
+    try:
+        await observe(c)
+        await say(c, "a little water please")
+        assert c.phase == "card"
+        assert c.state()["requires_confirmation"] is True
+    finally:
+        await c.close()
