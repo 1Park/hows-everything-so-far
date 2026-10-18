@@ -226,3 +226,7 @@ class SttTake(BaseModel):
     # take length, so the two are kept apart rather than summed.
     record_ms: int = Field(default=0, ge=0)
     stt_ms: int = Field(default=0, ge=0)
+    # Which model produced `heard`. Several rows can share take_id: one recording
+    # is transcribed by every model, so their numbers are directly comparable.
+    model: str = Field(default="", max_length=60)
+    take_id: str = Field(default="", max_length=40)

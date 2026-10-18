@@ -1,6 +1,8 @@
 import asyncio
 import json
 import time
+
+import httpx
 from pathlib import Path
 from contextlib import asynccontextmanager
 
@@ -27,6 +29,7 @@ from common.contracts import (
     CaptureModeInput,
     CaptureStatus,
 )
+from services.stt.normalize import normalize
 from common.media import read_upload, validate_audio, validate_image
 
 
@@ -211,14 +214,50 @@ def create_app(settings=None, clients=None, hardware=None):
         return {"takes": takes}
 
     @app.delete("/api/stt/results")
-    async def stt_delete_results(index: int = Query(default=-1, ge=-1)):
+    async def stt_delete_results(
+        index: int = Query(default=-1, ge=-1),
+        take_id: str = Query(default="", max_length=40),
+    ):
         takes = read_takes()
-        if index < 0:
+        if take_id:
+            # One recording produced a row per model; discarding it drops them all.
+            takes = [take for take in takes if take.get("take_id") != take_id]
+        elif index < 0:
             takes = []
         elif index < len(takes):
             takes.pop(index)
         write_takes(takes)
         return {"takes": takes}
+
+    def compare_targets():
+        """Extra models to transcribe the same audio with, as label=url pairs."""
+        targets = []
+        for entry in settings.stt_compare.split(","):
+            label, _, url = entry.partition("=")
+            if label.strip() and url.strip():
+                targets.append((label.strip(), url.strip().rstrip("/")))
+        return targets
+
+    async def transcribe_with(label, url, audio):
+        started = time.perf_counter()
+        try:
+            async with httpx.AsyncClient(
+                timeout=settings.inference_timeout, trust_env=False
+            ) as http:
+                response = await http.post(
+                    url + "/inference",
+                    files={"file": ("request.wav", audio, "audio/wav")},
+                    data={"language": "en", "response_format": "json", "temperature": "0"},
+                )
+                response.raise_for_status()
+                text = normalize(response.json()["text"]).text
+        except (httpx.HTTPError, ValueError, KeyError, TypeError) as error:
+            return {"model": label, "error": type(error).__name__, "text": "", "stt_ms": 0}
+        return {
+            "model": label,
+            "text": text,
+            "stt_ms": round((time.perf_counter() - started) * 1000),
+        }
 
     @app.post("/api/stt/check")
     async def stt_check(seconds: int = Query(default=0, ge=0, le=15)):
@@ -240,6 +279,11 @@ def create_app(settings=None, clients=None, hardware=None):
                 "stt_timeout", "Audio transcription timed out. Please retry", 504, True
             ) from None
         done = time.perf_counter()
+        # Every model hears the identical recording, so a difference between them is
+        # the model and not a difference in how the sentence happened to be spoken.
+        extra = await asyncio.gather(
+            *(transcribe_with(label, url, audio) for label, url in compare_targets())
+        )
         # Transcription is a near-fixed cost here, so it is reported apart from the
         # take length: shortening the recording does not shorten the wait.
         return {
@@ -249,6 +293,7 @@ def create_app(settings=None, clients=None, hardware=None):
             "bytes": len(audio),
             "record_ms": round((recorded - started) * 1000),
             "stt_ms": round((done - recorded) * 1000),
+            "others": list(extra),
         }
 
     @app.get("/api/frame")

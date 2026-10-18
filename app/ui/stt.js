@@ -42,8 +42,10 @@ async function saveTake(take) {
   results = body.takes;
 }
 
-async function dropTake(index) {
-  const query = index === null ? '' : `?index=${index}`;
+async function dropTake(key) {
+  // Rows that share a recording are discarded together; null clears everything.
+  const query = key === null ? ''
+    : key.startsWith('row-') ? `?index=${key.slice(4)}` : `?take_id=${encodeURIComponent(key)}`;
   const response = await fetch(`/api/stt/results${query}`, {method: 'DELETE'});
   const body = await response.json();
   results = body.takes || [];
@@ -114,40 +116,111 @@ function renderSuggestions() {
   }
 }
 
+function median(values) {
+  const sorted = values.filter(Boolean).sort((a, b) => a - b);
+  return sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0;
+}
+
+// Per model, because an average across models answers no question anyone has.
+function renderPerModel() {
+  const groups = new Map();
+  for (const take of results) {
+    const key = take.model || take.source || 'pipeline';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(take);
+  }
+  const box = $('sttPerModel');
+  box.replaceChildren();
+  for (const [model, takes] of groups) {
+    const exact = takes.filter(t => t.wer === 0).length;
+    const meanWer = takes.reduce((total, t) => total + t.wer, 0) / takes.length;
+    const card = document.createElement('div');
+    card.className = 'model-card';
+    const title = document.createElement('strong');
+    title.textContent = model;
+    const line = document.createElement('p');
+    line.textContent = `${takes.length} takes · ${Math.round(exact / takes.length * 100)}% exact · `
+      + `WER ${Math.round(meanWer * 100)}% · ${(median(takes.map(t => t.stt_ms)) / 1000).toFixed(1)}s`;
+    card.append(title, line);
+    box.append(card);
+  }
+}
+
 function summarise(source) {
-  $('sttCount').textContent = results.length;
+  renderPerModel();
+  const takeIds = new Set(results.map(r => r.take_id).filter(Boolean));
+  $('sttCount').textContent = takeIds.size || results.length;
   const exact = results.filter(r => r.wer === 0).length;
   $('sttExact').textContent = results.length ? `${Math.round(exact / results.length * 100)}%` : '—';
   const mean = results.reduce((total, r) => total + r.wer, 0) / (results.length || 1);
   $('sttWer').textContent = results.length ? `${Math.round(mean * 100)}%` : '—';
-  // Median, because one slow take should not define what the demo will feel like.
-  const timings = results.map(r => r.stt_ms).filter(Boolean).sort((a, b) => a - b);
-  $('sttLatency').textContent = timings.length
-    ? `${(timings[Math.floor(timings.length / 2)] / 1000).toFixed(1)}s` : '—';
+  $('sttLatency').textContent = results.length
+    ? `${(median(results.map(r => r.stt_ms)) / 1000).toFixed(1)}s` : '—';
   if (source) $('sttSource').textContent = source;
 
-  const rows = $('sttRows');
-  rows.replaceChildren();
-  results.forEach((r, i) => {
+  renderTable();
+}
+
+// One row per recording, one column per model: the whole point is reading the
+// same sentence across models without hunting for its pair.
+function renderTable() {
+  const models = [];
+  const takes = new Map();
+  results.forEach((take, position) => {
+    const model = take.model || take.source || 'pipeline';
+    if (!models.includes(model)) models.push(model);
+    const key = take.take_id || `row-${position}`;
+    if (!takes.has(key)) takes.set(key, {expected: take.expected, by: {}, key});
+    takes.get(key).by[model] = take;
+  });
+
+  const head = $('sttHead');
+  head.replaceChildren();
+  const headRow = document.createElement('tr');
+  for (const label of ['Expected', ...models, '']) {
+    const cell = document.createElement('th');
+    cell.textContent = label;
+    headRow.append(cell);
+  }
+  head.append(headRow);
+
+  const body = $('sttRows');
+  body.replaceChildren();
+  for (const take of [...takes.values()].reverse()) {
     const row = document.createElement('tr');
-    const latency = r.stt_ms ? `${(r.stt_ms / 1000).toFixed(1)}s` : '—';
-    for (const value of [i + 1, r.expected, r.heard, `${Math.round(r.wer * 100)}%`, latency]) {
+    const expected = document.createElement('td');
+    expected.textContent = take.expected;
+    row.append(expected);
+
+    for (const model of models) {
+      const entry = take.by[model];
       const cell = document.createElement('td');
-      cell.textContent = value;
+      if (!entry) {
+        cell.textContent = '—';
+      } else {
+        const said = document.createElement('div');
+        said.textContent = entry.heard || '—';
+        const badge = document.createElement('span');
+        badge.className = `verdict ${entry.wer === 0 ? 'hit' : 'miss'}`;
+        badge.textContent = `${Math.round(entry.wer * 100)}%` +
+          (entry.stt_ms ? ` · ${(entry.stt_ms / 1000).toFixed(1)}s` : '');
+        cell.append(said, badge);
+      }
       row.append(cell);
     }
-    // A fumbled take says nothing about the model, so single rows can go.
-    const cell = document.createElement('td');
+
+    const actions = document.createElement('td');
     const drop = document.createElement('button');
     drop.type = 'button';
     drop.className = 'secondary';
     drop.textContent = '✕';
-    drop.title = 'Discard this take';
-    drop.onclick = () => dropTake(i).catch(() => showError('Could not discard that take.'));
-    cell.append(drop);
-    row.append(cell);
-    rows.prepend(row);
-  });
+    drop.title = 'Discard this recording';
+    drop.onclick = () => dropTake(take.key)
+      .catch(() => showError('Could not discard that take.'));
+    actions.append(drop);
+    row.append(actions);
+    body.append(row);
+  }
 }
 
 function showError(message) {
@@ -169,17 +242,36 @@ $('sttRecord').onclick = async () => {
     const response = await fetch(`/api/stt/check?seconds=${seconds}`, {method: 'POST'});
     const body = await response.json();
     if (!response.ok) throw new Error(body.error?.message || 'Transcription failed');
+    // One recording, one id, one row per model: the rows are paired by construction.
+    const takeId = `${Date.now()}`;
+    const at = new Date().toISOString();
+    const heardBy = [{model: body.source || 'pipeline', text: body.text, stt_ms: body.stt_ms || 0}]
+      .concat(body.others || []);
+    for (const entry of heardBy) {
+      await saveTake({
+        expected, heard: entry.text || '', wer: Number(wer(expected, entry.text || '').toFixed(4)),
+        seconds: body.seconds, source: body.source, at,
+        record_ms: body.record_ms || 0, stt_ms: entry.stt_ms || 0,
+        model: entry.model || '', take_id: takeId,
+      });
+    }
     const score = wer(expected, body.text);
-    await saveTake({
-      expected, heard: body.text, wer: Number(score.toFixed(4)),
-      seconds: body.seconds, source: body.source, at: new Date().toISOString(),
-      record_ms: body.record_ms || 0, stt_ms: body.stt_ms || 0,
-    });
-    $('sttHeard').textContent = `“${body.text}”`;
-    const verdict = document.createElement('span');
-    verdict.className = `verdict ${score === 0 ? 'hit' : 'miss'}`;
-    verdict.textContent = score === 0 ? 'EXACT' : `WER ${Math.round(score * 100)}%`;
-    $('sttHeard').append(verdict);
+    $('sttHeard').replaceChildren();
+    for (const entry of heardBy) {
+      const line = document.createElement('div');
+      const name = document.createElement('span');
+      name.className = 'model-tag';
+      name.textContent = entry.model || 'pipeline';
+      const said = document.createElement('span');
+      said.textContent = ` “${entry.text || '—'}” `;
+      const each = wer(expected, entry.text || '');
+      const verdict = document.createElement('span');
+      verdict.className = `verdict ${each === 0 ? 'hit' : 'miss'}`;
+      verdict.textContent = `${each === 0 ? 'EXACT' : `WER ${Math.round(each * 100)}%`}` +
+        (entry.stt_ms ? ` · ${(entry.stt_ms / 1000).toFixed(1)}s` : '');
+      line.append(name, said, verdict);
+      $('sttHeard').append(line);
+    }
     renderDiff(expected, body.text);
     summarise(body.source);
     // The sentence stays put: the same wording usually needs several takes before
@@ -225,9 +317,10 @@ $('sttClear').onclick = () => {
 };
 
 $('sttCopy').onclick = async () => {
-  const csv = ['expected,heard,wer,take_seconds,record_ms,stt_ms']
-    .concat(results.map(r => `"${r.expected}","${r.heard.replace(/"/g, '""')}",` +
-      `${r.wer.toFixed(3)},${r.seconds || ''},${r.record_ms || ''},${r.stt_ms || ''}`))
+  const csv = ['model,expected,heard,wer,take_seconds,record_ms,stt_ms,take_id']
+    .concat(results.map(r => `"${r.model || ''}","${r.expected}",` +
+      `"${r.heard.replace(/"/g, '""')}",${r.wer.toFixed(3)},${r.seconds || ''},` +
+      `${r.record_ms || ''},${r.stt_ms || ''},${r.take_id || ''}`))
     .join('\n');
   try {
     await navigator.clipboard.writeText(csv);

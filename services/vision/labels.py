@@ -4,16 +4,21 @@
   other    : YOLO가 cup으로 잘못 잡는 물체. split_other()로 먼저 걸러내고, 남은 확률을 정규화해 아래 값을 계산한다.
   item       : drink별 확률을 합한 marginal의 최댓값. empty가 가장 크면 "unknown".
   fill_ratio : level별 대표 비율의 기대값 Σ p(class)·ratio(level). 계약은 0..1 연속값이라 단계 라벨을 비율로 바꾼다.
-  confidence : min(item marginal 최댓값, level marginal 최댓값) — 종류·잔량 둘 다 확신할 때만 높다.
+  confidence : min(음료 확신도, 잔량 확신도) — 종류·잔량 둘 다 확신할 때만 높다.
+               잔량 확신도는 low와 empty를 한 묶음(REFILL_LEVELS)으로 본다. 둘 다 리필 대상이라, 투명한 물이
+               조금 남은 잔처럼 low↔empty 사이에서 헷갈려도 리필 판단은 흔들리지 않기 때문이다.
+               이 묶음이 이기면 음료 확신도에도 반대편을 더한다: 음료 잔이면 + p(empty), 빈 잔(unknown)이면
+               + Σ p(<drink>__low). coke↔coffee, low↔full 사이 헷갈림은 그대로 점수를 낮춘다.
   item_confidence : 음료가 있다고 볼 때 "어느 음료인지"만의 확신도 = 최고 음료 marginal / 음료 marginal 합.
                     empty/unknown 확률은 빼고 정규화한다. item 이 unknown 이면 None.
                     coke↔coffee 처럼 음료만 애매한 경우를 Controller가 고객에게 묻는 데 쓴다.
-Controller 정책(confidence ≥ 0.7, fill_ratio ≤ 0.3)은 이 값을 그대로 쓴다.
+Controller 정책(기본 confidence ≥ 0.7, fill_ratio ≤ 0.3 / 보드 .env.board 0.6, 0.35)은 이 값을 그대로 쓴다.
 """
 
 DRINKS = ("water", "coke", "coffee")
 # 단계 → 대표 잔량 비율. full/mid/low 구간(합성 데이터 생성 기준)의 중앙값 근처. bundle.json 으로 덮어쓸 수 있다.
 DEFAULT_FILL_RATIO = {"full": 0.85, "mid": 0.5, "low": 0.18, "empty": 0.02}
+REFILL_LEVELS = ("low", "empty")  # 잔량 확신도에서 한 묶음으로 보는 단계 (둘 다 리필 대상)
 
 
 def parse(label):
@@ -48,7 +53,15 @@ def to_observation(probs, classes, fill_ratio=None):
         level_p[level] = level_p.get(level, 0.0) + float(p)
         fill += float(p) * ratio.get(level, 0.5)
     item = max(item_p, key=item_p.get)
-    conf = min(item_p[item], max(level_p.values()))
+    refill = sum(level_p.get(lv, 0.0) for lv in REFILL_LEVELS)
+    level_conf = max([refill] + [v for k, v in level_p.items() if k not in REFILL_LEVELS])
+    item_conf_part = item_p[item]
+    if refill >= level_conf:  # low·empty 쪽 판단: 둘 사이 헷갈림은 음료 확신도도 깎지 않는다
+        if item == "unknown":
+            item_conf_part += sum(float(p) for p, c in zip(probs, classes) if c != "empty" and parse(c)[1] == "low")
+        else:
+            item_conf_part += item_p.get("unknown", 0.0)
+    conf = min(item_conf_part, level_conf)
     drink_total = sum(v for k, v in item_p.items() if k in DRINKS)
     item_conf = None
     if item != "unknown" and drink_total > 0:
