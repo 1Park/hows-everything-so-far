@@ -8,8 +8,12 @@
     <div class="header-actions"><a href="/dashboard" class="pill dashboard-link">Go to dashboard →</a><span id="connection" class="pill">Connecting…</span></div>
   </div>
 </header>
-<div id="connectionLost" class="connection-lost" role="alert" aria-live="assertive" hidden>
-  <div><h2>bad cable connection</h2><p>Reconnecting automatically…</p></div>
+<div id="connectionLost" class="connection-lost" hidden>
+  <div><h2 role="alert">bad cable connection</h2><p>Reconnecting automatically…</p>
+    <p id="connectionHint">Checking the connection to the board.</p>
+    <pre id="connectionDiagnostics" class="connection-diagnostics" aria-live="off"></pre>
+    <p class="diagnostics-note">A timeout can also mean a slow or stopped server. Board link readings below are the last received sample.</p>
+  </div>
 </div>
 <main>
   <div class="workspace">
@@ -54,6 +58,7 @@
 
   <details class="dev-tools">
     <summary>Demo tools &amp; diagnostics</summary>
+    <details><summary>Connection diagnostics &amp; recent disconnects</summary><pre id="connectionHistory" class="connection-diagnostics"></pre></details>
     <div id="sources" class="sources">Checking services…</div>
     <p id="categoryMapping">DINO category mapping (read-only): loading…</p>
     <label><input id="untrainedCategories" type="checkbox"> Enable untrained drink variants (demo only)</label>

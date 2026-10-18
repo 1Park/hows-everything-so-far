@@ -84,6 +84,10 @@ main{padding:12px 24px 22px}
 .connection-lost:not([hidden]){position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;background:rgba(248,248,243,.97);color:#862e25}
 .connection-lost h2{font-size:clamp(28px,5vw,48px);margin:0 0 16px}
 .connection-lost p{font-size:18px;color:#555}
+.connection-lost:not([hidden]){overflow:auto;align-items:safe center}
+.connection-lost>div{width:min(100%,760px);margin:auto}
+.connection-diagnostics{white-space:pre-wrap;overflow-wrap:anywhere;text-align:left;background:#fff;border:1px solid #ddd;border-radius:12px;padding:16px;color:#333;font:14px/1.6 monospace;max-height:48vh;overflow:auto;user-select:text}
+.connection-lost .diagnostics-note{font-size:13px}
 .restart-settings{display:flex;align-items:center;flex-wrap:wrap;gap:12px 24px;margin:12px 0}
 .restart-settings label{display:flex;align-items:center;gap:8px}
 .restart-settings input[type=number]{width:84px;padding:8px}

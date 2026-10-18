@@ -4,6 +4,57 @@ let displayedSession = '', lastPhase = '', retryTimer = null;
 let socket = null, socketStarted = 0, lastSocketMessage = 0;
 let probingConnection = false;
 const apiRequests = new Set();
+const connectionDiag = {reason:'Starting', health:'Not checked', checked:0, ok:0,
+  latency:null, failures:0, attempts:0, board:null, boardAt:0, boardChecked:0,
+  boardError:'Not checked', events:[]};
+let boardProbe = false;
+function connectionEvent(message) {
+  connectionDiag.events.unshift(`${new Date().toLocaleTimeString()} · ${message}`);
+  connectionDiag.events.length = Math.min(connectionDiag.events.length, 10);
+}
+function paintConnectionDiagnostics() {
+  const ago = stamp => stamp ? `${((Date.now()-stamp)/1000).toFixed(1)}s ago` : 'never';
+  const value = item => item === null || item === undefined ? 'unknown' : item;
+  const board = connectionDiag.board;
+  const lines = [
+    `Page: ${location.origin}${location.pathname}`,
+    `Browser network: ${navigator.onLine ? 'online (does not prove LAN reachability)' : 'OFFLINE'}`,
+    `Disconnect reason: ${connectionDiag.reason}`,
+    `HTTP /health: ${connectionDiag.health}`,
+    `Last check: ${ago(connectionDiag.checked)} · last success: ${ago(connectionDiag.ok)}`,
+    `Last HTTP latency: ${value(connectionDiag.latency)} ms · failures in a row: ${connectionDiag.failures}`,
+    `WebSocket: ${socket ? ['CONNECTING','OPEN','CLOSING','CLOSED'][socket.readyState] : 'disconnected'} · attempts: ${connectionDiag.attempts}`,
+    `Last WebSocket message: ${ago(lastSocketMessage)} · state sequence: ${state?.sequence ?? 'none'}`,
+    `Board sample: ${ago(connectionDiag.boardAt)} · diagnostic request: ${connectionDiag.boardError}`,
+  ];
+  if (board) {
+    const eth = board.ethernet;
+    lines.push(`Board sees this tablet as: ${value(board.client_ip)}`,
+      `LAN end0: carrier=${value(eth.carrier)} · ${value(eth.state)} · ${value(eth.speed_mbps)} Mbps`,
+      `Link changes since boot: ${value(eth.carrier_changes)}`,
+      `Packets RX/TX: ${value(eth.rx_packets)}/${value(eth.tx_packets)} · errors: ${value(eth.rx_errors)}/${value(eth.tx_errors)} · RX dropped: ${value(eth.rx_dropped)}`);
+  }
+  lines.push('', 'Recent events:', ...connectionDiag.events);
+  for (const id of ['connectionDiagnostics', 'connectionHistory']) $(id).textContent = lines.join('\n');
+  $('connectionHint').textContent = !navigator.onLine ? 'The browser reports no network connection.'
+    : connectionDiag.failures ? 'The board HTTP check failed. This does not confirm a cable fault.'
+    : 'The board HTTP check responds; waiting for a fresh WebSocket state.';
+}
+async function sampleBoardConnection() {
+  if (boardProbe || Date.now() - connectionDiag.boardChecked < 5000) return;
+  boardProbe = true;
+  connectionDiag.boardChecked = Date.now();
+  const abort = new AbortController();
+  const timeout = setTimeout(() => abort.abort(), 2000);
+  try {
+    const response = await fetch('/api/connection-status', {cache:'no-store', signal:abort.signal});
+    if (!response.ok) throw Error(`HTTP ${response.status}`);
+    connectionDiag.board = await response.json();
+    connectionDiag.boardAt = Date.now();
+    connectionDiag.boardError = 'OK';
+  } catch (error) {connectionDiag.boardError = error.name === 'AbortError' ? 'timeout (2s)' : error.message;}
+  finally {clearTimeout(timeout); boardProbe = false; paintConnectionDiagnostics();}
+}
 let audioContext = null, playingSource = null;
 let draftVersion = 0, transcriptionVersion = 0, micVersion = 0;
 let micPending = false, transcribing = false, pendingAction = null;
@@ -381,7 +432,10 @@ function connect() {
   if (socket) return;
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
   socket = ws;
-  socketStarted = lastSocketMessage = Date.now();
+  socketStarted = Date.now();
+  connectionDiag.attempts++;
+  connectionEvent('WebSocket connecting');
+  ws.onopen = () => {if (socket === ws) {connectionEvent('WebSocket open; waiting for state'); paintConnectionDiagnostics();}};
   ws.onmessage = event => {
     if (socket !== ws) return;
     lastSocketMessage = Date.now();
@@ -396,6 +450,7 @@ function connect() {
       if (recovering) {lastPhase = ''; displayedSession = '';}
       render(data.state, true);
       if (recovering) {
+        connectionEvent('Recovered: fresh server state received');
         checkConnection();
         const image = $('sceneImage');
         if (!image.dataset.streaming && !state.snapshot_url) image.src = `/api/frame?t=${Date.now()}`;
@@ -403,10 +458,12 @@ function connect() {
       }
     } else if (data.type === 'capture' && data.instance_id === state?.instance_id) updateCapture(data.capture);
   };
-  ws.onclose = () => {if (socket === ws) disconnect();};
-  ws.onerror = () => {if (socket === ws) disconnect();};
+  ws.onclose = event => {if (socket === ws) disconnect(`WebSocket closed: code ${event.code}${event.reason ? ` · ${event.reason}` : ''}`);};
+  ws.onerror = () => {if (socket === ws) disconnect('WebSocket transport error (browser provides no detail)');};
 }
-function disconnect() {
+function disconnect(reason = 'Connection lost') {
+  if (connected || connectionDiag.reason !== reason) connectionEvent(reason);
+  connectionDiag.reason = reason;
   const ws = socket;
   socket = null;
   if (ws) {
@@ -426,6 +483,7 @@ function disconnect() {
   $('connectionLost').hidden = false;
   $('connection').textContent = 'bad cable connection';
   $('connection').classList.remove('online');
+  paintConnectionDiagnostics();
   clearTimeout(retryTimer);
   retryTimer = setTimeout(probeConnection, 1000);
 }
@@ -433,27 +491,42 @@ async function probeConnection() {
   if (probingConnection) return;
   probingConnection = true;
   const abort = new AbortController();
+  const started = performance.now();
+  connectionDiag.checked = Date.now();
   const timeout = setTimeout(() => abort.abort(), 2000);
   try {
     // /health only checks the Controller, so unavailable model backends do not
     // get mistaken for a disconnected cable. Never use cached responses.
     const response = await fetch('/health', {cache:'no-store', signal:abort.signal});
-    if (!response.ok) throw Error('Controller unreachable');
-    if (socket && ((!connected && Date.now() - socketStarted > 3000)
-        || Date.now() - lastSocketMessage > 15000)) disconnect();
+    if (!response.ok) throw Error(`HTTP ${response.status}`);
+    await response.json();
+    connectionDiag.latency = Math.round(performance.now() - started);
+    connectionDiag.ok = Date.now();
+    connectionDiag.health = '200 OK';
+    connectionDiag.failures = 0;
+    sampleBoardConnection();
+    if (socket && !connected && Date.now() - socketStarted > 3000) disconnect('WebSocket did not deliver an initial state within 3s');
+    else if (socket && connected && Date.now() - lastSocketMessage > 15000) disconnect('WebSocket silent for 15s while HTTP still responds');
     if (!socket) connect();
-  } catch {disconnect();}
+  } catch (error) {
+    connectionDiag.latency = Math.round(performance.now() - started);
+    connectionDiag.failures++;
+    connectionDiag.health = error.name === 'AbortError' ? 'TIMEOUT: no response within 2s' : error.message;
+    disconnect(`HTTP check failed: ${connectionDiag.health}`);
+  }
   finally {
     clearTimeout(timeout);
     probingConnection = false;
+    paintConnectionDiagnostics();
     clearTimeout(retryTimer);
     retryTimer = setTimeout(probeConnection, 1000);
   }
 }
-window.addEventListener('offline', disconnect);
+window.addEventListener('offline', () => disconnect('Browser offline event'));
 window.addEventListener('online', probeConnection);
 window.addEventListener('pageshow', probeConnection);
 document.addEventListener('visibilitychange', () => {if (!document.hidden) probeConnection();});
+setInterval(paintConnectionDiagnostics, 1000);
 async function observe() {
   const form = new FormData(); form.append('scenario', $('scenario').value);
   if ($('imageFile').files[0]) form.append('file', $('imageFile').files[0]);

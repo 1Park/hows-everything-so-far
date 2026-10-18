@@ -12,6 +12,12 @@ the notice closes after the latest state is received over a new WebSocket, and t
 is not reloaded and previous requests are not resent automatically. The browser cannot distinguish cable, network
 and server outages, so the same notice is used for all of them.
 
+The disconnect screen shows the page address, browser online status, HTTP response/2-second timeout/latency,
+last successful check, WebSocket status/last message/retry count, and recent events.
+`/api/connection-status` reads the board's end0 link, speed, link change count and packet errors without
+calling external networks or model services. Samples are taken every 5 seconds; during an outage the last
+sample is shown with its age. After recovery, Demo tools → Connection diagnostics keeps the recent history.
+
 Reconnect check: run a separate offline server on port 8096, then `npm run test:reconnect`.
 
 **Enable untrained drink variants (demo only)** in Demo tools is OFF by default.

@@ -6,7 +6,7 @@ import httpx
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import File, Form, Query, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import File, Form, Query, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -34,6 +34,26 @@ from common.contracts import (
 )
 from services.stt.normalize import normalize
 from common.media import read_upload, validate_audio, validate_image
+
+
+def ethernet_status(root=Path('/sys/class/net/end0')):
+    """Local kernel counters only; never depend on Wi-Fi, DNS or a model service."""
+    def read(name):
+        try:
+            return (root / name).read_text().strip()
+        except OSError:
+            return None
+
+    def number(name):
+        value = read(name)
+        return int(value) if value is not None and value.lstrip('-').isdigit() else None
+
+    return {
+        'interface': 'end0', 'carrier': number('carrier'), 'state': read('operstate'),
+        'speed_mbps': number('speed'), 'carrier_changes': number('carrier_changes'),
+        **{name: number(f'statistics/{name}') for name in
+           ('rx_packets', 'tx_packets', 'rx_errors', 'tx_errors', 'rx_dropped')},
+    }
 
 
 def create_app(settings=None, clients=None, hardware=None):
@@ -64,6 +84,12 @@ def create_app(settings=None, clients=None, hardware=None):
     # revalidated into a 304. The UI is tiny and served over a direct link, so
     # always send the current bytes rather than debug a stale page mid-demo.
     no_store = {"Cache-Control": "no-store"}
+
+    @app.get('/api/connection-status')
+    async def connection_status(request: Request):
+        return JSONResponse({'ethernet': ethernet_status(), 'server_time': time.time(),
+                             'client_ip': request.client.host if request.client else None},
+                            headers=no_store)
 
     @app.get("/")
     async def index():
