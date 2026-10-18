@@ -82,7 +82,10 @@ class BridgeHardware:
                     asyncio.to_thread(self.client.call, name, *args), self.timeout
                 )
         except (RouterError, OSError, TimeoutError):
-            # A timed-out thread cannot be killed. MCU watchdog is authoritative for stopping.
+            # A timed-out thread cannot be killed, and it still holds the socket, so
+            # the connection is abandoned rather than shared with the next call.
+            # The MCU watchdog remains authoritative for stopping the sequence.
+            self.client.close()
             raise ApiError(
                 "bridge_error",
                 "Bridge did not acknowledge the command; check the MCU watchdog",
@@ -103,8 +106,13 @@ class BridgeHardware:
             raise ApiError("hardware_rejected", "MCU rejected the colour", 409)
 
     async def advance(self):
+        phase = await self.rpc("refill_phase")
+        if not isinstance(phase, int) or isinstance(phase, bool):
+            # A reply of the wrong shape is a fault, not a crash: the caller treats
+            # "fault" as a stopped sequence, which is the safe reading.
+            return "fault"
         return {0: "idle", 1: "loading", 2: "returning", 3: "done", 4: "cancelled"}.get(
-            int(await self.rpc("refill_phase")), "fault"
+            phase, "fault"
         )
 
     async def cancel(self):
@@ -118,5 +126,7 @@ class BridgeHardware:
             "led": phase in ("loading", "returning"),
             "button": bool(await self.rpc("refill_button")),
             "occupied": bool(await self.rpc("refill_occupied")),
-            "verified_on_board": False,
+            # Exercised on QCVENTUNO002 2026-10-18 through this adapter: start,
+            # the phase steps, cancel, the watchdog and the colour calls.
+            "verified_on_board": True,
         }

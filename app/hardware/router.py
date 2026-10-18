@@ -49,9 +49,14 @@ class RouterClient:
         return client
 
     def close(self):
-        if self.socket is not None:
-            self.socket.close()
-            self.socket = None
+        # Drops the reference as well as the handle: a call that timed out may still
+        # be using this socket from its thread, and it must not meet the next call.
+        victim, self.socket = self.socket, None
+        if victim is not None:
+            try:
+                victim.close()
+            except OSError:
+                pass
 
     def call(self, method: str, *params):
         client = self.connect()
@@ -60,10 +65,14 @@ class RouterClient:
         try:
             client.sendall(msgpack.packb([0, expected, method, list(params)], use_bin_type=True))
             return self.await_reply(client, expected)
-        except (OSError, msgpack.UnpackException, RouterError):
-            # Never reuse a stream whose framing or state is in doubt; reconnect next call.
+        except RouterError:
             self.close()
             raise
+        except Exception as error:
+            # Everything the transport can raise — socket errors, malformed packs,
+            # unexpected types — reaches callers as one failure they already handle.
+            self.close()
+            raise RouterError(f"{type(error).__name__}: {error}") from error
 
     def await_reply(self, client, expected):
         while True:

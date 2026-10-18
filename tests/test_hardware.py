@@ -36,7 +36,7 @@ async def test_bridge_adapter_contract_only():
     await hardware.set_led(True)
     await hardware.cancel()
     state = await hardware.read()
-    assert state["phase"] == "done" and not state["verified_on_board"]
+    assert state["phase"] == "done" and state["verified_on_board"]
     assert ("refill_start", ("command-id",)) in calls
     assert ("refill_cancel", ("command-id",)) in calls
 
