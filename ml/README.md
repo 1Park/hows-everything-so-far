@@ -56,6 +56,7 @@ docker build --platform linux/amd64 -t refill-ml-export ml                      
 | 보드 export·NPU | 보드 ExecuTorch venv에서 `python -m ml.export.export_qnn ... --soc_model QCS8275`, `python -m ml.evaluation.board_npu_check {dinov2,yolo} --pte <pte> --images <dir>` | 보드 실측 (설치·환경변수는 [BOARD_RUNBOOK](../docs/BOARD_RUNBOOK.md#보드-executorch-설치-기록-2026-10-17-qcventuno002)) |
 | 보드 LLM | `scripts/board_llm.sh status / use gemma3\|gemma4\|auto / ask "..."` | 주최 측 Gemma `.pte` 전환 실행 |
 | 학습 crop | `python -m ml.training.make_crops --data data/real --bundle <bundle> --runner-bin <runner> --out data/crops` | YOLO 모드: 학습 사진 → 추론과 같은 pad crop (`data/crops/`, 옆 물체는 `data/crops_extra/`) |
+| 보드 카메라 수집 | `python -m ml.tools.board_collect --bundle <bundle> --runner-bin <runner> --labels water__low water__mid ...` | Controller `/api/frame`(실제 640×480) → 왼쪽부터 라벨 붙인 YOLO crop |
 | head 학습 | `python -m ml.training.make_head --data data/crops --dino-pte <pte> --runner {py,cli} --class-weight balanced` (**배포할 .pte로**) | head JSON |
 | bundle | `python -m ml.export.make_bundle --out models/{local,board}/vision/<name> ...` | `bundle.json` + .pte + head |
 
