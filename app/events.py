@@ -29,6 +29,7 @@ class EventLog:
             self.path = path if path.is_absolute() else ROOT / path
         self.low_fill_threshold = low_fill_threshold
         self.failed = False
+        self.last_request = None
 
     def level(self, fill_ratio: float | None) -> str:
         if fill_ratio is None:
@@ -53,8 +54,12 @@ class EventLog:
                 }
                 for o in state["scene"]["objects"]
             ]
-        if phase == "card" and state.get("card"):
+        if phase in ("card", "loading") and state.get("card"):
             card = state["card"]
+            identity = (session, card.get("request_id", card["object_id"]), card["revision"])
+            if identity == self.last_request:
+                return []
+            self.last_request = identity
             row = {
                 "ts": ts,
                 "event": "requested",
@@ -65,7 +70,8 @@ class EventLog:
             }
             if state.get("transcript"):
                 row["transcript"] = state["transcript"]
-            return [row]
+            selected = card.get("selections") or [{"object_id":card["object_id"], "item":card["item"]}]
+            return [{**row, **entry} for entry in selected]
         return []
 
     def record(self, state: dict) -> None:

@@ -44,7 +44,7 @@ async def run_refill(c):
         )
     )
     await settled(c)
-    await c.confirm(ConfirmInput(**c.card.model_dump(exclude={"item"})))
+    await c.confirm(ConfirmInput(**c.card.model_dump(exclude={"item", "selections"})))
     await settled(c)
 
 

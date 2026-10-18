@@ -1,0 +1,197 @@
+{
+  "model": "gemma4",
+  "backend": "executorch resident runner",
+  "temperature": 0,
+  "date": "2026-10-18",
+  "scope": "Product prompt -> real board generation API via SSH; no board deployment. Vision/Hardware UI checks use fixtures.",
+  "prompt_sha256": "694af995b1658931079475f04a2a5396d60e55b0ead160f99388507ce4d6c047",
+  "targets": [
+    {
+      "object_id": "cup-0",
+      "observed_group": "water",
+      "allowed_items": [
+        "water"
+      ]
+    },
+    {
+      "object_id": "cup-1",
+      "observed_group": "coke",
+      "allowed_items": [
+        "coke",
+        "coffee"
+      ]
+    }
+  ],
+  "production_id_cases": [
+    {
+      "utterance": "Yes please",
+      "temperature": 0,
+      "source": "executorch",
+      "raw": "{\"intent\":\"refill\",\"selections\":[{\"object_id\":\"cup-0\",\"item\":\"water\"},{\"object_id\":\"cup-1\",\"item\":\"coke\"}]}",
+      "parsed": {
+        "intent": "refill",
+        "item": null,
+        "selections": [
+          {
+            "object_id": "cup-0",
+            "item": "water"
+          },
+          {
+            "object_id": "cup-1",
+            "item": "coke"
+          }
+        ]
+      }
+    },
+    {
+      "utterance": "Just water please",
+      "temperature": 0,
+      "source": "executorch",
+      "raw": "{\"intent\":\"refill\",\"selections\":[{\"object_id\":\"cup-0\",\"item\":\"water\"}]}",
+      "parsed": {
+        "intent": "refill",
+        "item": null,
+        "selections": [
+          {
+            "object_id": "cup-0",
+            "item": "water"
+          }
+        ]
+      }
+    },
+    {
+      "utterance": "Coffee only, please",
+      "temperature": 0,
+      "source": "executorch",
+      "raw": "{\"intent\":\"refill\",\"selections\":[{\"object_id\":\"cup-1\",\"item\":\"coffee\"}]}",
+      "parsed": {
+        "intent": "refill",
+        "item": null,
+        "selections": [
+          {
+            "object_id": "cup-1",
+            "item": "coffee"
+          }
+        ]
+      }
+    },
+    {
+      "utterance": "No thanks, I'm fine",
+      "temperature": 0,
+      "source": "executorch",
+      "raw": "{\"intent\":\"decline\",\"selections\":[]}",
+      "parsed": {
+        "intent": "decline",
+        "item": null,
+        "selections": []
+      }
+    },
+    {
+      "utterance": "Water and coke please",
+      "temperature": 0,
+      "source": "executorch",
+      "raw": "{\"intent\":\"refill\",\"selections\":[{\"object_id\":\"cup-0\",\"item\":\"water\"},{\"object_id\":\"cup-1\",\"item\":\"coke\"}]}",
+      "parsed": {
+        "intent": "refill",
+        "item": null,
+        "selections": [
+          {
+            "object_id": "cup-0",
+            "item": "water"
+          },
+          {
+            "object_id": "cup-1",
+            "item": "coke"
+          }
+        ]
+      }
+    }
+  ],
+  "production_id_result": "5/5 expected intents and selected cups/drinks",
+  "named_id_probe": [
+    {
+      "utterance": "Yes please",
+      "temperature": 0,
+      "source": "executorch",
+      "raw": "{\"intent\":\"refill\",\"selections\":[{\"object_id\":\"cup-water\",\"item\":\"water\"},{\"object_id\":\"cup-coke\",\"item\":\"coke\"}]}",
+      "parsed": {
+        "intent": "refill",
+        "item": null,
+        "selections": [
+          {
+            "object_id": "cup-water",
+            "item": "water"
+          },
+          {
+            "object_id": "cup-coke",
+            "item": "coke"
+          }
+        ]
+      }
+    },
+    {
+      "utterance": "Just water please",
+      "temperature": 0,
+      "source": "executorch",
+      "raw": "{\"intent\":\"refill\",\"selections\":[{\"object_id\":\"cup-water\",\"item\":\"water\"}]}",
+      "parsed": {
+        "intent": "refill",
+        "item": null,
+        "selections": [
+          {
+            "object_id": "cup-water",
+            "item": "water"
+          }
+        ]
+      }
+    },
+    {
+      "utterance": "Coffee only, please",
+      "temperature": 0,
+      "source": "executorch",
+      "raw": "{\"intent\":\"refill\",\"selections\":[{\"object_id\":\"cup-coke\",\"item\":\"coke\"}]}",
+      "parsed": {
+        "intent": "refill",
+        "item": null,
+        "selections": [
+          {
+            "object_id": "cup-coke",
+            "item": "coke"
+          }
+        ]
+      }
+    },
+    {
+      "utterance": "No thanks, I'm fine",
+      "temperature": 0,
+      "source": "executorch",
+      "raw": "{\"intent\":\"decline\",\"selections\":[]}",
+      "parsed": {
+        "intent": "decline",
+        "item": null,
+        "selections": []
+      }
+    },
+    {
+      "utterance": "Water and coke please",
+      "temperature": 0,
+      "source": "executorch",
+      "raw": "{\"intent\":\"refill\",\"selections\":[{\"object_id\":\"cup-water\",\"item\":\"water\"},{\"object_id\":\"cup-coke\",\"item\":\"coke\"}]}",
+      "parsed": {
+        "intent": "refill",
+        "item": null,
+        "selections": [
+          {
+            "object_id": "cup-water",
+            "item": "water"
+          },
+          {
+            "object_id": "cup-coke",
+            "item": "coke"
+          }
+        ]
+      }
+    }
+  ],
+  "limitation": "With semantic IDs cup-water/cup-coke, Coffee only selected the right cup but returned coke instead of coffee (4/5). Preserved as a model error, not corrected or replaced by fixture output."
+}

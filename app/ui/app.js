@@ -366,7 +366,9 @@ function render(next, authoritative = false) {
   syncFrameRatio();
   const boxes = $('boxes'); boxes.replaceChildren(); const objects = $('objects'); objects.replaceChildren();
   for (const obj of (monitoring ? [] : state.scene?.objects || [])) {
-    const selected = obj.object_id === state.target?.object_id;
+    const selected = state.card?.selections?.length
+      ? state.card.selections.some(s=>s.object_id === obj.object_id)
+      : (state.targets?.length ? state.targets.some(t=>t.object_id === obj.object_id) : obj.object_id === state.target?.object_id);
     // Needs refill = same fill/confidence thresholds as the Controller policy (an empty cup
     // reported as unknown is still visibly a refill target, so it is marked too)
     // Vision sends empty cups as item unknown (the contract has no empty) → shown as empty
@@ -396,11 +398,15 @@ function render(next, authoritative = false) {
   $('requestCard').hidden = !state.card || !['card','interpreting','not_understood','error','loading','returning','done'].includes(state.phase);
   if (monitoring) $('requestCard').hidden = true;
   if (state.card) {
-    $('cardDrink').textContent = state.card.item.replaceAll('_', ' ');
+    const selected = state.card.selections?.length ? state.card.selections : [{object_id:state.card.object_id,item:state.card.item}];
+    const counts = new Map();
+    for (const entry of selected) counts.set(entry.item, (counts.get(entry.item) || 0) + 1);
+    $('cardDrink').textContent = Array.from(counts, ([item,count]) => item.replaceAll('_',' ') + (count > 1 ? ` × ${count}` : '')).join(' and ');
     $('revision').textContent = `v${state.card.revision}`;
-    $('targetId').textContent = `Target ${state.card.object_id} · Frozen at proposal · ${state.qwen_source || 'pending'} LLM`;
+    $('targetId').textContent = `Cups: ${selected.map(s=>s.object_id).join(', ')} · Frozen at proposal · ${state.qwen_source || 'pending'} LLM`;
     // CSS presentation of the frozen target. Never supplied as model crop/preprocessing.
-    const b = state.target.bbox, width = b.x2-b.x1, height = b.y2-b.y1;
+    const previewTarget = state.scene?.objects.find(o=>o.object_id === selected[0].object_id) || state.target;
+    const b = previewTarget.bbox, width = b.x2-b.x1, height = b.y2-b.y1;
     $('targetImage').style.backgroundImage = `url("${state.snapshot_url}")`;
     $('targetImage').style.backgroundSize = `${100/width}% ${100/height}%`;
     $('targetImage').style.backgroundPosition = `${width === 1 ? 0 : b.x1/(1-width)*100}% ${height === 1 ? 0 : b.y1/(1-height)*100}%`;

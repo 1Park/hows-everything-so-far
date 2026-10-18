@@ -4,6 +4,8 @@ Short, friendly English lines. The screen keeps its own longer message; speech s
 board microphone can start recording soon after the offer. None means stay silent.
 """
 
+from collections import Counter
+
 from common.vision_categories import VISION_CATEGORY_MAP
 
 
@@ -11,20 +13,32 @@ def say(item):
     return item.replace("_", " ")  # orange_juice -> "orange juice"
 
 
-def refill_offer(item):
-    category = VISION_CATEGORY_MAP.get(item, item)
-    if category == "unknown":
+def drink_list(items):
+    counts = Counter(items)
+    names = [say(item) if count == 1 else f"{count} glasses of {say(item)}"
+             for item, count in counts.items()]
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+
+
+def refill_offer(items):
+    if isinstance(items, str):
+        items = [items]
+    categories = [VISION_CATEGORY_MAP.get(item, item) for item in items]
+    if not categories or "unknown" in categories:
         return "How is everything? Can I get you a refill?"
-    return f"How is everything? Can I get you some more {say(category)}?"
+    if len(set(categories)) < len(categories):
+        return f"How is everything? Would you like refills for your {drink_list(categories)}?"
+    return f"How is everything? Can I get you some more {drink_list(categories)}?"
 
 
 def speech_for(phase, target, card, item_confirm_threshold, allowed_items=None):
+    requested = drink_list([s.item for s in card.selections] or [card.item]) if card else None
     if phase == "offered" and target is not None:
         return refill_offer(target.item)
     if phase == "card" and card is not None:
-        return f"One more {say(card.item)}, got it. Please press Confirm."
+        return f"One more {requested}, got it. Please press Confirm."
     if phase == "loading" and card is not None:
-        return f"Got it, I'll be right back with {say(card.item)}."
+        return f"Got it, I'll be right back with {requested}."
     if phase == "not_understood":
         return "Sorry, I didn't catch that. Could you say that again?"
     if phase == "declined":

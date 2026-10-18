@@ -7,7 +7,7 @@ from app.audio import BoardMicrophone
 from app.events import EventLog
 from app.speech import refill_offer, speech_for
 from common.api import ApiError, log
-from common.contracts import CurrentRequest, RequestCard, StateEvent, uid
+from common.contracts import CurrentRequest, RefillSelection, RefillTarget, RequestCard, StateEvent, uid
 from common.vision_categories import available_drinks
 
 # What the board shows for each controller phase. Linux owns this mapping so a new
@@ -64,6 +64,7 @@ class Controller:
         self.led_colour = None
         self.scene = None
         self.target = None
+        self.targets = []
         self.card = None
         self.snapshot = None
         self.qwen_source = None
@@ -86,6 +87,7 @@ class Controller:
             "message": self.message,
             "scene": self.scene.model_dump() if self.scene else None,
             "target": self.target.model_dump() if self.target else None,
+            "targets": [o.model_dump() for o in self.targets],
             "card": self.card.model_dump() if self.card else None,
             "snapshot_url": f"/api/snapshot/{self.session_id}" if self.snapshot else None,
             "qwen_source": self.qwen_source,
@@ -100,8 +102,9 @@ class Controller:
             "transcript": self.transcript,
             "stt_source": self.stt_source,
             "capture": self.capture_status,
-            "speech": speech_for(self.phase, self.target, self.card,
-                                 self.settings.item_confirm_threshold, self.allowed_items()),
+            "speech": (self.offer_message(self.target) if self.phase == "offered" and self.target
+                       else speech_for(self.phase, self.target, self.card,
+                                       self.settings.item_confirm_threshold, self.allowed_items())),
         }
 
     def show_phase_led(self, phase):
@@ -187,6 +190,7 @@ class Controller:
                 self.voice_task.cancel()
             token = self.token
             self.session_id, self.scene, self.target, self.card = uid(), None, None, None
+            self.targets = []
             self.snapshot = (data, content_type)
             self.deadline, self.last_error, self.qwen_source = None, None, None
             self.transcript = self.stt_source = None
@@ -243,6 +247,7 @@ class Controller:
                     and o.fill_ratio is not None
                     and o.confidence >= self.settings.min_confidence
                     and o.fill_ratio <= self.settings.low_fill_threshold]
+        self.targets = sorted(eligible, key=lambda o: (o.bbox.x1, o.object_id))
         if not eligible:
             self.emit("skipped", "No confident low-fill cup was found. No refill will be suggested.")
             return
@@ -271,7 +276,7 @@ class Controller:
 
     def offer_message(self, target):
         """Offer the observed category; the customer's reply selects its member."""
-        return refill_offer(target.item)
+        return refill_offer([o.item for o in self.targets] or [target.item])
 
     def check_target(self, body):
         if (
@@ -299,6 +304,12 @@ class Controller:
         current = CurrentRequest(
             item=self.card.item if self.card else self.target.item,
             allowed_items=self.allowed_items(),
+            targets=[RefillTarget(object_id=o.object_id, item=o.item,
+                                  allowed_items=(available_drinks([o.item], self.untrained_categories)
+                                                 if len(self.targets) > 1 else self.allowed_items()))
+                     for o in self.targets],
+            selections=(self.card.selections if self.card else
+                        [RefillSelection(object_id=o.object_id, item=o.item) for o in self.targets]),
         )
         self.token += 1
         self.deadline, self.last_error = None, None
@@ -400,7 +411,7 @@ class Controller:
                         "cancelled" if result.intent == "cancel" else "declined",
                         "No refill will be started.",
                     )
-                elif result.intent == "not_understood" or result.item not in current.allowed_items:
+                elif result.intent == "not_understood" or not self.resolve_selections(result, current):
                     # Keep previous card as edit context, but phase blocks all confirmation.
                     self.arm_deadline()
                     self.emit(
@@ -408,12 +419,14 @@ class Controller:
                         "Sorry, I didn't catch that. Could you say that again?",
                     )
                 else:
+                    selections = self.resolve_selections(result, current)
                     self.card = RequestCard(
                         request_id=self.card.request_id if self.card else uid(),
                         revision=self.card.revision + 1 if self.card else 1,
                         scene_id=self.scene.scene_id,
                         object_id=self.target.object_id,
-                        item=result.item,
+                        item=selections[0].item,
+                        selections=selections,
                     )
                     if self.settings.require_confirmation:
                         self.arm_deadline()
@@ -444,6 +457,16 @@ class Controller:
                 token,
                 ApiError("qwen_error", "Request interpretation failed. Please retry", 502, True),
             )
+
+    def resolve_selections(self, result, current):
+        """Validate all LLM-selected cups atomically against this frozen offer."""
+        selections = result.selections
+        if not selections and len(current.targets) == 1 and result.item:
+            selections = [RefillSelection(object_id=current.targets[0].object_id, item=result.item)]
+        allowed = {t.object_id: t.allowed_items for t in current.targets}
+        if not selections or any(s.item not in allowed.get(s.object_id, []) for s in selections):
+            return None
+        return selections
 
     async def confirm(self, body):
         async with self.lock:
@@ -522,6 +545,7 @@ class Controller:
             self.token += 1
             self.session_id = uid()
             self.scene = self.target = self.card = self.snapshot = None
+            self.targets = []
             self.transcript = self.stt_source = self.qwen_source = None
             self.deadline = self.last_error = None
             self.voice_retries = 0

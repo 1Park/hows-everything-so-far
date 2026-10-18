@@ -9,8 +9,8 @@ The schema in [`common/contracts.py`](../common/contracts.py) and the settings i
 - Observed items are water/coke/coffee/unknown; request items are water/coke/coffee. `fill_ratio` and `item_confidence` may be null. `confidence` and `item_confidence` are the overall confidence and the drink-class confidence, respectively.
 - The DINO backend sums the coffee/coke probabilities and returns the representative observed item `coke`. In this case `item_confidence` is the group confidence. Fixtures and separate adapters may use the existing observation enum.
 - `allowed_items` in the state is the request menu expanded from the observation groups across the whole frozen scene. The coke group allows coke/coffee, and unknown adds no menu items. The LLM input carries `current_request`, `allowed_items`, and `utterance`, and the Controller also blocks refills outside the list.
-- Requests, cards, and LLM output have no quantity. If a request is changed to a drink different from the observed one, the target object stays the same.
-- Only one target and one request are handled at a time. Confirm requires the current card's scene/object/request/revision to all match. Proposals, STT, or LLM results alone never approve hardware actions.
+- `targets` holds all eligible cups in the frozen scene. The legacy `target` and card `object_id` anchor the session/ACK/Confirm identity. Card `selections` is the authoritative list of selected cup IDs and requested drinks; repeated drinks retain separate IDs.
+- One batch request is handled at a time. Confirm requires the current card's scene/object/request/revision to match when `REQUIRE_CONFIRMATION=true`; otherwise an understood request starts the existing simulated sequence. No new physical motion is implemented.
 
 ## Service APIs
 
@@ -22,7 +22,7 @@ The schema in [`common/contracts.py`](../common/contracts.py) and the settings i
 
 The Vision/STT model servers do not open the camera or microphone. The Controller passes image and audio bytes. Supported MIME and size checks are in [`common/media.py`](../common/media.py); the actual preprocessing is in each service backend.
 
-The LLM product prompt and parser are in [`app/language.py`](../app/language.py). Output has the form `{"intent":"refill","item":"water"}`, where intent is refill/decline/cancel/not_understood. refill requires a valid item; the others have item=null. A single JSON Markdown fence is allowed, but prose extraction, extra fields, duplicate keys, and field correction are not.
+The product prompt and parser are in [`app/language.py`](../app/language.py). Cup-aware output is `{"intent":"refill","selections":[{"object_id":"cup-0","item":"water"}]}`. Other intents have an empty selections array. The Controller rejects IDs outside the frozen offer and drinks outside each cup's allowed list. Legacy `{intent,item}` output remains supported for single-cup callers, but cannot approve a multi-cup offer. A single JSON Markdown fence is allowed; prose extraction, extra fields, duplicate keys, and duplicate cup IDs are rejected. See [multi-cup requests](MULTI_CUP.md).
 
 External Vision/STT plugins are selected with `*_MODEL_BACKEND=external` and `*_ADAPTER=package:create_backend`. The no-argument factory is called once, and the backend provides the following async methods. Return values are the common types or dicts of the same shape.
 

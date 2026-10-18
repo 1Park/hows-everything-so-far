@@ -64,21 +64,36 @@ class STTResult(Contract):
     source: Literal["fixture", "external"]
 
 
+class RefillSelection(Contract):
+    object_id: str = Field(min_length=1, max_length=100)
+    item: RequestedDrink
+
+
+class RefillTarget(RefillSelection):
+    allowed_items: list[RequestedDrink]
+
+
 class CurrentRequest(Contract):
     item: RequestedDrink
     allowed_items: list[RequestedDrink] = Field(default_factory=lambda: ["water", "coke", "coffee", "orange_juice"])
+    targets: list[RefillTarget] = Field(default_factory=list, max_length=50)
+    selections: list[RefillSelection] = Field(default_factory=list, max_length=50)
 
 
 class Interpretation(Contract):
     intent: Literal["refill", "decline", "cancel", "not_understood"]
-    item: RequestedDrink | None
+    item: RequestedDrink | None = None
+    selections: list[RefillSelection] = Field(default_factory=list, max_length=50)
 
     @model_validator(mode="after")
     def coherent(self):
-        if self.intent == "refill" and self.item is None:
-            raise ValueError("Refill requires an item")
-        if self.intent != "refill" and self.item is not None:
-            raise ValueError("Non-refill item must be null")
+        if self.intent == "refill" and bool(self.item) == bool(self.selections):
+            raise ValueError("Refill requires either one legacy item or explicit cup selections")
+        if self.intent != "refill" and (self.item is not None or self.selections):
+            raise ValueError("Non-refill must not select cups or drinks")
+        ids = [s.object_id for s in self.selections]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Each cup may be selected only once")
         return self
 
 
@@ -102,6 +117,7 @@ class Generation(Contract):
 
 class RequestCard(Contract):
     item: RequestedDrink
+    selections: list[RefillSelection] = Field(default_factory=list, max_length=50)
     request_id: str
     scene_id: str
     object_id: str
@@ -197,6 +213,7 @@ class SpeechRequest(Contract):
 
 
 class StateSnapshot(Contract):
+    targets: list[ObservedObject] = Field(default_factory=list)
     allowed_items: list[RequestedDrink] = Field(default_factory=list)
     untrained_categories: bool = False
     instance_id: str

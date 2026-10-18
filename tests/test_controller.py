@@ -38,7 +38,7 @@ async def say(c, text):
 
 
 def confirmation(c):
-    return ConfirmInput(**c.card.model_dump(exclude={"item"}))
+    return ConfirmInput(**c.card.model_dump(exclude={"item", "selections"}))
 
 
 async def test_full_refill_and_edit(controller):

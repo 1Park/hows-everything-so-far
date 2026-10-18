@@ -20,10 +20,10 @@ flowchart TD
 ## Request flow
 
 1. [`media.py`](../app/media.py) captures a single input. A manual observation, or the stability check in [`capture.py`](../app/capture.py), freezes the image and its Vision result. Bboxes are drawn on this snapshot.
-2. [`controller.py`](../app/controller.py) picks the target by confidence and fill level. Scenes with enough drink left or with uncertain results are skipped. Policy thresholds come from settings.
+2. [`controller.py`](../app/controller.py) offers all confident low-fill cups together. Full and uncertain cups are excluded. One primary target anchors the session identifiers; `targets` contains the complete frozen offer.
 3. When the tablet finishes the fixed WAV prompt and ACKs with the current session/scene/object/sequence, the board records. The STT transcript is passed to the LLM automatically. With development browser recording, the user reviews the transcript and then presses Send.
-4. [`language.py`](../app/language.py) sends an English system prompt and `{current_request: {item}, utterance}`. Images, the full Vision result, and conversation history are not sent to the LLM. The first item comes from the observed target; corrections come from the current card.
-5. The LLM returns `refill/decline/cancel/not_understood` and an item. Only refill creates a card; if the request is not understood, the user is asked to try again. Nothing is loaded or returned before an explicit Confirm on the card.
+4. [`language.py`](../app/language.py) sends an English prompt, frozen target IDs/groups/allowed drinks, current cup selections, and the new utterance. Images and model tensors are not sent to the LLM.
+5. The LLM returns an intent and cup-level `selections`. Yes accepts every current selection; a named drink selects matching offered cups; refusal selects none. The Controller validates every ID and drink before creating one batch card. `REQUIRE_CONFIRMATION` controls whether the batch waits for Confirm. See [multi-cup requests](MULTI_CUP.md).
 
 The Controller uses a lock, a generation token, and a card revision to block duplicate confirmations and late results that arrive after a cancel. The UI ignores stale state by instance_id/sequence and receives the full state when the WS reconnects. Sessions live in memory only. Auto-capture progress events use a separate revision and do not change the request sequence.
 

@@ -71,6 +71,50 @@ class FixtureTextBackend:
     async def ready(self):
         return True
 
+    def cup_selections(self, data):
+        """Deterministic multi-cup fixture, never a fallback for an actual LLM."""
+        text = data["utterance"].lower().strip()
+        current = data["current_request"]
+        def empty(intent):
+            return {"intent": intent, "selections": []}
+        if re.search(r"\b(cancel|stop|never mind)\b", text):
+            return empty("cancel")
+        if re.search(r"\b(no thanks|nope|fine|nothing|no refill|don't need)\b", text) or text == "no":
+            return empty("decline")
+        if re.search(r"\b(maybe|not sure|tea|lemonade|ignore)\b", text):
+            return empty("not_understood")
+        named = []
+        rest = re.sub(r"\boj\b", "orange juice", text)
+        for name in ("sparkling_water", "orange_juice", "coke_zero", "water", "coke", "coffee", "soda"):
+            phrase = name.replace("_", " ")
+            pattern = rf"\b{phrase}\b"
+            if re.search(rf"\bnot\s+{phrase}\b", rest):
+                rest = re.sub(rf"\bnot\s+{phrase}\b", "", rest)
+            elif re.search(pattern, rest):
+                named.append(name)
+                rest = re.sub(pattern, "", rest)
+        targets = current["targets"]
+        if not named:
+            if re.search(r"\b(both|all)\b", text):
+                selected = [{"object_id": t["object_id"], "item": t["observed_group"]} for t in targets]
+            elif re.search(r"\b(yes|sure|please|same)\b", text):
+                selected = current["selections"]
+            else:
+                return empty("not_understood")
+        else:
+            selected = []
+            matched = set()
+            for target in targets:
+                matches = [name for name in named if name in target["allowed_items"]]
+                if len(matches) > 1:
+                    return empty("not_understood")
+                if matches:
+                    selected.append({"object_id": target["object_id"], "item": matches[0]})
+                    matched.update(matches)
+            if matched != set(named) or (len(selected) > 1 and re.search(r"\b(one|1)\b", text)):
+                return empty("not_understood")
+        return {"intent": "refill", "selections": selected} if selected else empty("not_understood")
+
     async def generate(self, body: Generation):
         await asyncio.sleep(0.04)
         try:
@@ -81,6 +125,11 @@ class FixtureTextBackend:
             raise ApiError(
                 "fixture_input", "Fixture expects a current_request and utterance", 422
             ) from None
+        if current.get("targets"):
+            result = self.cup_selections(data)
+            return {"model": body.model, "source": "fixture", "choices": [
+                {"message": {"role": "assistant", "content": json.dumps(result)}, "finish_reason": "stop"}
+            ]}
         intent, item = "refill", current["item"]
         if re.search(r"\b(cancel|stop|never mind)\b", utterance):
             intent = "cancel"
