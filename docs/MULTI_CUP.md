@@ -4,7 +4,7 @@ All confident low-fill cups are offered in one sentence: for example, "Can I get
 Two water cups are described as "2 glasses of water" and retain distinct object IDs.
 Unknown, uncertain, and sufficiently full cups keep their existing skip policy.
 
-The Controller sends eligible target IDs, observed groups, per-cup allowed drinks, current selections,
+For multiple eligible cups, the Controller sends target IDs, observed groups, per-cup allowed drinks, current selections,
 and the new utterance to the LLM. The LLM chooses the intent and cup selections:
 
 ```json
@@ -26,6 +26,9 @@ Single-cup requests keep the prior scene-wide drink-edit menu for compatibility.
 history use these selections. The existing MCU/mock sequence runs once per batch; this change adds
 no physical navigation or per-cup dispensing implementation.
 
+Single-cup requests keep the original prompt, `{current_request:{item},allowed_items,utterance}`
+input, and `{intent,item}` reply. The Controller maps that reply to the single cup for UI/events.
+This avoids changing single-cup model behavior merely because multi-cup support was added.
 Legacy `{intent,item}` model replies are accepted for single-cup requests only. An actual model
 error is never replaced by the deterministic fixture backend.
 
@@ -38,3 +41,10 @@ the production `cup-0`/`cup-1` IDs: five replies selected the expected cups and 
 A separate semantic-ID probe (`cup-water`/`cup-coke`) returned coke for "Coffee only";
 that model error is preserved alongside the successful production-ID run. This small
 evaluation does not guarantee general language accuracy. No board deployment was performed.
+
+[Single-cup regression smoke](gemma_evaluation/single-cup-regression-20261018.json) runs
+the local Controller against the actual board LLM at temperature 0 (fixture Vision/mock Hardware):
+13 scenarios, 14 model calls, all expected Controller outcomes after restoring the single-cup
+prompt. It covers acceptance, drink edits and reacceptance, refusal/cancel, unclear/unsupported
+requests, demo variants, and automatic sequence completion. The pre-fix duplicate-ID failure
+and raw model outputs are preserved. Out-of-menu model answers are rejected by the Controller.

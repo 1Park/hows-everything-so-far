@@ -9,6 +9,18 @@ from common.contracts import Interpretation, RefillSelection, VisionResult
 from tests.test_controller import observe, say, confirmation, settled
 
 
+def test_single_cup_keeps_original_llm_prompt_and_payload():
+    from app.language import generation
+    from common.contracts import CurrentRequest, RefillTarget
+
+    legacy = CurrentRequest(item="coffee", allowed_items=["coke", "coffee"])
+    single = legacy.model_copy(update={
+        "targets": [RefillTarget(object_id="cup-0", item="coke", allowed_items=["coke", "coffee"])],
+        "selections": [RefillSelection(object_id="cup-0", item="coffee")],
+    })
+    assert generation("gemma4", single, "Yes please") == generation("gemma4", legacy, "Yes please")
+
+
 @pytest.mark.parametrize(("utterance", "items"), [
     ("Yes please", ["water", "coke"]),
     ("Water please", ["water"]),

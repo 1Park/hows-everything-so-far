@@ -83,16 +83,19 @@ Example context: cup-a water (water allowed), cup-b coke (coke and coffee allowe
 
 
 def generation(model: str, current: CurrentRequest, utterance: str) -> Generation:
-    context = current.model_dump(exclude=({"allowed_items"} if current.targets
+    # Keep the established single-cup prompt/payload unchanged. Only multiple
+    # eligible cups require object-ID selection from the model.
+    multi = len(current.targets) > 1
+    context = current.model_dump(exclude=({"allowed_items"} if multi
                                          else {"allowed_items", "targets", "selections"}))
-    if current.targets:
+    if multi:
         context["targets"] = [{"object_id":t.object_id, "observed_group":t.item,
                                "allowed_items":t.allowed_items} for t in current.targets]
     return Generation(
         model=model,
-        max_completion_tokens=512 if len(current.targets) > 1 else 192,
+        max_completion_tokens=512 if multi else 192,
         messages=[
-            Message(role="system", content=MULTI_PROMPT if current.targets else SYSTEM_PROMPT),
+            Message(role="system", content=MULTI_PROMPT if multi else SYSTEM_PROMPT),
             Message(
                 role="user",
                 content=json.dumps(

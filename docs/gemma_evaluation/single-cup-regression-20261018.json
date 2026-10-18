@@ -1,0 +1,527 @@
+{
+  "model": "gemma4",
+  "backend": "actual resident board ExecuTorch",
+  "temperature": 0,
+  "scope": "Local Controller -> ModelClients -> actual board LLM API over SSH forwarding. Vision and Hardware are fixtures/mock; no microphone, TTS, or physical hardware validation.",
+  "change": "Single eligible cup now uses exactly the original product prompt and item-only input/output; multiple eligible cups keep the new cup selection prompt.",
+  "result": {
+    "scenarios_passed": 13,
+    "scenarios_total": 13,
+    "llm_invocations": 14
+  },
+  "cases": [
+    {
+      "group": "water",
+      "demo": false,
+      "auto": false,
+      "offer": "How is everything? Can I get you some more water?",
+      "expected": [
+        [
+          "card",
+          "water"
+        ]
+      ],
+      "outputs": [
+        {
+          "utterance": "Yes please",
+          "phase": "card",
+          "item": "water",
+          "selections": [
+            {
+              "object_id": "cup-0",
+              "item": "water"
+            }
+          ],
+          "source": "executorch",
+          "error": null
+        }
+      ],
+      "passed": true,
+      "hardware_commands": 0,
+      "invocations": [
+        {
+          "raw": "{\"intent\":\"refill\",\"item\":\"water\"}",
+          "temperature": 0,
+          "source": "executorch",
+          "seconds": 1.805
+        }
+      ]
+    },
+    {
+      "group": "coke",
+      "demo": false,
+      "auto": false,
+      "offer": "How is everything? Can I get you some more coke?",
+      "expected": [
+        [
+          "card",
+          "coke"
+        ]
+      ],
+      "outputs": [
+        {
+          "utterance": "Yes please",
+          "phase": "card",
+          "item": "coke",
+          "selections": [
+            {
+              "object_id": "cup-0",
+              "item": "coke"
+            }
+          ],
+          "source": "executorch",
+          "error": null
+        }
+      ],
+      "passed": true,
+      "hardware_commands": 0,
+      "invocations": [
+        {
+          "raw": "{\"intent\":\"refill\",\"item\":\"coke\"}",
+          "temperature": 0,
+          "source": "executorch",
+          "seconds": 1.865
+        }
+      ]
+    },
+    {
+      "group": "coke",
+      "demo": false,
+      "auto": false,
+      "offer": "How is everything? Can I get you some more coke?",
+      "expected": [
+        [
+          "card",
+          "coffee"
+        ],
+        [
+          "card",
+          "coffee"
+        ]
+      ],
+      "outputs": [
+        {
+          "utterance": "Coffee instead, please",
+          "phase": "card",
+          "item": "coffee",
+          "selections": [
+            {
+              "object_id": "cup-0",
+              "item": "coffee"
+            }
+          ],
+          "source": "executorch",
+          "error": null
+        },
+        {
+          "utterance": "Yes please",
+          "phase": "card",
+          "item": "coffee",
+          "selections": [
+            {
+              "object_id": "cup-0",
+              "item": "coffee"
+            }
+          ],
+          "source": "executorch",
+          "error": null
+        }
+      ],
+      "passed": true,
+      "hardware_commands": 0,
+      "invocations": [
+        {
+          "raw": "{\"intent\":\"refill\",\"item\":\"coffee\"}",
+          "temperature": 0,
+          "source": "executorch",
+          "seconds": 1.908
+        },
+        {
+          "raw": "{\"intent\":\"refill\",\"item\":\"coffee\"}",
+          "temperature": 0,
+          "source": "executorch",
+          "seconds": 1.85
+        }
+      ]
+    },
+    {
+      "group": "orange_juice",
+      "demo": false,
+      "auto": false,
+      "offer": "How is everything? Can I get you some more orange juice?",
+      "expected": [
+        [
+          "card",
+          "orange_juice"
+        ]
+      ],
+      "outputs": [
+        {
+          "utterance": "OJ please",
+          "phase": "card",
+          "item": "orange_juice",
+          "selections": [
+            {
+              "object_id": "cup-0",
+              "item": "orange_juice"
+            }
+          ],
+          "source": "executorch",
+          "error": null
+        }
+      ],
+      "passed": true,
+      "hardware_commands": 0,
+      "invocations": [
+        {
+          "raw": "{\"intent\":\"refill\",\"item\":\"orange_juice\"}",
+          "temperature": 0,
+          "source": "executorch",
+          "seconds": 2.65
+        }
+      ]
+    },
+    {
+      "group": "water",
+      "demo": false,
+      "auto": false,
+      "offer": "How is everything? Can I get you some more water?",
+      "expected": [
+        [
+          "declined",
+          null
+        ]
+      ],
+      "outputs": [
+        {
+          "utterance": "No thanks, I'm fine",
+          "phase": "declined",
+          "item": null,
+          "selections": [],
+          "source": "executorch",
+          "error": null
+        }
+      ],
+      "passed": true,
+      "hardware_commands": 0,
+      "invocations": [
+        {
+          "raw": "{\"intent\":\"decline\",\"item\":null}",
+          "temperature": 0,
+          "source": "executorch",
+          "seconds": 2.721
+        }
+      ]
+    },
+    {
+      "group": "water",
+      "demo": false,
+      "auto": false,
+      "offer": "How is everything? Can I get you some more water?",
+      "expected": [
+        [
+          "cancelled",
+          null
+        ]
+      ],
+      "outputs": [
+        {
+          "utterance": "Cancel that",
+          "phase": "cancelled",
+          "item": null,
+          "selections": [],
+          "source": "executorch",
+          "error": null
+        }
+      ],
+      "passed": true,
+      "hardware_commands": 0,
+      "invocations": [
+        {
+          "raw": "{\"intent\":\"cancel\",\"item\":null}",
+          "temperature": 0,
+          "source": "executorch",
+          "seconds": 1.745
+        }
+      ]
+    },
+    {
+      "group": "water",
+      "demo": false,
+      "auto": false,
+      "offer": "How is everything? Can I get you some more water?",
+      "expected": [
+        [
+          "not_understood",
+          null
+        ]
+      ],
+      "outputs": [
+        {
+          "utterance": "Maybe, I'm not sure",
+          "phase": "not_understood",
+          "item": null,
+          "selections": [],
+          "source": "executorch",
+          "error": null
+        }
+      ],
+      "passed": true,
+      "hardware_commands": 0,
+      "invocations": [
+        {
+          "raw": "{\"intent\":\"not_understood\",\"item\":null}",
+          "temperature": 0,
+          "source": "executorch",
+          "seconds": 1.984
+        }
+      ]
+    },
+    {
+      "group": "water",
+      "demo": false,
+      "auto": false,
+      "offer": "How is everything? Can I get you some more water?",
+      "expected": [
+        [
+          "not_understood",
+          null
+        ]
+      ],
+      "outputs": [
+        {
+          "utterance": "Coffee please",
+          "phase": "not_understood",
+          "item": null,
+          "selections": [],
+          "source": "executorch",
+          "error": null
+        }
+      ],
+      "passed": true,
+      "hardware_commands": 0,
+      "invocations": [
+        {
+          "raw": "{\"intent\":\"refill\",\"item\":\"coffee\"}",
+          "temperature": 0,
+          "source": "executorch",
+          "seconds": 2.184
+        }
+      ]
+    },
+    {
+      "group": "coke",
+      "demo": false,
+      "auto": false,
+      "offer": "How is everything? Can I get you some more coke?",
+      "expected": [
+        [
+          "not_understood",
+          null
+        ]
+      ],
+      "outputs": [
+        {
+          "utterance": "Water and coffee please",
+          "phase": "not_understood",
+          "item": null,
+          "selections": [],
+          "source": "executorch",
+          "error": null
+        }
+      ],
+      "passed": true,
+      "hardware_commands": 0,
+      "invocations": [
+        {
+          "raw": "{\"intent\":\"not_understood\",\"item\":null}",
+          "temperature": 0,
+          "source": "executorch",
+          "seconds": 2.394
+        }
+      ]
+    },
+    {
+      "group": "water",
+      "demo": false,
+      "auto": false,
+      "offer": "How is everything? Can I get you some more water?",
+      "expected": [
+        [
+          "not_understood",
+          null
+        ]
+      ],
+      "outputs": [
+        {
+          "utterance": "Soda please",
+          "phase": "not_understood",
+          "item": null,
+          "selections": [],
+          "source": "executorch",
+          "error": null
+        }
+      ],
+      "passed": true,
+      "hardware_commands": 0,
+      "invocations": [
+        {
+          "raw": "{\"intent\":\"not_understood\",\"item\":null}",
+          "temperature": 0,
+          "source": "executorch",
+          "seconds": 6.909
+        }
+      ]
+    },
+    {
+      "group": "water",
+      "demo": true,
+      "auto": false,
+      "offer": "How is everything? Can I get you some more water?",
+      "expected": [
+        [
+          "card",
+          "soda"
+        ]
+      ],
+      "outputs": [
+        {
+          "utterance": "Soda please",
+          "phase": "card",
+          "item": "soda",
+          "selections": [
+            {
+              "object_id": "cup-0",
+              "item": "soda"
+            }
+          ],
+          "source": "executorch",
+          "error": null
+        }
+      ],
+      "passed": true,
+      "hardware_commands": 0,
+      "invocations": [
+        {
+          "raw": "{\"intent\":\"refill\",\"item\":\"soda\"}",
+          "temperature": 0,
+          "source": "executorch",
+          "seconds": 1.93
+        }
+      ]
+    },
+    {
+      "group": "coke",
+      "demo": true,
+      "auto": false,
+      "offer": "How is everything? Can I get you some more coke?",
+      "expected": [
+        [
+          "card",
+          "coke_zero"
+        ]
+      ],
+      "outputs": [
+        {
+          "utterance": "Coke zero please",
+          "phase": "card",
+          "item": "coke_zero",
+          "selections": [
+            {
+              "object_id": "cup-0",
+              "item": "coke_zero"
+            }
+          ],
+          "source": "executorch",
+          "error": null
+        }
+      ],
+      "passed": true,
+      "hardware_commands": 0,
+      "invocations": [
+        {
+          "raw": "{\"intent\":\"refill\",\"item\":\"coke_zero\"}",
+          "temperature": 0,
+          "source": "executorch",
+          "seconds": 1.979
+        }
+      ]
+    },
+    {
+      "group": "water",
+      "demo": false,
+      "auto": true,
+      "offer": "How is everything? Can I get you some more water?",
+      "expected": [
+        [
+          "done",
+          "water"
+        ]
+      ],
+      "outputs": [
+        {
+          "utterance": "Yes please",
+          "phase": "done",
+          "item": "water",
+          "selections": [
+            {
+              "object_id": "cup-0",
+              "item": "water"
+            }
+          ],
+          "source": "executorch",
+          "error": null
+        }
+      ],
+      "passed": true,
+      "hardware_commands": 1,
+      "invocations": [
+        {
+          "raw": "{\"intent\":\"refill\",\"item\":\"water\"}",
+          "temperature": 0,
+          "source": "executorch",
+          "seconds": 1.769
+        }
+      ]
+    }
+  ],
+  "before_fix_failures": [
+    {
+      "group": "coke",
+      "demo": false,
+      "auto": false,
+      "offer": "How is everything? Can I get you some more coke?",
+      "expected": [
+        [
+          "not_understood",
+          null
+        ]
+      ],
+      "outputs": [
+        {
+          "utterance": "Water and coffee please",
+          "phase": "error",
+          "item": null,
+          "selections": [],
+          "source": null,
+          "error": {
+            "code": "invalid_model_output",
+            "message": "The model returned an invalid request. Please try again",
+            "retryable": true
+          }
+        }
+      ],
+      "passed": false,
+      "hardware_commands": 0,
+      "invocations": [
+        {
+          "raw": "{\"intent\":\"refill\",\"selections\":[{\"object_id\":\"cup-0\",\"item\":\"coke\"},{\"object_id\":\"cup-0\",\"item\":\"coffee\"}]}",
+          "temperature": 0,
+          "source": "executorch",
+          "seconds": 3.099
+        }
+      ]
+    }
+  ],
+  "limitation": "A successful Controller outcome does not imply every raw model answer was valid. Coffee requested for a water-only offer still produced an out-of-menu item; Controller rejected it and asked again. No fixture substitution was used."
+}
