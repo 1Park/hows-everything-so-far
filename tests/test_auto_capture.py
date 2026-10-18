@@ -87,7 +87,7 @@ class Camera:
         return IMAGE + str(self.index).encode(), "image/jpeg"
 
 
-async def test_scan_selects_analyzed_frame_once_pauses_and_latches():
+async def test_scan_selects_analyzed_frame_once_and_pauses_during_interaction():
     settings = Settings(qwen_backend="fixture", capture_mode="auto")
     clients = ModelClients(settings)
     calls = []
@@ -273,7 +273,7 @@ async def test_restart_timer_rearms_same_scene_after_ten_seconds(phase):
         clock[0] = 10
         await capture.scan_once()
         assert controller.phase == "idle" and controller.session_id != previous_session
-        assert capture.blocked is None and not calls
+        assert not calls
         for now in (10.5, 11, 11.5, 12, 12.5, 13):
             clock[0] = now
             await capture.scan_once()
@@ -301,10 +301,9 @@ async def test_timer_setting_changes_disable_and_manual_mode_cancel_countdown():
         assert controller.capture_status["restart_remaining_seconds"] == 20
         capture.configure_restart(False, 20)
         clock[0] = 30
-        # No fake model calls: use a blocked fixture signature to keep the same scene waiting.
-        capture.blocked = ("fixture", (("coffee", 1), ("coke", 1), ("water", 1)))
         await capture.scan_once()
         assert controller.session_id == original_session
+        assert controller.capture_status["status"] == "waiting"  # Restart explicitly disabled.
         assert controller.capture_status["restart_remaining_seconds"] is None
         capture.configure_restart(True, 1)
         await capture.scan_once()

@@ -105,7 +105,6 @@ class AutoCapture:
         self.window = StableWindow(settings.auto_capture_stable_seconds, max(1, self.interval*3))
         self.mode = "auto" if settings.observe_interval_seconds else settings.capture_mode
         self.epoch = self.revision = 0
-        self.blocked = None
         self.last_token = controller.token
         self.restart_enabled = settings.auto_capture_restart_enabled
         self.restart_seconds = settings.auto_capture_restart_seconds
@@ -134,7 +133,6 @@ class AutoCapture:
         self.mode = mode
         self.epoch += 1  # Invalidate in-flight inference even on auto -> auto rearm.
         self.window.reset()
-        self.blocked = None
         self.restart_deadline = self.restart_session = None
         return self.publish("scanning" if mode == "auto" else "manual")
 
@@ -154,12 +152,14 @@ class AutoCapture:
         if c.phase not in TERMINAL:
             self.restart_deadline = self.restart_session = None
             self.window.reset()
-            if c.scene:
-                self.blocked = signature(c.scene)
             if c.capture_status["status"] != "paused":
                 self.publish("paused")
             return
         now = self.clock()
+        if not self.restart_enabled and c.phase != "idle":
+            self.window.reset()
+            self.publish("waiting")
+            return
         if self.restart_enabled and c.phase != "idle":
             if self.restart_session != c.session_id:
                 self.restart_session = c.session_id
@@ -186,21 +186,14 @@ class AutoCapture:
                 result = await c.clients.vision(data, mime, uid(), "normal")
             if epoch != self.epoch or token != c.token or c.phase not in TERMINAL:
                 return
-            key = signature(result)
-            if self.blocked == key:
-                self.window.reset()
-                self.publish("waiting", source=result.source)
-                return
-            self.blocked = None
             best = self.window.add(now, data, mime, result)
             if best is not None:
                 # start() rechecks token/phase under the Controller lock.
                 state = await c.start(best.data, best.mime, "normal", automatic=True,
                                       preanalyzed=best.result, expected_token=token)
                 if state["scene"] and state["scene"]["scene_id"] == best.result.scene_id:
-                    self.blocked = self.window.key
                     self.window.reset()
-                    self.publish("paused" if c.phase not in TERMINAL else "waiting",
+                    self.publish("paused" if c.phase not in TERMINAL else "scanning",
                                  source=best.result.source, overlap_area=best.score)
                 return
             self.publish("stabilizing" if result.objects else "scanning",

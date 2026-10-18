@@ -34,7 +34,7 @@ function paintCapture() {
     scanning: 'Automatic capture · Waiting for cups.',
     stabilizing: `Automatic capture · Stable types ${seconds} / ${captureState.required_seconds}s · ${captureState.samples} frames`,
     paused: 'Automatic capture paused during the current interaction.',
-    waiting: 'Automatic capture · This scene was already inspected. Change the cups or restart capture.',
+    waiting: 'Automatic restart is off. Press Restart auto capture to continue.',
     cooldown: 'Request finished · Waiting to restart automatic capture.',
     error: captureState.error || 'Automatic capture unavailable. Retrying.'
   };

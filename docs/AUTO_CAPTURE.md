@@ -14,12 +14,13 @@ UI의 **Demo tools & diagnostics → Capture mode → Automatic**을 선택한�
 
 **Manual**은 기존 Start demo / Inspect again 버튼으로 즉시 캡처한다. 자동 모드에서 Start 위치의 **Restart auto capture**는 안정성 구간을 새로 시작하며 즉시 freeze하지 않는다. 자동 모드에서도 이미지 업로드로 시작하려면 Manual로 전환한다. 주기적 스캔은 항상 카메라/서버 영상 입력과 normal 시나리오를 사용한다.
 
-## 재시작·취소·중복
+## 재시작·취소
 
 - 고객 응대·LLM 처리·카드·mock 시퀀스 중에는 스캔을 중단한다. 진행 중 mode 변경은 기존 요청/카드를 취소하거나 새로 승인하지 않는다.
 - 기본은 완료·거절·취소·skip·오류 후 **10초 대기 → 자동 재시작 → 새 3초 안정성 판정**이다. 대기 중에는 영상만 live로 표시하고 Vision 검사는 쉬며, 같은 종류·개수 구성도 재시작 후 다시 검사한다. 첫 시작과 응대 진행 중에는 타이머가 동작하지 않는다.
 - Restart auto capture 옆에서 남은 시간을 확인한다. Demo tools의 자동 재시작 체크박스로 끄거나 대기 시간을 1–300초로 바꿀 수 있다. 대기 중 시간 변경은 변경 시점부터 다시 센다. 수동 재시작은 즉시 대기를 해제하고, Manual 전환은 타이머를 취소한다.
-- 타이머를 끄면 같은 구성은 재안내하지 않는다. 객체 구성 변경/빈 장면 관측 후 다시 안정되거나 Restart auto capture로 시작한다.
+- 음료 종류·개수로 이전 테이블과 중복 여부를 판단하지 않는다. 물 두 잔처럼 같은 구성도 재시작 후 다시 처리한다.
+- 자동 재시작을 끄면 응대 종료 후 수동 Restart auto capture를 기다린다. waiting 표시는 이 경우에만 쓰며, 이미 처리한 테이블이라는 뜻이 아니다.
 - Manual 전환·취소·수동 시작 후 도착한 옛 Vision 결과는 mode epoch와 Controller token으로 폐기한다.
 - UI 모드는 Controller 프로세스에서 관리하므로 새 탭/새로고침에도 유지된다. 서버 재시작 시 환경 설정 기본값을 다시 적용한다.
 
@@ -51,7 +52,7 @@ OBSERVE_INTERVAL_SECONDS=0
 
 ## 로컬 검증
 
-`tests/test_auto_capture.py`: 면적 독립 grid oracle·3중 겹침, 3초 전 시작 금지·종류/개수/공백/빈 장면 reset, 최적 이미지와 결과의 동일성·재추론 없음, 응대 중 pause·중복 방지, mode/수동 시작/취소와 늦은 결과 경쟁, 오류 복구·HTTP 입력 검증.
+`tests/test_auto_capture.py`: 면적 독립 grid oracle·3중 겹침, 3초 전 시작 금지·종류/개수/공백/빈 장면 reset, 최적 이미지와 결과의 동일성·재추론 없음, 응대 중 pause·같은 구성 재시작, mode/수동 시작/취소와 늦은 결과 경쟁, 오류 복구·HTTP 입력 검증.
 
 실제 Chrome `scripts/browser_auto_capture.cjs`: 기본 3초 자동 시작·새로고침 유지·선택 snapshot/bbox 정합·진행 중 mode 변경 시 세션 보존·재시작 구간 reset·1440/390px 화면. 이 브라우저 검증은 fixture Vision을 사용했으며 실제 보드 카메라 정확도/지연/실물 음성 검증과 구분한다.
 
