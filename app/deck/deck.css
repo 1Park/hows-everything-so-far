@@ -82,6 +82,7 @@ footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space
 .sub{fill:var(--dim);font:12px ui-monospace,monospace}
 .wire{stroke:#4a5a50;stroke-width:1.6;fill:none;marker-end:url(#arrow)}
 .wire.hot{stroke:var(--green)}
+.hot-label{fill:var(--green)}
 .zone{fill:none;stroke:var(--line);stroke-dasharray:5 5}
 .zone-label{fill:var(--dim);font:12px ui-monospace,monospace;letter-spacing:2px}
 
