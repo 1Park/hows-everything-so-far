@@ -126,6 +126,12 @@ function paintImage() {
   };
 }
 
+function isSelected(object) {
+  const selected = state?.card?.selections?.length ? state.card.selections
+    : state?.targets?.length ? state.targets : [state?.target];
+  return selected.some(entry => entry?.object_id === object.object_id);
+}
+
 function paintBoxes() {
   const boxes = $('boxes');
   boxes.replaceChildren();
@@ -134,7 +140,7 @@ function paintBoxes() {
   if (!state?.snapshot_url) return;
   for (const object of state.scene?.objects || []) {
     const node = document.createElement('div');
-    const selected = object.object_id === state.target?.object_id;
+    const selected = isSelected(object);
     const refill = needsRefill(object);
     node.className = `bbox${selected ? ' selected' : ''}${refill ? ' refill' : ''}`;
     const b = object.bbox;
@@ -166,7 +172,7 @@ function paintObjects() {
     return;
   }
   for (const object of objects) {
-    const isTarget = object.object_id === state.target?.object_id;
+    const isTarget = isSelected(object);
     const fill = object.fill_ratio;
     const refill = needsRefill(object);
     const node = document.createElement('div');
@@ -241,8 +247,13 @@ function paintText() {
   const card = state?.card;
   $('requestPanel').hidden = !card;
   if (card) {
+    const selections = card.selections?.length ? card.selections : [card];
+    const counts = new Map();
+    for (const selection of selections) counts.set(selection.item, (counts.get(selection.item) || 0) + 1);
+    const drinks = Array.from(counts, ([item, count]) =>
+      item.replace(/_/g, ' ') + (count > 1 ? ` × ${count}` : '')).join(' and ');
     $('request').replaceChildren(
-      document.createTextNode(card.item.replace(/_/g, ' ')));
+      document.createTextNode(drinks));
     const source = document.createElement('span');
     source.className = 'source';
     source.textContent = `interpreted by ${state.qwen_source || 'the language model'}`
