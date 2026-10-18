@@ -50,7 +50,7 @@ python -m uvicorn services.vision.server:create_app --factory --host 127.0.0.1 -
 
 - 흐름: 이미지 bytes → 컵 박스 (`boxes.mode`: `yolo` .pte / 고정 `rois` / `center`) → crop (`yolo`는 기본 `crop_mode: pad` = 박스×1.15 + 회색 패딩) → DINOv2 .pte → head → `item`·`fill_ratio`·`confidence`·`item_confidence` ([labels.py](labels.py)).
 - head에 `other` 클래스(캔·병)가 있으면 p(other) ≥ 0.5인 박스는 결과에서 뺀다. object_id는 남은 컵 기준으로 다시 매긴다.
-- YOLO 모드 head는 추론과 같은 crop으로 학습한다 (`ml/training/make_crops.py` → `make_head --data data/crops`). 보드 배포 bundle: `models/board/vision/dinov2-qnn-v3`.
+- YOLO 모드 head는 추론과 같은 crop으로 학습한다 (`ml/training/make_crops.py` → `make_head --data data/crops`). 보드 배포 bundle: `models/board/vision/dinov2-qnn-v4c` (물 full/mid/low 포함, 클래스 11개). 아래 지연 비교 기록은 당시 `dinov2-qnn-v3` bundle을 사용했다.
 - 서비스는 시작 시 DINO와 YOLO(detector)를 모두 로드하고 준비 신호를 기다린다. 기존 bundle의 `runner=cli`는 서비스 안에서 상주 worker로 연결하며 bundle 파일은 수정하지 않는다. `py`는 Python 런타임 모델을 한 번 로드해 유지한다. 학습·독립 진단의 `CliRunner`는 기존 일회성 동작을 유지한다.
 - 의존성: numpy + Pillow (OpenCV·ultralytics 불필요). 추론은 전용 스레드 1개에서 직렬 실행.
 - bundle·worker 없음 또는 시작 로드 실패면 서비스 시작에 실패한다. `/ready`는 실제 worker 생존 여부와 `runners.dino/detector`의 resident·PID를 표시한다. 추론 실패·timeout·취소는 해당 worker를 회수하고 ready=false가 되며, 서비스 재시작으로 복구한다. fixture/일회성 CLI 자동 전환 없음.
