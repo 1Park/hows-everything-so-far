@@ -81,3 +81,6 @@ main{padding:12px 24px 22px}
 .header-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .dashboard-link{color:var(--green);text-decoration:none;font-weight:600;border-color:#a4bb7a;background:#f0f5e5}
 .dashboard-link:hover{background:var(--lime)}
+.connection-lost:not([hidden]){position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;background:rgba(248,248,243,.97);color:#862e25}
+.connection-lost h2{font-size:clamp(28px,5vw,48px);margin:0 0 16px}
+.connection-lost p{font-size:18px;color:#555}

@@ -1,6 +1,9 @@
 const $ = id => document.getElementById(id);
 let state = null, connected = false, sound = false, recorder = null, recordingStream = null;
 let displayedSession = '', lastPhase = '', retryTimer = null;
+let socket = null, socketStarted = 0, lastSocketMessage = 0;
+let probingConnection = false;
+const apiRequests = new Set();
 let audioContext = null, playingSource = null;
 let draftVersion = 0, transcriptionVersion = 0, micVersion = 0;
 let micPending = false, transcribing = false, pendingAction = null;
@@ -57,12 +60,17 @@ function setSound(enabled) {
 
 function showError(message) { $('error').textContent = message; $('error').hidden = false; clearTimeout(showError.timer); showError.timer = setTimeout(() => $('error').hidden = true, 9000); }
 async function api(path, options = {}) {
+  const abort = new AbortController();
+  apiRequests.add(abort);
   try {
-    const response = await fetch(path, options);
+    const response = await fetch(path, {...options, signal:abort.signal});
     const body = await response.json();
     if (!response.ok) throw Error(body.error?.message || 'The service is unavailable. Please retry.');
     return body;
-  } catch (error) { showError(error.message); throw error; }
+  } catch (error) {
+    if (error.name !== 'AbortError' && connected) showError(error.message);
+    throw error;
+  } finally {apiRequests.delete(abort);}
 }
 function post(path, data) { return api(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)}); }
 // Plays one decoded buffer; resolves true only if it finished while sound stayed on.
@@ -318,18 +326,89 @@ $('sceneImage').onload = () => {
   if ($('sceneImage').getAttribute('src') === state?.snapshot_url) $('boxes').hidden = false;
 };
 function sceneImageError() {
+  if (!connected) return;
   $('boxes').hidden = true;
   showError('The scene image could not load. Inspect the scene again to retry.');
 }
 $('sceneImage').onerror = sceneImageError;
 function connect() {
   clearTimeout(retryTimer);
+  if (socket) return;
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
-  ws.onopen = () => {connected=true; lastPhase=''; $('connection').textContent='● Connected'; $('connection').classList.add('online'); checkConnection();};
-  ws.onmessage = event => {const data=JSON.parse(event.data); if(data.type==='state') render(data.state, true); else if(data.type==='capture' && data.instance_id === state?.instance_id) updateCapture(data.capture);};
-  ws.onclose = () => {connected=false; audioVersion++; playingSource?.stop(); $('connection').textContent='Reconnecting…'; $('connection').classList.remove('online'); if(state) render(state); retryTimer=setTimeout(connect,1500);};
-  ws.onerror = () => ws.close();
+  socket = ws;
+  socketStarted = lastSocketMessage = Date.now();
+  ws.onmessage = event => {
+    if (socket !== ws) return;
+    lastSocketMessage = Date.now();
+    const data = JSON.parse(event.data);
+    if (data.type === 'state') {
+      // A fresh authoritative snapshot, not just an open TCP socket, restores the UI.
+      const recovering = !connected;
+      connected = true;
+      $('connectionLost').hidden = true;
+      $('connection').textContent = '● Connected';
+      $('connection').classList.add('online');
+      if (recovering) {lastPhase = ''; displayedSession = '';}
+      render(data.state, true);
+      if (recovering) {
+        checkConnection();
+        const image = $('sceneImage');
+        if (!image.dataset.streaming && !state.snapshot_url) image.src = `/api/frame?t=${Date.now()}`;
+        if ($('livePreview').parentElement.open) attachStream($('livePreview'));
+      }
+    } else if (data.type === 'capture' && data.instance_id === state?.instance_id) updateCapture(data.capture);
+  };
+  ws.onclose = () => {if (socket === ws) disconnect();};
+  ws.onerror = () => {if (socket === ws) disconnect();};
 }
+function disconnect() {
+  const ws = socket;
+  socket = null;
+  if (ws) {
+    // Discard blackholed sockets immediately; close() can otherwise wait minutes.
+    ws.onopen = ws.onmessage = ws.onclose = ws.onerror = null;
+    ws.close();
+  }
+  if (connected) {
+    connected = false;
+    for (const request of apiRequests) request.abort();
+    audioVersion++;
+    playingSource?.stop();
+    stopRecording(true);
+    for (const id of ['sceneImage', 'livePreview']) detachStream($(id));
+    if (state) render(state);
+  }
+  $('connectionLost').hidden = false;
+  $('connection').textContent = 'bad cable connection';
+  $('connection').classList.remove('online');
+  clearTimeout(retryTimer);
+  retryTimer = setTimeout(probeConnection, 1000);
+}
+async function probeConnection() {
+  if (probingConnection) return;
+  probingConnection = true;
+  const abort = new AbortController();
+  const timeout = setTimeout(() => abort.abort(), 2000);
+  try {
+    // /health only checks the Controller, so unavailable model backends do not
+    // get mistaken for a disconnected cable. Never use cached responses.
+    const response = await fetch('/health', {cache:'no-store', signal:abort.signal});
+    if (!response.ok) throw Error('Controller unreachable');
+    if (socket && ((!connected && Date.now() - socketStarted > 3000)
+        || Date.now() - lastSocketMessage > 15000)) disconnect();
+    if (!socket) connect();
+  } catch {disconnect();}
+  finally {
+    clearTimeout(timeout);
+    probingConnection = false;
+    clearTimeout(retryTimer);
+    retryTimer = setTimeout(probeConnection, 1000);
+  }
+}
+window.addEventListener('offline', disconnect);
+window.addEventListener('online', probeConnection);
+window.addEventListener('pageshow', probeConnection);
+document.addEventListener('visibilitychange', () => {if (!document.hidden) probeConnection();});
 async function observe() {
   const form = new FormData(); form.append('scenario', $('scenario').value);
   if ($('imageFile').files[0]) form.append('file', $('imageFile').files[0]);
@@ -477,6 +556,7 @@ function detachStream(image) {
 // An <img> MJPEG stream never retries by itself, so a single dropped connection
 // used to leave a dead feed until the page was reloaded.
 function attachStream(image) {
+  if (!connected) return;
   if (image.dataset.streaming) return;
   image.dataset.streaming = '1';
   // The query string stops the browser from reusing the dead response.
@@ -543,6 +623,7 @@ $('record').onclick = async () => {
 };
 window.addEventListener('beforeunload',()=>recordingStream?.getTracks().forEach(t=>t.stop()));
 connect();
+probeConnection();
 $('mediaSupport').textContent = window.isSecureContext && navigator.mediaDevices?.getUserMedia
   ? 'Microphone & speaker: this browser · permission requested when recording'
   : 'For tablet microphone access, open the HTTPS demo URL.';
