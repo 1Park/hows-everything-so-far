@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Refill Assist · How it is built</title>
+<link rel="stylesheet" href="/deck/deck.css">
+</head>
+<body>
+<main id="deck">
+
+<section class="slide title-slide">
+  <p class="eyebrow">ExecuTorch Hackathon · IoT track · Arduino VENTUNO Q</p>
+  <h1>How's everything so far?</h1>
+  <p class="lede">A serving robot stops at your table, sees that your drink is low,
+    asks if you would like a refill, and acts on your answer — every model on the board.</p>
+  <p class="note">No cloud call in the loop. The camera, the microphone, the models and the
+    microcontroller are all on one device.</p>
+</section>
+
+<section class="slide">
+  <h2>Why on the device</h2>
+  <div class="cards">
+    <div class="card">
+      <h3>Tables are private</h3>
+      <p>Cameras and microphones sit where people eat and talk. Nothing from this table
+        leaves the board.</p>
+    </div>
+    <div class="card">
+      <h3>A venue is not a datacentre</h3>
+      <p>Conference Wi-Fi drops. A refill should not wait on a round trip to a region
+        on another coast.</p>
+    </div>
+    <div class="card">
+      <h3>Confidence is a decision</h3>
+      <p>Reaching for a glass you only think is empty is worse than asking. A low score
+        makes the robot ask rather than act.</p>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <h2>The stack</h2>
+  <table class="stack">
+    <thead><tr><th>Stage</th><th>Model</th><th>Runs on</th><th>How it is served</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>See</td><td>YOLO11n + DINOv2-small</td>
+        <td><b class="npu">Hexagon NPU</b><span>QNN HTP via ExecuTorch</span></td>
+        <td>Resident QNN worker, port 8001</td>
+      </tr>
+      <tr>
+        <td>Hear</td><td>whisper.cpp tiny.en</td>
+        <td><b class="cpu">CPU</b><span>4 of 8 cores</span></td>
+        <td>whisper-server, port 8179</td>
+      </tr>
+      <tr>
+        <td>Understand</td><td>Gemma (QCS8275 .pte)</td>
+        <td><b class="npu">Hexagon NPU</b><span>qnn_llm_runner, resident</span></td>
+        <td>Board LLM API, port 8000</td>
+      </tr>
+      <tr>
+        <td>Speak</td><td>Piper</td>
+        <td><b class="npu">Hexagon NPU</b><span>decoder as .pte</span></td>
+        <td>TTS API, port 8003</td>
+      </tr>
+      <tr>
+        <td>Act</td><td>—</td>
+        <td><b>STM32H5</b><span>Arduino Zephyr core</span></td>
+        <td>MessagePack-RPC through arduino-router</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="note">Every service is a user systemd unit: enabled, restarted on failure,
+    and back after a reboot without anyone logging in.</p>
+</section>
+
+<section class="slide">
+  <h2>How it fits together</h2>
+  <div class="diagram" id="diagram"></div>
+  <p class="note">One Linux process owns the camera. The microcontroller owns the pins.
+    Between them is a single command, not a video feed.</p>
+</section>
+
+<section class="slide">
+  <h2>Is it really the NPU?</h2>
+  <div class="cards">
+    <div class="card">
+      <h3>The graph is delegated</h3>
+      <p>Each <code>.pte</code> contains a QNN delegate and <b>no CPU kernels</b> —
+        not one <code>aten::</code> operator left in the program.</p>
+    </div>
+    <div class="card">
+      <h3>The DSP is in use</h3>
+      <p>During inference the vision and language processes hold
+        <code>/dev/fastrpc-cdsp</code> handles: work is crossing to Hexagon.</p>
+    </div>
+    <div class="card">
+      <h3>What we do not claim</h3>
+      <p>No CPU baseline was exported, so we do not quote a speed-up.
+        Speech recognition runs on CPU and is labelled that way.</p>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <h2>Measured on the board</h2>
+  <div class="numbers">
+    <div><b>64–126<small>ms</small></b><span>see the table<br>YOLO + DINOv2, NPU</span></div>
+    <div><b>2.8<small>s</small></b><span>transcribe<br>whisper tiny.en, CPU</span></div>
+    <div><b>1.8<small>s</small></b><span>understand<br>Gemma, NPU</span></div>
+    <div><b>3<small>s</small></b><span>mock load and return<br>on the microcontroller</span></div>
+  </div>
+  <p class="note">Choosing the speech model was a measurement, not a preference: the same
+    twenty recordings went through both, so the pairs differ only by model.
+    tiny.en matched base.en on 17 of 20, kept the drink name on 19 of 20,
+    and cut transcription from 6.9s to 3.0s.</p>
+</section>
+
+<section class="slide">
+  <h2>On a serving robot</h2>
+  <div class="split">
+    <figure class="shot">
+      <img id="robot" src="/deck/assets/robot.png" alt="The module on a serving robot">
+      <figcaption id="robotNote" hidden>Drop an image at <code>app/deck/assets/robot.png</code>.</figcaption>
+    </figure>
+    <ul class="points">
+      <li><b>It rides, it does not drive.</b> Navigation stays with the robot; this module
+        only looks at the table it stopped beside.</li>
+      <li><b>One board, one cable.</b> Camera and microphone over USB, the display over
+        Ethernet, everything else on the device.</li>
+      <li><b>The arm is the easy part to add.</b> The microcontroller already runs a
+        bounded sequence with a host watchdog; today it drives an LED instead of a gripper.</li>
+      <li><b>It degrades politely.</b> If it mishears it asks again, and if it is unsure
+        of the drink it asks which one rather than guessing.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide title-slide">
+  <h2 class="demo-heading">Let's watch it run</h2>
+  <p class="lede">The next screen is the live view: what the camera sees, what the board
+    heard, and how it read the request.</p>
+  <a id="demoLink" class="jump" href="#">Open the live view ↗</a>
+</section>
+
+</main>
+
+<footer>
+  <span id="position">1 / 7</span>
+  <span class="hint">← → or click to move</span>
+</footer>
+<script src="/deck/deck.js" defer></script>
+</body>
+</html>
