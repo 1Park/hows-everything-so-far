@@ -107,6 +107,20 @@ def test_label_conversion():
     assert to_observation([0.1, 0.9], ["coke__low", "empty"])["item_confidence"] is None
 
 
+def test_confidence_treats_low_and_empty_as_one_refill_level():
+    # 보드 실측: 물이 조금 남은 잔이 water__low와 empty 사이에서 나뉘어 confidence 0.5대 → 제안 누락
+    obs = to_observation([0.5, 0.4, 0.1], ["water__low", "empty", "water__mid"])
+    assert obs["item"] == "water" and obs["confidence"] == pytest.approx(0.9)  # 이전: min(0.6, 0.5) = 0.5
+    obs = to_observation([0.5, 0.4, 0.1], ["empty", "water__low", "water__full"])
+    assert obs["item"] == "unknown" and obs["confidence"] == pytest.approx(0.9)  # 빈 잔 쪽도 같은 규칙
+    # 리필 여부가 갈리는 헷갈림(low↔full)과 음료 헷갈림(coke↔coffee)은 그대로 점수를 낮춘다
+    assert to_observation([0.5, 0.5], ["coffee__low", "coffee__full"])["confidence"] == pytest.approx(0.5)
+    obs = to_observation([0.45, 0.45, 0.1], ["coke__low", "coffee__low", "empty"])
+    assert obs["confidence"] == pytest.approx(0.55)
+    # full↔mid는 합치지 않는다
+    assert to_observation([0.5, 0.5], ["water__full", "water__mid"])["confidence"] == pytest.approx(0.5)
+
+
 class FakeDinoByPosition:
     """왼쪽 crop은 컵 특징 [1,0,0], 오른쪽은 캔 특징 [0,0,1] (crop 평균 밝기와 무관하게 호출 순서로 구분)."""
 
