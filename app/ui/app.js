@@ -44,11 +44,9 @@ function paintCapture() {
 }
 function paintRestartTimer() {
   const timer = $('captureRestartTimer');
-  timer.hidden = captureState?.mode !== 'auto';
+  timer.hidden = captureState?.mode !== 'auto' || !captureState.restart_enabled || restartDisplayDeadline === null;
   if (timer.hidden) return;
-  timer.textContent = !captureState.restart_enabled ? 'Auto restart off'
-    : restartDisplayDeadline === null ? `After request: ${captureState.restart_seconds}s`
-    : `Restart in ${Math.max(0, Math.ceil((restartDisplayDeadline-performance.now())/1000))}s`;
+  timer.textContent = `Restart in ${Math.max(0, Math.ceil((restartDisplayDeadline-performance.now())/1000))}s`;
 }
 setInterval(paintRestartTimer, 250);
 function updateCapture(next) {
@@ -77,6 +75,29 @@ function setSound(enabled) {
   $('audioToggle').textContent = sound ? 'Sound on' : 'Enable sound';
   $('audioToggle').setAttribute('aria-pressed', String(sound));
 }
+async function resumeAudio() {
+  if (!sound || !audioContext) return false;
+  let timeout;
+  try {
+    if (audioContext.state !== 'running') {
+      await Promise.race([audioContext.resume(), new Promise((_, reject) => {
+        timeout = setTimeout(() => reject(Error('Audio activation timed out')), 2500);
+      })]);
+    }
+    if (audioContext.state !== 'running') throw Error('Audio is suspended');
+    return true;
+  } catch {
+    showError('Audio is paused. Tap Replay voice to resume playback.');
+    return false;
+  } finally {clearTimeout(timeout);}
+}
+async function enableAudio() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) {setSound(false); showError('This browser does not support audio playback.'); return false;}
+  if (!audioContext || audioContext.state === 'closed') audioContext = new AudioContextClass();
+  setSound(true);
+  return resumeAudio();
+}
 
 function showError(message) { $('error').textContent = message; $('error').hidden = false; clearTimeout(showError.timer); showError.timer = setTimeout(() => $('error').hidden = true, 9000); }
 async function api(path, options = {}) {
@@ -95,7 +116,8 @@ async function api(path, options = {}) {
 function post(path, data) { return api(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)}); }
 // Plays one decoded buffer; resolves true only if it finished while sound stayed on.
 async function playBuffer(buffer, version) {
-  if (!sound || version !== audioVersion || audioContext.state !== 'running') return false;
+  if (!sound || version !== audioVersion) return false;
+  if (!await resumeAudio() || !sound || version !== audioVersion) return false;
   playingSource?.stop();
   playingSource = audioContext.createBufferSource();
   playingSource.buffer = buffer;
@@ -446,16 +468,20 @@ async function action(name, operation) {
     if (state) render(state);
   }
 }
-$('start').onclick = () => {
-  if(!sound) $('audioToggle').click();
+$('start').onclick = async () => {
+  await enableAudio();
   if (captureState?.mode === 'auto') post('/api/capture', {mode:'auto'}).then(updateCapture).catch(()=>{});
   else observe().catch(()=>{});
 };
 $('captureMode').onchange = async () => {
   const mode = $('captureMode').value;
-  if (mode === 'auto' && !sound) $('audioToggle').click();
+  const resumeOffer = mode === 'auto' && !sound && ['offered','not_understood'].includes(state?.phase);
+  if (mode === 'auto') await enableAudio();
   $('captureMode').disabled = true;
-  try {updateCapture(await post('/api/capture', {mode}));}
+  try {
+    updateCapture(await post('/api/capture', {mode}));
+    if (resumeOffer) announceAndListen();
+  }
   catch {paintCapture();}
   finally {$('captureMode').disabled = false;}
 };
@@ -489,23 +515,21 @@ $('cancel').onclick = () => {if(state && pendingAction !== 'cancel') action('can
 $('refresh').onclick = checkConnection;
 $('replayVoice').onclick = async () => {
   if (['listening','transcribing'].includes(state?.phase)) return;
-  if (!sound) {$('audioToggle').click(); return;}
   try {
-    await audioContext.resume();
+    if (!await enableAudio()) return;
     if (['offered','not_understood'].includes(state?.phase)) await announceAndListen();
     else if (state?.speech) await speakState('offer');
     else await playWelcome();
   } catch {showError('Voice playback failed. Check your tablet volume and audio output.');}
 };
-$('audioToggle').onclick = () => {
+$('audioToggle').onclick = async () => {
   audioVersion++;
-  setSound(!sound);
-  if(sound) {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) {setSound(false); showError('This browser does not support audio playback.'); return;}
-    audioContext ||= new AudioContextClass();
-    audioContext.resume().then(()=>['offered','not_understood'].includes(state?.phase) ? announceAndListen() : state?.speech ? speakState('offer') : playWelcome()).catch(()=>showError('Tap Enable sound to activate audio.'));
-  } else {playingSource?.stop(); playingSource=null;}
+  if (sound) {setSound(false); playingSource?.stop(); playingSource=null; return;}
+  if (await enableAudio()) {
+    if (['offered','not_understood'].includes(state?.phase)) await announceAndListen();
+    else if (state?.speech) await speakState('offer');
+    else await playWelcome();
+  }
 };
 $('livePreview').parentElement.addEventListener('toggle', event => {
   if (event.target.open) attachStream($('livePreview'));
