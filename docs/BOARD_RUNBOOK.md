@@ -36,6 +36,37 @@ python scripts/build_vision_worker.py --sdk "$HOME/git/executorch" \
 
 ## 시작
 
+### USB 분리와 독립적인 실행 (권장)
+
+ADB shell에서 시작한 프로세스는 USB 분리 시 종료될 수 있다. Controller/STT와 Vision은
+`scripts/systemd/*.service`를 user systemd에 설치해 실행한다. 이 unit은 현재 보드의
+`~/project/hows-everything-so-far` 경로 기준이며, 다른 경로에서는 unit도 수정한다.
+
+```sh
+loginctl enable-linger arduino
+mkdir -p ~/.config/systemd/user ~/.config/refill-assist
+# 기존 실제 Vision의 환경을 ~/.config/refill-assist/vision.env 에 기록:
+# VISION_MODEL_BACKEND=external
+# VISION_ADAPTER=services.vision.backend:create_backend
+# VISION_MODEL_PATH=<실제 bundle 절대경로>
+# VISION_WORKER_BIN=<실제 worker 절대경로>
+# LD_LIBRARY_PATH=<현재 SDK library 경로>
+# ADSP_LIBRARY_PATH=<현재 DSP library 경로>
+cp scripts/systemd/refill-*.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+# 기존 Controller/STT supervisor와 Vision listener를 확인·종료한 후:
+systemctl --user enable --now refill-vision.service refill-controller.service
+systemctl --user status refill-vision.service refill-controller.service
+```
+
+배포 후에는 `systemctl --user restart refill-controller`로 앱을 재시작한다.
+Vision 코드가 바뀌면 `systemctl --user restart refill-vision`도 수행한다.
+종료는 `systemctl --user stop refill-controller refill-vision`이며, systemd와 별도 supervisor를
+중복 실행하지 않는다. 로그는 기존 `logs/controller.log`, `logs/stt.log` 및
+`journalctl --user -u refill-controller -u refill-vision`에서 확인한다.
+Gemma·TTS·외부 Whisper·arduino-router는 별도 실행 주체다. 이 두 unit만으로 전체 모델의
+재부팅 자동 시작까지 설정되는 것은 아니다. USB 없이 `/ready`와 태블릿 접속을 검증한다.
+
 아래는 제공 SDK가 `~/git/executorch`, bundle이 `dinov2-qnn-v5e`(오렌지주스, 데모 자리 과자봉지 포함)에 있는 배치 예다. 실제 경로를 확인하고 **기존 listener가 없는 서비스만** 시작한다. 선택 env를 각 프로세스에 명시한다.
 
 ```sh
