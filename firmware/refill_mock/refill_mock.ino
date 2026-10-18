@@ -1,4 +1,7 @@
-// UNVERIFIED MCU DRAFT. No motors or gripper. Confirm LED polarity for the board.
+// Mock sequence only: no motors or gripper. Run on QCVENTUNO002 2026-10-18 —
+// all six RPCs answered, LED1 showed white and each RGB channel, the sequence
+// stepped LOADING/RETURNING/DONE at 1.5s and 3s, a duplicate command id and a
+// late start after cancel were refused, and 3s without a poll cancelled it.
 #include <Arduino_RouterBridge.h>
 
 enum Phase { IDLE=0, LOADING=1, RETURNING=2, DONE=3, CANCELLED=4 };
