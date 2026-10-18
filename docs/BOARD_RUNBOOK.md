@@ -74,7 +74,7 @@ supervisors, then cleans up only the lock/ready/stop files of exited processes. 
 `/ready` may return 503. arduino-router is a separate system service; check that it is enabled.
 Verify: without USB, check that `/ready` reports the real models, TTS, microphone, and Bridge as ready, and that the tablet can connect.
 
-Below is an example layout with the provided SDK at `~/git/executorch` and the bundle at `dinov2-qnn-v6` (LDA head with augmentation; includes orange juice and the snack bag at the demo spot; `-v5e` is the previous logistic-regression head). Check the actual paths and start **only services that have no existing listener**. Set the selected env explicitly for each process.
+Below is an example layout with the provided SDK at `~/git/executorch` and the bundle at `dinov2-qnn-v7` (LDA head with augmentation; v6 plus two board-camera sessions at the demo spot; `-v6` is the previous head, `-v5e` the last logistic-regression head). Check the actual paths and start **only services that have no existing listener**. Set the selected env explicitly for each process.
 
 ```sh
 mkdir -p logs tmp
@@ -83,7 +83,7 @@ export LD_LIBRARY_PATH="$HOME/git/executorch/build-x86/backends/qualcomm:/usr/li
 export ADSP_LIBRARY_PATH=/usr/lib
 
 VISION_MODEL_BACKEND=external VISION_ADAPTER=services.vision.backend:create_backend \
-VISION_MODEL_PATH=models/board/vision/dinov2-qnn-v6 \
+VISION_MODEL_PATH=models/board/vision/dinov2-qnn-v7 \
 VISION_WORKER_BIN="$PWD/models/board/bin/qnn_vision_worker" \
 nohup .venv/bin/python -m uvicorn services.vision.server:create_app --factory \
   --host 127.0.0.1 --port 8001 > logs/vision-8001.log 2>&1 < /dev/null &
