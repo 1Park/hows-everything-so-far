@@ -58,6 +58,15 @@ code{font:0.92em ui-monospace,monospace;color:var(--amber)}
 .flow b.npu{color:var(--green)}
 .flow b.cpu{color:var(--amber)}
 
+/* Two places, same loop: shown side by side rather than argued in text. */
+.scenes{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+.scene-shot{margin:0}
+.scene-shot img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:14px;
+  border:1px solid var(--line);display:block}
+.scene-shot figcaption{border:0;padding:16px 2px 0;text-align:left;
+  color:#cfd8cb;font-size:clamp(14px,1.3vw,18px);margin:0}
+.scene-shot figcaption b{color:var(--ink)}
+
 .split{display:grid;grid-template-columns:1fr 1fr;gap:34px;align-items:center}
 .shot{margin:0}
 .shot img{width:100%;border-radius:16px;border:1px solid var(--line);display:block}

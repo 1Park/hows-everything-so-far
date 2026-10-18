@@ -42,13 +42,6 @@ for (const id of ['demoLink', 'demoLinkEnd']) document.getElementById(id).href =
 document.getElementById('dashboardLink').href =
   `${location.protocol}//${location.hostname}:8080/dashboard`;
 
-// The robot picture is optional: the slide should read as a plan, not a broken image.
-const robot = document.getElementById('robot');
-robot.onerror = () => {
-  robot.hidden = true;
-  document.getElementById('robotNote').hidden = false;
-};
-
 document.getElementById('diagram').innerHTML = `
 <svg viewBox="0 0 1140 470" role="img"
      aria-label="A camera and microphone feed three board services; the Controller drives

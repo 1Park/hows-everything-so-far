@@ -149,22 +149,21 @@
 
 <section class="slide">
   <h2>It is not only about drinks</h2>
-  <div class="split">
-    <figure class="shot">
-      <img id="robot" src="/deck/assets/robot.png" alt="The module on a serving robot">
-      <figcaption id="robotNote" hidden>Drop an image at <code>app/deck/assets/robot.png</code>.</figcaption>
+  <div class="scenes">
+    <figure class="scene-shot">
+      <img src="/deck/assets/restaurant.png" alt="A serving robot stopped beside a table with an empty glass">
+      <figcaption><b>A dining room.</b> The robot stops at the table, sees the empty
+        glass, and asks before anyone has to wave someone down.</figcaption>
     </figure>
-    <ul class="points">
-      <li><b>A hospital ward.</b> The same loop watches an IV bag instead of a glass and
-        calls a nurse the moment it runs low.</li>
-      <li><b>Privacy matters even more there.</b> Patients and their rooms never leave
-        the device, which is the whole reason this runs on the NPU.</li>
-      <li><b>The module rides, it does not drive.</b> Navigation stays with the robot;
-        this looks after the table it stopped beside.</li>
-      <li><b>The arm is the easy part to add.</b> The microcontroller already runs a
-        bounded sequence with a host watchdog — today it drives a display, not a gripper.</li>
-    </ul>
+    <figure class="scene-shot">
+      <img src="/deck/assets/hospital.png" alt="The same module on a robot watching an IV bag beside a hospital bed">
+      <figcaption><b>A hospital ward.</b> The same loop watches an IV bag instead of a
+        glass and calls a nurse the moment it runs low.</figcaption>
+    </figure>
   </div>
+  <p class="note">Privacy matters more in the second one, not less — which is the whole
+    reason this runs on the board. The module rides, it does not drive: navigation stays
+    with the robot, and this looks after whatever it stopped beside.</p>
 </section>
 
 <section class="slide title-slide">
