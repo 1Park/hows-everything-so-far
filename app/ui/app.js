@@ -469,6 +469,10 @@ async function action(name, operation) {
   }
 }
 $('start').onclick = async () => {
+  // Restart unlocks audio silently; discard any queued welcome or previous-state speech.
+  audioVersion++;
+  playingSource?.stop();
+  playingSource = null;
   await enableAudio();
   if (captureState?.mode === 'auto') post('/api/capture', {mode:'auto'}).then(updateCapture).catch(()=>{});
   else observe().catch(()=>{});
