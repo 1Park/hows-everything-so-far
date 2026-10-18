@@ -25,6 +25,9 @@ addEventListener('click', event => {
 // The live view is served by the display on 8004; same host as this deck.
 const liveView = `${location.protocol}//${location.hostname}:8004/`;
 for (const id of ['demoLink', 'demoLinkEnd']) document.getElementById(id).href = liveView;
+// The log lives with the Controller, which serves the tablet UI.
+document.getElementById('dashboardLink').href =
+  `${location.protocol}//${location.hostname}:8080/dashboard`;
 
 // The robot picture is optional: the slide should read as a plan, not a broken image.
 const robot = document.getElementById('robot');

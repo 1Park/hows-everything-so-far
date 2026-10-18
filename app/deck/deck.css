@@ -42,6 +42,22 @@ code{font:0.92em ui-monospace,monospace;color:var(--amber)}
 .numbers small{font-size:.42em;margin-left:3px;color:var(--dim)}
 .numbers span{display:block;margin-top:14px;color:var(--dim);font-size:clamp(13px,1.2vw,17px)}
 
+/* A claim on the left, the reasoning beside it. */
+.split-lead{display:grid;grid-template-columns:1.1fr 1fr;gap:40px;align-items:start}
+.big{font:normal clamp(26px,3.4vw,46px)/1.25 Georgia,serif;margin:0;letter-spacing:-1px}
+.big b{color:var(--green);font-weight:normal}
+.aside{color:#cfd8cb;font-size:clamp(15px,1.4vw,20px);margin:0}
+
+/* The pipeline, read top to bottom. */
+.flow{list-style:none;margin:0;padding:0;display:grid;gap:12px;counter-reset:step}
+.flow li{display:grid;grid-template-columns:150px 1fr;gap:20px;align-items:baseline;
+  background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 20px}
+.step{font:normal clamp(20px,2vw,28px)/1 Georgia,serif;color:var(--green)}
+.flow p{margin:0;color:#cfd8cb;font-size:clamp(15px,1.35vw,19px)}
+.flow b{display:inline-block;margin-top:6px;font-size:.88em;color:var(--dim)}
+.flow b.npu{color:var(--green)}
+.flow b.cpu{color:var(--amber)}
+
 .split{display:grid;grid-template-columns:1fr 1fr;gap:34px;align-items:center}
 .shot{margin:0}
 .shot img{width:100%;border-radius:16px;border:1px solid var(--line);display:block}
@@ -69,7 +85,11 @@ footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space
 .zone{fill:none;stroke:var(--line);stroke-dasharray:5 5}
 .zone-label{fill:var(--dim);font:12px ui-monospace,monospace;letter-spacing:2px}
 
+.slide .jump{align-self:flex-start}
+.title-slide .jump{align-self:center}
+
 @media(max-width:900px){
   .cards,.numbers{grid-template-columns:1fr 1fr}
-  .split{grid-template-columns:1fr}
+  .split,.split-lead{grid-template-columns:1fr}
+  .flow li{grid-template-columns:1fr}
 }
