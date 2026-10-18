@@ -40,6 +40,8 @@ let said = {assistant: null, customer: null};
 let lastPhase = null;
 let shownSnapshot = null;
 let streaming = false;
+// The Controller process the current video connection belongs to.
+let liveInstance = null;
 let retry = null;
 
 function paintRuntime(ready) {
@@ -103,6 +105,29 @@ function paintSteps(phase) {
   });
 }
 
+// Attach the camera feed, unless one is already attached and still believed live.
+function showLive() {
+  if (streaming) return;
+  streaming = true;
+  shownSnapshot = null;
+  $('frameLabel').textContent = 'Live view';
+  const image = $('sceneImage');
+  image.onerror = () => {
+    streaming = false;
+    setTimeout(paintImage, 1500);  // the feed drops; the display should not stay blank
+  };
+  image.src = `${HTTP}/api/video?t=${Date.now()}`;
+}
+
+// A live stream we are still holding across a Controller restart is already dead,
+// but an aborted multipart stream does not reliably fire the image's error event,
+// so nothing would clear the flag and the room would keep the last frame forever.
+// A changed instance id is the one signal that says the process is new.
+function dropDeadStream(next) {
+  if (liveInstance !== null && next.instance_id !== liveInstance) streaming = false;
+  liveInstance = next.instance_id;
+}
+
 function paintImage() {
   const snapshot = state?.snapshot_url;
   if (snapshot) {
@@ -114,16 +139,7 @@ function paintImage() {
     }
     return;
   }
-  shownSnapshot = null;
-  if (streaming) return;
-  streaming = true;
-  $('frameLabel').textContent = 'Live view';
-  const image = $('sceneImage');
-  image.src = `${HTTP}/api/video?t=${Date.now()}`;
-  image.onerror = () => {
-    streaming = false;
-    setTimeout(paintImage, 1500);  // the feed drops; the display should not stay blank
-  };
+  showLive();
 }
 
 function isSelected(object) {
@@ -264,6 +280,7 @@ function paintText() {
 
 function render(next) {
   state = next;
+  dropDeadStream(next);
   paintSteps(next.phase);
   paintImage();
   paintBoxes();
@@ -277,6 +294,9 @@ function connect() {
   socket.onopen = () => {
     $('link').textContent = `connected · ${CONTROLLER}`;
     $('link').classList.remove('down');
+    // Reconnecting means the Controller went away and came back; the video
+    // connection went with it.
+    streaming = false;
     loadRuntime();
   };
   socket.onmessage = event => {
