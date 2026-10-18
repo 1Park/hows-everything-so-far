@@ -334,6 +334,14 @@ class Controller:
             task.add_done_callback(self.tasks.discard)
             return self.state()
 
+    async def retry_voice(self, token, message):
+        async with self.lock:
+            if token != self.token:
+                return
+            self.last_error = None
+            self.arm_deadline()
+            self.emit("not_understood", message)
+
     async def hear(self, token):
         try:
             started = time.perf_counter()
@@ -353,18 +361,10 @@ class Controller:
                 self.transcript, self.stt_source = result.text, result.source
                 self.begin_interpret(result.text)
         except TimeoutError:
-            await self.fail(
-                token,
-                ApiError("stt_timeout", "Speech recognition timed out. Please retry", 504, True),
-            )
+            await self.retry_voice(token, "Speech recognition took too long. Please speak again after the prompt.")
         except ApiError as error:
-            if error.code == "no_speech":
-                async with self.lock:
-                    if token != self.token:
-                        return
-                    self.last_error = None
-                    self.arm_deadline()
-                    self.emit("not_understood", "I didn't hear your request. Please speak again after the prompt.")
+            if error.code in ("no_speech", "stt_timeout", "service_timeout"):
+                await self.retry_voice(token, "I couldn't hear your request clearly. Please speak again after the prompt.")
             else:
                 await self.fail(token, error)
         except Exception:

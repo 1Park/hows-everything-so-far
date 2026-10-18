@@ -9,7 +9,7 @@ Controller가 보드 카메라·마이크를 소유하고 태블릿 브라우저
 3. Start demo 또는 [Automatic 캡처](AUTO_CAPTURE.md)로 관찰한다. 자동 모드는 기본 5초간 객체 종류별 개수가 같아야 시작하며 동일 구성은 반복 안내하지 않는다.
 4. 대상 제안 안내가 끝나면 브라우저가 현재 session/scene/object/sequence로 ACK한다. 음소거·재생 실패·취소된 안내는 녹음을 시작하지 않는다.
 5. 보드가 설정 시간 동안 녹음 → STT → LLM → 카드까지 진행한다. UI는 LISTENING → TRANSCRIBING → INTERPRETING → CARD로 바뀐다. VAD는 없으며 녹음 길이는 `AUDIO_SECONDS`다.
-6. 전사·음료를 확인하고 수정·Confirm 또는 Cancel한다. LLM `not_understood`와 STT `no_speech`는 재질문 상태로 전환하고, 안내 재생이 끝나면 현재 상태 ACK 후 자동으로 보드 녹음을 다시 시작한다. 취소·장면 변경·음소거·재생 실패 시 자동 녹음하지 않는다. timeout/서비스 장애는 error 상태에서 수동 재시도한다. 카드만으로 하드웨어를 시작하지 않는다.
+6. 전사·음료를 확인하고 수정·Confirm 또는 Cancel한다. LLM `not_understood`와 STT `no_speech`·timeout은 재질문 상태로 전환하고, 안내 재생이 끝나면 현재 상태 ACK 후 자동으로 보드 녹음을 다시 시작한다. 취소·장면 변경·음소거·재생 실패 시 자동 녹음하지 않는다. 기타 서비스 장애는 error 상태에서 수동 재시도한다. 카드만으로 하드웨어를 시작하지 않는다.
 
 네트워크 단절 시 입력을 막고 재연결 후 최신 상태를 복구한다. 자동 캡처 재시작은 안정성 구간을 다시 시작한다. 수동 시작·모드 전환·동일 테이블 재시작 규칙은 자동 캡처 문서를 따른다.
 

@@ -48,6 +48,8 @@ class ModelClients:
                 data=form,
                 headers={"x-request-id": request_id.get()},
             )
+            if kind == "stt" and response.status_code == 504:
+                raise ApiError("stt_timeout", "Speech recognition timed out. Please speak again", 504, True)
             if kind == "stt" and response.status_code == 422:
                 payload = response.json()
                 error = payload.get("error") if isinstance(payload, dict) else None
@@ -62,7 +64,8 @@ class ModelClients:
             return result
         except httpx.TimeoutException:
             raise ApiError(
-                "service_timeout", f"The {kind.upper()} service timed out", 504, True
+                "stt_timeout" if kind == "stt" else "service_timeout",
+                f"The {kind.upper()} service timed out", 504, True
             ) from None
         except (httpx.HTTPError, ValueError, ValidationError):
             raise ApiError(
