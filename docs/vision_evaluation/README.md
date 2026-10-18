@@ -216,7 +216,7 @@ Single-seed screening of other heads with augmentation: linear SVM 95.8%, RBF SV
 Before deploying, v5e and v6 were run end to end on five saved board scenes (snack bag scene, an older frame with cut-off glasses and cans, and three real demo captures): the same boxes were refill targets in all five, the snack bag stayed dropped, and the orange juice glass beside it moved from 0.42 to 0.50 fill (about 60% in reality). One nearly empty glass with a red can behind it changed from `coke` to `water`, which matches the clear remnant in it.
 
 - Trade-off: LDA posteriors are sharp, so v6 confidence is usually 0.9–1.0 and the 0.6 confidence floor filters less. CV false refills did not increase, but watch this in the rehearsal.
-- v6 was trained with an ad hoc script on the board features (StandardScaler → `LinearDiscriminantAnalysis(solver="lsqr", shrinkage="auto")`, exported as `W = coef_`, `b = intercept_`); `make_head` does not have an LDA or augmentation option yet.
+- The head is StandardScaler → `LinearDiscriminantAnalysis(solver="lsqr", shrinkage="auto")`, exported as `W = coef_`, `b = intercept_`. v6/v7 were first fit with an ad hoc script; `make_head --model lda --augment 4` now does the same (on the v7 training features it reproduces the deployed v7 head to within 6e-5 in `W`/`b`). LDA needs scikit-learn.
 
 ## Board NPU measurements (2026-10-17, VENTUNO Q / QCS8275, organizer ExecuTorch + QNN 2.49)
 

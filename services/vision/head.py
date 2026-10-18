@@ -36,12 +36,15 @@ class Head:
         return softmax(((X - self.mean) / self.scale) @ self.W.T + self.b)
 
 
-def fit_head(X, y, classes, C=0.1, iters=3000, lr=0.5, class_weight=None):
-    """StandardScaler + multinomial logistic regression. Uses sklearn when available (same as
-    on the Mac), otherwise numpy gradient descent.
+def fit_head(X, y, classes, C=0.1, iters=3000, lr=0.5, class_weight=None, model="logistic"):
+    """StandardScaler + linear head. model="logistic": multinomial logistic regression, sklearn
+    when available (same as on the Mac), otherwise numpy gradient descent.
+    model="lda": LinearDiscriminantAnalysis (lsqr, shrinkage="auto"), needs sklearn. Its
+    posteriors are softmax(coef_ · z + intercept_), so it saves in the same W/b format (board
+    v6/v7 head).
 
     class_weight="balanced": reweights for uneven per-class image counts (e.g. many can crops in
-    other).
+    other). Logistic only; LDA uses class priors instead.
     """
     X = np.asarray(X, np.float64).reshape(len(X), -1)
     y = np.asarray(y)
@@ -49,6 +52,19 @@ def fit_head(X, y, classes, C=0.1, iters=3000, lr=0.5, class_weight=None):
     scale[scale == 0] = 1.0
     Z = (X - mean) / scale
     k = len(classes)
+    if model == "lda":
+        try:
+            from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+        except ImportError:
+            raise ImportError("model='lda' needs scikit-learn (pip install scikit-learn)") from None
+
+        lda = LinearDiscriminantAnalysis(solver="lsqr", shrinkage="auto").fit(Z, y)
+        W, b = lda.coef_, lda.intercept_
+        if k == 2:  # one row for 2 classes, as in logistic regression
+            W, b = np.vstack([-W[0] / 2, W[0] / 2]), np.array([-b[0] / 2, b[0] / 2])
+        acc = float((softmax(Z @ W.T + b).argmax(1) == y).mean())
+        return dict(classes=list(classes), mean=mean.tolist(), scale=scale.tolist(), W=np.asarray(W).tolist(),
+                    b=np.asarray(b).tolist(), fit="sklearn-lda-shrinkage", train_acc=acc, n=int(len(y)))
     try:
         from sklearn.linear_model import LogisticRegression
 
