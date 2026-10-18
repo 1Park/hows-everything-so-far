@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.clients import ModelClients
 from app.controller import Controller
+from app.events import EventLog
 from app.media import VideoSource
 from common.api import ApiError, create_api
 from common.config import ROOT, load_settings
@@ -82,6 +83,18 @@ def create_app(settings=None, clients=None, hardware=None):
             return False
 
     app.mount("/ui", FreshStaticFiles(directory=ROOT / "app/ui"), name="ui")
+
+    @app.get("/dashboard")
+    async def dashboard():
+        return FileResponse(ROOT / "app/ui/dashboard.html", headers=no_store)
+
+    mock_events = EventLog(ROOT / "fixtures/mock_events.jsonl")
+
+    @app.get("/api/events")
+    async def events_history():
+        # The week of mock history plus whatever this board has really recorded;
+        # mock rows carry "mock": true so the dashboard can tell them apart.
+        return {"events": mock_events.read() + controller.event_log.read()}
 
     @app.get("/ready")
     async def ready():

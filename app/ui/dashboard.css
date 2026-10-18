@@ -1,0 +1,59 @@
+/* Dashboard: same paper/green look as the demo page, sized to be read from across the room. */
+body.dashboard{font-size:20px}
+.dashboard header{max-width:1600px;padding:28px 40px 6px}
+.dashboard header .title-row{align-items:flex-end}
+.dashboard header .eyebrow{display:block;font-size:14px;letter-spacing:2.4px;color:var(--muted);margin:0 0 8px}
+.dashboard header h1{font:normal clamp(40px,4.4vw,64px)/1.02 Georgia,serif;letter-spacing:-2px}
+.dashboard .pill{font-size:16px;padding:9px 18px}
+.range-note{color:var(--muted);font-size:18px;margin:12px 0 0}
+.dashboard main{max-width:1600px;padding:20px 40px 36px}
+
+.segmented{display:inline-flex;border:1px solid var(--line);border-radius:999px;background:var(--white);padding:4px;gap:2px}
+.segmented button{background:transparent;color:var(--muted);font-size:17px;font-weight:600;padding:9px 20px;border-radius:999px}
+.segmented button.on{background:var(--green);color:#fff}
+.segmented.level button[data-level=low].on{background:var(--orange)}
+
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px;margin-bottom:20px}
+.kpi{background:var(--white);border:1px solid var(--line);border-radius:16px;padding:20px 24px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.kpi.accent{background:#f0f5e5;border-color:#c5d6a6}
+.kpi-label{font-size:14px;letter-spacing:1.6px;text-transform:uppercase;color:var(--muted);font-weight:600}
+.kpi strong{font:normal 52px/1.05 Georgia,serif;letter-spacing:-1.5px;color:var(--ink);text-transform:capitalize;overflow-wrap:anywhere}
+.kpi small{font-size:17px;color:var(--muted)}
+
+.dash-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.chart-card{padding:24px 28px 22px}
+.chart-card.wide{grid-column:1/-1}
+.chart-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:10px}
+.chart-head h2{font:normal 32px/1.1 Georgia,serif;letter-spacing:-.8px;color:var(--ink);text-transform:none}
+.chart-head p{margin:6px 0 0;font-size:17px;color:var(--muted)}
+.chart{width:100%;min-height:360px}
+.chart svg{display:block;overflow:visible}
+.chart text{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;fill:var(--muted)}
+.chart .total{fill:var(--ink);font-weight:700}
+.chart .peak{fill:var(--green);font-weight:800}
+.chart .empty{font-size:22px}
+
+.legend{display:flex;flex-wrap:wrap;gap:10px 24px;margin-top:12px;font-size:18px}
+.legend span{display:inline-flex;align-items:center;gap:8px;text-transform:capitalize}
+.legend i{width:18px;height:18px;border-radius:5px;display:inline-block}
+
+.ranking{display:flex;flex-direction:column;gap:16px;margin-top:14px}
+.rank-row{display:grid;grid-template-columns:48px 150px minmax(0,1fr) 70px;align-items:center;gap:14px}
+.rank-no{font:normal 34px Georgia,serif;color:var(--muted);text-align:center}
+.rank-row:first-child .rank-no{color:var(--green);font-weight:700}
+.rank-name{font-size:24px;font-weight:650;text-transform:capitalize}
+.rank-bar{height:38px;background:#eceee4;border-radius:10px;overflow:hidden}
+.rank-bar span{display:block;height:100%;border-radius:10px;transition:width .6s ease}
+.rank-count{font:700 30px system-ui,sans-serif;text-align:right}
+
+@media(max-width:1200px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:960px){
+  .dash-grid{grid-template-columns:1fr}
+  .dashboard header{padding:20px 16px 4px}
+  .dashboard header .title-row{flex-direction:column;align-items:flex-start}
+  .dashboard main{padding:16px 16px 28px}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kpi strong{font-size:40px}
+  .rank-row{grid-template-columns:36px 110px minmax(0,1fr) 54px}
+}
+.dashboard .footer{font-size:14px;margin-top:22px}
